@@ -17,7 +17,7 @@ Strip down to a minimal custom server: one tool returning a greeting, one UI res
 **Exit criteria:** Custom `ui://` resource renders, button click triggers second tool call, result updates UI.
 
 ## Stage 3: Persistent data round-trip
-**Status**: implemented — pending live verification in Claude Desktop (criterion 4: text-to-SQL via Haiku)
+**Status**: passed (2026-05-26)
 
 Validate the dual-engine persistence architecture and both table patterns end-to-end. Not about building the full schema — about proving the core mechanics before Stage 4 adds real ingestion. See `docs/architecture.md` for the full design this stage is validating.
 
