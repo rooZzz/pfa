@@ -67,12 +67,13 @@ function extractSql(text: string): string {
   return text.trim();
 }
 
-export async function queryNaturalLanguage(question: string): Promise<string> {
+export async function generateSql(question: string): Promise<string> {
   const catalog = readCatalog();
 
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 1024,
+    temperature: 0,
     system: [
       {
         type: "text",
@@ -97,7 +98,12 @@ export async function queryNaturalLanguage(question: string): Promise<string> {
     response.content.length > 0 && response.content[0].type === "text"
       ? response.content[0].text
       : "";
-  const sql = extractSql(rawText);
+
+  return extractSql(rawText);
+}
+
+export async function queryNaturalLanguage(question: string): Promise<string> {
+  const sql = await generateSql(question);
 
   let rows: Record<string, unknown>[];
   try {

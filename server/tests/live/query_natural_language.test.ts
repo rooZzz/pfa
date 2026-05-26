@@ -1,7 +1,16 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { initDb, getDb } from "../../db.js";
 import { ingestManualEntry } from "../../tools/ingest_manual_entry.js";
-import { queryNaturalLanguage } from "../../tools/query_natural_language.js";
+import { generateSql, queryNaturalLanguage } from "../../tools/query_natural_language.js";
+import { sqlTranslationFixtures } from "./fixtures/sql-translations.js";
+
+function normalizeSql(sql: string): string {
+  return sql
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/;$/, "")
+    .toLowerCase();
+}
 
 beforeAll(async () => {
   initDb();
@@ -17,23 +26,21 @@ beforeAll(async () => {
   });
 });
 
-describe("query_natural_language", () => {
-  it("generates valid SQL and returns the correct balance", async () => {
+describe("SQL translation golden records", () => {
+  for (const fixture of sqlTranslationFixtures) {
+    it(fixture.description, async () => {
+      const actual = await generateSql(fixture.question);
+      expect(normalizeSql(actual)).toBe(normalizeSql(fixture.expectedSql));
+    });
+  }
+});
+
+describe("end-to-end execution", () => {
+  it("returns the correct balance value and surfaces recorded_at", async () => {
     const result = await queryNaturalLanguage(
       "what is the current balance for account 1?",
     );
-
-    expect(result).toContain("Generated SQL:");
-    expect(result).toMatch(/SELECT/i);
-    expect(result).toMatch(/account_balances/i);
     expect(result).toContain("250000");
-  });
-
-  it("surfaces recorded_at in the result", async () => {
-    const result = await queryNaturalLanguage(
-      "show me the balance and when it was recorded for account 1",
-    );
-
     expect(result).toMatch(/recorded_at/i);
   });
 });
