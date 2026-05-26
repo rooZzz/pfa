@@ -7,17 +7,26 @@
   "scripts": {
     "build": "tsc --noEmit && cross-env INPUT=mcp-app.html vite build && tsc -p tsconfig.server.json",
     "dev:ui": "cross-env INPUT=mcp-app.html vite build --watch",
-    "start:stdio": "npm run build 1>&2 && tsx main.ts --stdio"
+    "start:stdio": "npm run build 1>&2 && tsx main.ts --stdio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+
     "@modelcontextprotocol/ext-apps": "^1.0.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^11.0.0",
+    "duckdb": "^1.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
+    "vitest": "^3.0.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.3.4",

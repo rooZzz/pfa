@@ -65,7 +65,7 @@ Use them in order. Don't skip ahead. Don't loop back without finishing the curre
 - Don't use AI-generated code you don't understand. If it's unclear, ask.
 
 ## Current phase
-**POC — architecture validation before any real build.** Staged spike (4 stages). Currently: Stage 1.
+**POC — architecture validation before any real build.** Staged spike (4 stages). Currently: Stage 3.
 
 - Stage 1: Confirm MCP Apps UI resource renders in Claude Desktop (ext-apps map-server example)
 - Stage 2: Custom server — one tool, one `ui://` resource, bidirectional comms confirmed

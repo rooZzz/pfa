@@ -1,5 +1,4 @@
 .DS_Store
-ext-apps/
 node_modules/
 dist/
 *.db
