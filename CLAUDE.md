@@ -14,15 +14,14 @@ A local-first, AI-native personal finance app for a single user (UK tax context)
 Prioritize correctness and clarity over cleverness. This handles real financial data — mistakes matter.
 
 ## Workflow
-This project uses five skills that define the standard development loop:
+This project uses four skills that define the standard development loop:
 
 | Skill | Purpose | Input | Output |
 |-------|---------|-------|--------|
 | `/idea` | Commit to a direction | Vague problem | One clear decision |
-| `/plan` | Scope the work | Decision | Task list + non-goals |
-| `/implement` | Build it | Task list | Working code |
 | `/refine` | Clean it up | Working code | Simpler code |
 | `/test` | Verify behavior | Feature | Passing tests |
+| `/research` | Verify assumptions | Claim or direction | Evidence-based verdict |
 
 Use them in order. Don't skip ahead. Don't loop back without finishing the current stage.
 
@@ -55,7 +54,7 @@ Use them in order. Don't skip ahead. Don't loop back without finishing the curre
 - Deterministic always. No `sleep()`, no time-sensitive assertions without mocking.
 
 ## What not to do
-- Don't add features mid-implementation. Finish what's planned, then /idea a new one.
+- Don't add features mid-work. Finish what's in scope, then /idea a new one.
 - Don't refactor while fixing a bug. Fix first, refine after.
 - Don't design for hypothetical future requirements.
 - Don't use AI-generated code you don't understand. If it's unclear, ask.
