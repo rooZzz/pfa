@@ -21,7 +21,8 @@ This project uses four skills that define the standard development loop:
 | `/idea` | Commit to a direction | Vague problem | One clear decision |
 | `/refine` | Clean it up | Working code | Simpler code |
 | `/test` | Verify behavior | Feature | Passing tests |
-| `/research` | Verify assumptions | Claim or direction | Evidence-based verdict |
+| `/research` | Verify assumptions | Claim or decision | Evidence-based verdict |
+| `/explore` | Survey a space | Unfamiliar territory | Landscape map + direction |
 
 Use them in order. Don't skip ahead. Don't loop back without finishing the current stage.
 
