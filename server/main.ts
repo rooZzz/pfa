@@ -1,6 +1,7 @@
+import { config } from "dotenv";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
 
-process.loadEnvFile(new URL(".env", import.meta.url));
+config({ override: true });
 
 createServer().connect(new StdioServerTransport());
