@@ -1,0 +1,75 @@
+flowchart TD
+    USER(["User"])
+
+    subgraph CD["Claude Desktop — exclusive interaction surface"]
+        CHAT["Chat\nmanual entry - Q&A - conversation"]
+        subgraph UI["MCP Apps UI resources"]
+            UPLOAD["ui://upload\ndrag and drop documents"]
+            CONNECTORS["ui://connectors\nadd / configure API connectors"]
+            REVIEW["ui://review\nstaged-row confirmation"]
+            NW["ui://net_worth"]
+            CF["ui://cashflow"]
+        end
+    end
+
+    subgraph MCP["MCP Server — stdio"]
+        IT["ingest_document"]
+        ME["ingest_manual_entry"]
+        SC["setup_connector"]
+        QT["query_natural_language"]
+        CT["confirm_staged_rows"]
+        STAGE[("staging buffer\nunconfirmed rows")]
+        CAT[["schema_catalog.md + DDL\ninjected into every Haiku call"]]
+    end
+
+    subgraph BGP["Background process — launchd"]
+        CONN["Connector runners\nMonzo / Ethereum / ..."]
+    end
+
+    subgraph HAIKU["Haiku 4.5 — Anthropic API"]
+        VIS["Vision\ndocument parsing"]
+        T2S["Text to SQL\nquery generation"]
+    end
+
+    subgraph PERSIST["Persistence — single .sqlite file on disk"]
+        subgraph WRITE["SQLite — write store / better-sqlite3 / ACID"]
+            DOCS["documents\nsource_type: upload or manual or connector"]
+            EV["Events — immutable, append-only\ntransactions / income_events"]
+            SN["Snapshots — valid_from / valid_to / recorded_at\naccount_balances / pension_values / mortgage_balance\nasset_values / person_profile"]
+            RF["Reference\naccounts / assets / mortgages / tax_periods"]
+        end
+        READ["DuckDB — analytical read layer\nSQLite extension / LOCF / window functions / aggregations"]
+    end
+
+    USER --> CD
+
+    UPLOAD -->|"tool call"| IT
+    IT -->|parse| VIS
+    VIS -->|extracted rows| STAGE
+    STAGE -->|renders| REVIEW
+    REVIEW -->|user approves| CT
+    CT -->|"write — source_id enforced"| DOCS
+
+    CHAT -->|"tool call"| ME
+    ME -->|"generates JSON file"| DOCS
+
+    CONNECTORS -->|"tool call"| SC
+    SC -->|"store credentials"| CONN
+
+    CONN -->|"INSERT OR IGNORE — external_id dedup"| EV
+    CONN -->|snapshot| SN
+    CONN -->|run record| DOCS
+
+    DOCS -->|source_id| EV
+    DOCS -->|source_id| SN
+
+    CHAT -->|"tool call"| QT
+    QT --> CAT
+    CAT -->|"DDL + catalog + question"| T2S
+    T2S -->|SQL| READ
+    READ -.->|"reads directly — no ETL"| WRITE
+    READ -->|result set| QT
+    QT -->|answer| CHAT
+
+    READ -->|net worth data| NW
+    READ -->|cashflow data| CF

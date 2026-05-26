@@ -19,9 +19,65 @@ Strip down to a minimal custom server: one tool returning a greeting, one UI res
 ## Stage 3: Persistent data round-trip
 **Status**: not started
 
-Add `better-sqlite3`. One table (`transactions`), one tool to insert, one tool to read, one UI resource displaying rows as a table.
+Validate the dual-engine persistence architecture and both table patterns end-to-end. Not about building the full schema — about proving the core mechanics before Stage 4 adds real ingestion. See `docs/architecture.md` for the full design this stage is validating.
 
-**Exit criteria:** Data persists across Claude Desktop restarts, UI table reflects DB state.
+### Minimal schema
+
+```sql
+CREATE TABLE documents (
+  id           INTEGER PRIMARY KEY,
+  source_type  TEXT NOT NULL CHECK (source_type IN ('upload', 'manual', 'connector')),
+  file_path    TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  ingested_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notes        TEXT
+);
+
+CREATE TABLE transactions (
+  id           INTEGER PRIMARY KEY,
+  account_id   INTEGER NOT NULL,
+  occurred_at  TIMESTAMP NOT NULL,
+  recorded_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  amount_pence INTEGER NOT NULL,
+  currency     TEXT NOT NULL DEFAULT 'GBP',
+  description  TEXT,
+  source_id    INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE account_balances (
+  id            INTEGER PRIMARY KEY,
+  account_id    INTEGER NOT NULL,
+  balance_pence INTEGER NOT NULL,
+  currency      TEXT NOT NULL DEFAULT 'GBP',
+  valid_from    DATE NOT NULL,
+  valid_to      DATE,
+  recorded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id     INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE tax_periods (
+  tax_year  TEXT PRIMARY KEY,
+  starts_on DATE NOT NULL,
+  ends_on   DATE NOT NULL
+);
+```
+
+### Tools to implement
+
+| Tool | What it does |
+|---|---|
+| `ingest_manual_entry` | Generates JSON file, writes `documents` row, writes event or snapshot row |
+| `query_natural_language` | Calls Haiku with DDL + schema catalog, executes returned SQL via DuckDB against the SQLite file |
+
+### Exit criteria
+
+1. Data persists across Claude Desktop restarts (SQLite confirmed).
+2. DuckDB reads the same `.sqlite` file and produces correct aggregate results (dual-engine confirmed).
+3. LOCF query on `account_balances` with a deliberate gap returns the last known value, not null (snapshot pattern confirmed).
+4. `query_natural_language("what is my current account balance?")` returns the correct value via Haiku-generated SQL (text-to-SQL pipeline end-to-end).
+5. Insert with no `source_id` is rejected at the DB constraint level — not application logic (audit trail enforced).
+6. Two `account_balances` rows with different `valid_from` dates; query for a date between them returns the earlier value (LOCF confirmed).
+7. A `ui://data` resource renders the stored rows and reflects the current DB state — MCP server to UI round-trip confirmed with real persisted data.
 
 ## Stage 4: Real schema and ingestion (only if 1–3 pass)
 **Status**: not started

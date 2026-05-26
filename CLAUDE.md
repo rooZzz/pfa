@@ -13,6 +13,10 @@ A local-first, AI-native personal finance app for a single user (UK tax context)
 
 Prioritize correctness and clarity over cleverness. This handles real financial data — mistakes matter.
 
+## Rules
+- No comments anywhere — in code, config, or responses.
+- No emojis anywhere — in code, config, or responses.
+
 ## Workflow
 This project uses four skills that define the standard development loop:
 
@@ -32,7 +36,7 @@ Use them in order. Don't skip ahead. Don't loop back without finishing the curre
 - Correct > simple > fast. In that order.
 - No speculative abstractions. Three similar things is fine; extract only when the pattern is proven.
 - No feature flags, backwards-compat shims, or dead code.
-- No comments explaining what code does. Only comment non-obvious WHY.
+- No comments. See Rules.
 
 ### Functions and naming
 - Functions do one thing. If the name needs "and", split it.
@@ -84,5 +88,3 @@ Automated parsing (Haiku 4.5 vision) always goes through staged confirmation (`u
 
 ### 2026-05-26: Recommendations — observations only
 Start with facts ("ISA 60% funded, 47 days left"). No buy/sell/overpay advice until trust is established through demonstrated accuracy.
-
-<!-- format: ### YYYY-MM-DD: <decision title> -->
