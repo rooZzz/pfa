@@ -117,6 +117,7 @@ For the current balance (today), omit the date filter and just get the row with 
 | `occurred_at` | TIMESTAMP | Midnight UTC on `pay_date`. |
 | `recorded_at` | TIMESTAMP | UTC timestamp when the row was written to the database. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `payload` | TEXT | JSON object holding descriptive payslip line items (`{"line_items": [{"description": "...", "amount_pence": N}]}`). Present when ingested via the upload widget. **Do not use `payload` as a source for arithmetic or aggregation** — use the typed spine columns above. The payload is for display and auditability only. |
 
 **Sign convention:** all amounts are positive integers. Deductions are stored as their absolute value — do not negate.
 
@@ -262,6 +263,8 @@ LIMIT 1
 
 ### 3. All account balances (latest per account)
 
+**IMPORTANT:** An account can have multiple rows in `account_balances` (one per observation). Always deduplicate to one row per `account_id` before aggregating. Never `SUM(balance_pence)` without this subquery — it will double-count.
+
 ```sql
 SELECT DISTINCT ON (account_id)
   account_id,
@@ -272,6 +275,22 @@ SELECT DISTINCT ON (account_id)
 FROM pfa.account_balances
 WHERE valid_to IS NULL
 ORDER BY account_id, valid_from DESC
+```
+
+### 3a. Total net worth across all accounts
+
+Always wrap the per-account deduplication in a subquery before summing. Never aggregate `account_balances` directly.
+
+```sql
+SELECT SUM(latest.balance_pence) AS net_worth_pence
+FROM (
+  SELECT DISTINCT ON (account_id)
+    account_id,
+    balance_pence
+  FROM pfa.account_balances
+  WHERE valid_to IS NULL
+  ORDER BY account_id, valid_from DESC
+) AS latest
 ```
 
 ### 4. Total credits to account 1 this calendar month

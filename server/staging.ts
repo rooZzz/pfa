@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 
 export interface StagedIncomeEvent {
-  source_file_path: string;
+  file_bytes: Buffer;
+  filename: string;
+  mime_type: string;
   content_hash: string;
   currency: string;
   pay_date: string;
@@ -13,6 +15,7 @@ export interface StagedIncomeEvent {
   ni_employee_pence: number;
   pension_employee_pence: number;
   pension_employer_pence: number | null;
+  payload: unknown;
 }
 
 const buffer = new Map<string, StagedIncomeEvent>();

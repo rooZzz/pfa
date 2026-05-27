@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS income_events (
   currency               TEXT NOT NULL DEFAULT 'GBP',
   occurred_at            TIMESTAMP NOT NULL,
   recorded_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id              INTEGER NOT NULL REFERENCES documents(id)
+  source_id              INTEGER NOT NULL REFERENCES documents(id),
+  payload                TEXT
 );
 
 CREATE TABLE IF NOT EXISTS account_balances (
@@ -149,6 +150,10 @@ export function initDb(): void {
   db = new Database(DB_PATH);
   db.pragma("foreign_keys = ON");
   db.exec(DDL);
+  try {
+    db.exec("ALTER TABLE income_events ADD COLUMN payload TEXT");
+  } catch {
+  }
 }
 
 export function getDb(): Database.Database {

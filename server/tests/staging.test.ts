@@ -3,7 +3,9 @@ import { clearReview, getReview, stageReview } from "../staging.js";
 import type { StagedIncomeEvent } from "../staging.js";
 
 const SAMPLE: StagedIncomeEvent = {
-  source_file_path: "/tmp/test-payslip.pdf",
+  file_bytes: Buffer.from("mock-pdf-content"),
+  filename: "test-payslip.pdf",
+  mime_type: "application/pdf",
   content_hash: "abc123",
   currency: "GBP",
   pay_date: "2026-05-22",
@@ -15,6 +17,7 @@ const SAMPLE: StagedIncomeEvent = {
   ni_employee_pence: 36240,
   pension_employee_pence: 106016,
   pension_employer_pence: 106015,
+  payload: { line_items: [] },
 };
 
 describe("staging buffer", () => {

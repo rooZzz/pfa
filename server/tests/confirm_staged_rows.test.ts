@@ -1,12 +1,31 @@
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, initDb } from "../db.js";
 import { stageReview } from "../staging.js";
 import { confirmStagedRows } from "../tools/confirm_staged_rows.js";
 
-let sourceFile: string;
+const FILE_BYTES = Buffer.from("mock-pdf-content");
+
+function makeStagedEntry(overrides: Partial<Parameters<typeof stageReview>[0]> = {}) {
+  return {
+    file_bytes: FILE_BYTES,
+    filename: "test-payslip.pdf",
+    mime_type: "application/pdf",
+    content_hash: "test-hash-default",
+    currency: "GBP",
+    pay_date: "2026-05-22",
+    tax_year: null,
+    gross_pence: 974521,
+    taxable_pence: 988965,
+    net_pence: 540832,
+    paye_pence: 332767,
+    ni_employee_pence: 36240,
+    pension_employee_pence: 106016,
+    pension_employer_pence: 106015,
+    payload: { line_items: [{ description: "Basic Salary", amount_pence: 974521 }] },
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   initDb();
@@ -16,33 +35,11 @@ beforeEach(() => {
     DELETE FROM transactions;
     DELETE FROM documents;
   `);
-
-  sourceFile = path.join(os.tmpdir(), `pfa-test-payslip-${Date.now()}.pdf`);
-  fs.writeFileSync(sourceFile, "mock-pdf-content");
-});
-
-afterEach(() => {
-  if (fs.existsSync(sourceFile)) {
-    fs.unlinkSync(sourceFile);
-  }
 });
 
 describe("confirmStagedRows", () => {
   it("writes a documents row with source_type='upload'", async () => {
-    const reviewId = stageReview({
-      source_file_path: sourceFile,
-      content_hash: "test-hash-001",
-      currency: "GBP",
-      pay_date: "2026-05-22",
-      tax_year: null,
-      gross_pence: 974521,
-      taxable_pence: 988965,
-      net_pence: 540832,
-      paye_pence: 332767,
-      ni_employee_pence: 36240,
-      pension_employee_pence: 106016,
-      pension_employer_pence: 106015,
-    });
+    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-001" }));
 
     await confirmStagedRows({ review_id: reviewId });
 
@@ -55,20 +52,7 @@ describe("confirmStagedRows", () => {
   });
 
   it("writes an income_events row linked to the document via source_id", async () => {
-    const reviewId = stageReview({
-      source_file_path: sourceFile,
-      content_hash: "test-hash-002",
-      currency: "GBP",
-      pay_date: "2026-05-22",
-      tax_year: null,
-      gross_pence: 974521,
-      taxable_pence: 988965,
-      net_pence: 540832,
-      paye_pence: 332767,
-      ni_employee_pence: 36240,
-      pension_employee_pence: 106016,
-      pension_employer_pence: 106015,
-    });
+    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-002" }));
 
     await confirmStagedRows({ review_id: reviewId });
 
@@ -91,23 +75,38 @@ describe("confirmStagedRows", () => {
     expect(row.source_id).toBe(row.doc_id);
   });
 
+  it("stores payload JSON in income_events", async () => {
+    const payload = { line_items: [{ description: "Basic Salary", amount_pence: 974521 }] };
+    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-005", payload }));
+
+    await confirmStagedRows({ review_id: reviewId });
+
+    const row = getDb()
+      .prepare("SELECT payload FROM income_events LIMIT 1")
+      .get() as { payload: string };
+
+    expect(JSON.parse(row.payload)).toEqual(payload);
+  });
+
+  it("writes the file bytes to DOCUMENTS_DIR", async () => {
+    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-004" }));
+
+    await confirmStagedRows({ review_id: reviewId });
+
+    const doc = getDb()
+      .prepare("SELECT file_path FROM documents LIMIT 1")
+      .get() as { file_path: string };
+
+    expect(fs.existsSync(doc.file_path)).toBe(true);
+    expect(fs.readFileSync(doc.file_path)).toEqual(FILE_BYTES);
+  });
+
   it("clears the staging buffer after confirmation", async () => {
     const { getReview } = await import("../staging.js");
 
-    const reviewId = stageReview({
-      source_file_path: sourceFile,
-      content_hash: "test-hash-003",
-      currency: "GBP",
-      pay_date: "2026-05-22",
-      tax_year: null,
-      gross_pence: 500000,
-      taxable_pence: null,
-      net_pence: 350000,
-      paye_pence: 100000,
-      ni_employee_pence: 20000,
-      pension_employee_pence: 30000,
-      pension_employer_pence: null,
-    });
+    const reviewId = stageReview(
+      makeStagedEntry({ content_hash: "test-hash-003", gross_pence: 500000 }),
+    );
 
     await confirmStagedRows({ review_id: reviewId });
 
@@ -120,28 +119,24 @@ describe("confirmStagedRows", () => {
     ).rejects.toThrow(/No staged review found/);
   });
 
-  it("copies the source file to DOCUMENTS_DIR", async () => {
-    const reviewId = stageReview({
-      source_file_path: sourceFile,
-      content_hash: "test-hash-004",
-      currency: "GBP",
-      pay_date: "2026-05-22",
-      tax_year: null,
-      gross_pence: 500000,
-      taxable_pence: null,
-      net_pence: 350000,
-      paye_pence: 100000,
-      ni_employee_pence: 20000,
-      pension_employee_pence: 30000,
-      pension_employer_pence: null,
-    });
+  it("upserts the tax_year into tax_periods so the FK constraint is satisfied", async () => {
+    const reviewId = stageReview(
+      makeStagedEntry({ content_hash: "test-hash-006", tax_year: "2026/27" }),
+    );
 
     await confirmStagedRows({ review_id: reviewId });
 
-    const doc = getDb()
-      .prepare("SELECT file_path FROM documents LIMIT 1")
-      .get() as { file_path: string };
+    const row = getDb()
+      .prepare("SELECT tax_year, starts_on, ends_on FROM tax_periods WHERE tax_year = '2026/27'")
+      .get() as { tax_year: string; starts_on: string; ends_on: string };
 
-    expect(fs.existsSync(doc.file_path)).toBe(true);
+    expect(row.tax_year).toBe("2026/27");
+    expect(row.starts_on).toBe("2026-04-06");
+    expect(row.ends_on).toBe("2027-04-05");
+  });
+
+  it("does not fail when tax_year is null", async () => {
+    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-007", tax_year: null }));
+    await expect(confirmStagedRows({ review_id: reviewId })).resolves.toMatch(/confirmed/);
   });
 });

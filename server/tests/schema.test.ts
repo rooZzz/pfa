@@ -67,6 +67,16 @@ describe("full schema", () => {
   });
 });
 
+describe("income_events columns", () => {
+  it("has a payload column", () => {
+    const db = getDb();
+    const cols = (
+      db.prepare("PRAGMA table_info(income_events)").all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(cols).toContain("payload");
+  });
+});
+
 describe("income_events constraints", () => {
   it("rejects an insert with no source_id at the constraint level", () => {
     const db = getDb();

@@ -15,7 +15,7 @@ import { queryNaturalLanguage } from "./tools/query_natural_language.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 const RESOURCE_URI = "ui://pfa/mcp-app.html";
-const REVIEW_URI = "ui://pfa/review.html";
+const UPLOAD_URI = "ui://pfa/upload.html";
 
 export function createServer(): McpServer {
   initDb();
@@ -60,18 +60,34 @@ export function createServer(): McpServer {
 
   registerAppTool(
     server,
+    "open_upload",
+    {
+      title: "Upload Document",
+      description:
+        "Open the document upload widget. The user drops a payslip (PDF or image) into the widget to start the ingestion and review flow.",
+      inputSchema: {},
+      _meta: { ui: { resourceUri: UPLOAD_URI } },
+    },
+    async () => ({
+      content: [{ type: "text", text: "Upload widget opened." }],
+    }),
+  );
+
+  registerAppTool(
+    server,
     "ingest_document",
     {
       title: "Ingest Document",
       description:
-        "Parse a UK payslip or financial document via Haiku 4.5 vision. Extracts structured data and opens the review screen for confirmation before writing to the store.",
+        "Parse a document from base64-encoded content via Haiku 4.5 vision. Called from the upload widget — not model-visible.",
       inputSchema: {
-        file_path: z
-          .string()
-          .describe("Absolute path to the document file on disk (PDF, JPEG, or PNG)."),
+        file_base64: z.string().describe("Base64-encoded file content."),
+        filename: z.string().describe("Original filename with extension."),
+        mime_type: z.string().describe("MIME type of the file (e.g. application/pdf)."),
+        document_type: z.string().describe("Document type. Supported: payslip."),
         notes: z.string().optional().describe("Optional annotation for the document."),
       },
-      _meta: { ui: { resourceUri: REVIEW_URI, visibility: ["model"] } },
+      _meta: { ui: { visibility: ["app"] } },
     },
     async (input) => {
       const result = await ingestDocument(input);
@@ -85,11 +101,11 @@ export function createServer(): McpServer {
     {
       title: "Confirm Staged Rows",
       description:
-        "Write staged rows from a document review session to the canonical store. Only callable from the review UI.",
+        "Write staged rows from a document review session to the canonical store. Called from the upload widget.",
       inputSchema: {
         review_id: z.string().describe("The review session ID returned by ingest_document."),
       },
-      _meta: { ui: { resourceUri: REVIEW_URI, visibility: ["app"] } },
+      _meta: { ui: { resourceUri: UPLOAD_URI, visibility: ["app"] } },
     },
     async (input) => {
       const message = await confirmStagedRows(input);
@@ -122,13 +138,13 @@ export function createServer(): McpServer {
 
   registerAppResource(
     server,
-    REVIEW_URI,
-    REVIEW_URI,
+    UPLOAD_URI,
+    UPLOAD_URI,
     { mimeType: RESOURCE_MIME_TYPE },
     async () => {
-      const html = await fs.readFile(path.join(DIST_DIR, "review.html"), "utf-8");
+      const html = await fs.readFile(path.join(DIST_DIR, "upload.html"), "utf-8");
       return {
-        contents: [{ uri: REVIEW_URI, mimeType: RESOURCE_MIME_TYPE, text: html }],
+        contents: [{ uri: UPLOAD_URI, mimeType: RESOURCE_MIME_TYPE, text: html }],
       };
     },
   );
