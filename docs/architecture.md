@@ -164,13 +164,18 @@ source_id          INTEGER NOT NULL REFERENCES documents(id)
 
 Corrections close the old row (`valid_to = today`) and insert a new one with the corrected value. The old row is preserved — the full history is always recoverable.
 
+#### Flex layer — optional `payload` column
+
+Some tables carry a long tail of attributes that vary per source and resist typing. These get a nullable `payload` JSON column (stored as JSON text, readable by DuckDB) for the unmodelled remainder. The payload is an optional column orthogonal to the event/snapshot/reference patterns — it is not a third pattern. It is added to a table only when that table has a demonstrated long tail, never as a blanket field. Its use is bounded by design rule 7.
+
 ### Table taxonomy
 
 | Table | Pattern | What it holds |
 |---|---|---|
 | `documents` | Reference | Source anchor for every ingested row — file, manual JSON, connector run |
 | `transactions` | Event | Every cash movement; linked to account |
-| `income_events` | Event | Per-payslip: gross, net, PAYE, NI, pension contribution, employer contribution |
+| `income_events` | Event | Per-payslip: gross, net, PAYE, NI, pension contribution, employer contribution; variable line items in `payload` |
+| `equity_vesting_event` | Event | A vesting tranche — vest date, units, estimated value; scheme-specific detail in `payload` |
 | `account_balances` | Snapshot | Current account, savings balances at observation time |
 | `pension_values` | Snapshot | Pot value at statement date |
 | `mortgage_balance` | Snapshot | Outstanding balance, current interest rate, property value |
@@ -179,6 +184,7 @@ Corrections close the old row (`valid_to = today`) and insert a new one with the
 | `accounts` | Reference | Account definitions (bank, type, ISA subtype, currency) |
 | `assets` | Reference | Asset definitions (name, type, currency) |
 | `mortgages` | Reference | Mortgage definitions (lender, property, original amount) |
+| `equity_grant` | Reference | Equity award definition — scheme type, units, strike, vest schedule; variable terms in `payload` |
 | `tax_periods` | Reference | UK tax years — `starts_on` (April 6), `ends_on` (April 5) |
 
 ### Design rules
@@ -196,6 +202,14 @@ These are invariants. They hold across all tables, all ingestion types, all stag
 5. **LOCF is a query contract.** The last known value for a snapshot is always returned for any query date, via `LAST_VALUE ... IGNORE NULLS` window functions in DuckDB. The application never interpolates or estimates. Unknown = last observed.
 
 6. **`external_id` on event rows.** Required for connector-ingested events. Inserts from connectors use `INSERT OR IGNORE` — deduplication is guaranteed at the database level, not application logic.
+
+7. **The flex layer is bounded.** A nullable `payload` JSON column holds the long tail of attributes that vary per source and resist typing. It is governed strictly:
+   - Anything aggregated or trended stays in the typed spine — money, dates, currency, counts are never in `payload`. The payload holds descriptive attributes reasoned over qualitatively, never arithmetic.
+   - Provenance never moves into `payload`. `source_id`, `recorded_at`, `valid_from` stay typed.
+   - The payload is not a primary text-to-SQL target. The schema catalog documents that a table has a payload and what kind of thing it holds — it does not expose payload keys for querying. Payload surfaces in the UI and Claude's reasoning layer.
+   - Promotion path: a payload attribute that becomes a recurring query target graduates to a typed spine column. This keeps the spine honest and the catalog bounded.
+   - Payload is parser-structured output (typed primitives extracted first, remainder to payload), not free-form user input.
+   - Added per table only on demonstrated need. Initially: `income_events`, `equity_grant`, `equity_vesting_event`. Pure-value tables (`account_balances`, `pension_values`, `mortgage_balance`) stay spine-only.
 
 ---
 
@@ -330,3 +344,5 @@ Not all questions are SQL questions. The schema catalog documents which question
 | 2026-05-26 | Connector deduplication: `external_id` + `INSERT OR IGNORE` | Idempotent at the database level. No application-layer dedup logic. |
 | 2026-05-26 | Text-to-SQL accuracy: schema design + catalog, not fine-tuning | Well-named schemas + `schema_catalog.md` reach ~95% accuracy on bounded domains. |
 | 2026-05-26 | Staleness: always surface `recorded_at` | Every snapshot-derived value carries its observation date. Never imply live data. |
+| 2026-05-27 | Flex layer: bounded `payload` JSON on proven-tail tables | Typed spine for anything aggregated or trended; `payload` for the unmodelled long tail on `income_events` and the equity tables. Not blanket, not a query target, with a promotion path. Derived from the end-state flow refinement in `docs/end-state-flows.md`. See design rule 7. |
+| 2026-05-27 | Equity entities: `equity_grant` + `equity_vesting_event` | Typed primitives (scheme type, units, strike, vest dates) plus `payload` for scheme-specific terms. Valuation and vesting-tax methods remain open decisions. |

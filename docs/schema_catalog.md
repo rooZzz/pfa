@@ -57,6 +57,146 @@ For the current balance (today), omit the date filter and just get the row with 
 
 ---
 
+## Table: `pfa.accounts`
+
+**Pattern: Reference.** Defines an account — a named, typed financial account. Rows are inserted once and rarely change.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. Referenced as `account_id` in `account_balances`, `pension_values`. |
+| `name` | TEXT | Human-readable account name (e.g. "Barclays Current", "Nest Pension"). |
+| `type` | TEXT | One of: `current`, `savings`, `isa`, `pension`, `mortgage`. |
+| `currency` | TEXT | ISO 4217 code. Default `GBP`. |
+
+---
+
+## Table: `pfa.assets`
+
+**Pattern: Reference.** Defines a non-account asset (crypto, investments). Rows are inserted once.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. Referenced as `asset_id` in `asset_values`. |
+| `name` | TEXT | Human-readable name (e.g. "ETH", "Vanguard FTSE All-World"). |
+| `asset_type` | TEXT | Free-form type descriptor (e.g. "crypto", "etf", "stock"). |
+| `base_currency` | TEXT | The native currency of the asset (e.g. "ETH", "USD", "GBP"). |
+
+---
+
+## Table: `pfa.mortgages`
+
+**Pattern: Reference.** Defines a mortgage. Rows are inserted once.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. Referenced as `mortgage_id` in `mortgage_balance`. |
+| `lender` | TEXT | Lender name (e.g. "Nationwide"). |
+| `property` | TEXT | Property address or identifier. |
+| `original_amount_pence` | INTEGER | Original loan amount in pence. Never updated — use `mortgage_balance` for current outstanding. |
+| `currency` | TEXT | ISO 4217 code. Default `GBP`. |
+
+---
+
+## Table: `pfa.income_events`
+
+**Pattern: Event.** Immutable record of one payslip. One row per pay period. Never updated or deleted.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `pay_date` | DATE | The payment date from the payslip (not the period end date). |
+| `tax_year` | TEXT | UK tax year (e.g. `2026/27`), if shown on the payslip. FK to `tax_periods`. NULL if absent. |
+| `gross_pence` | INTEGER | Gross Pay in pence — total earnings before deductions. Not the same as Taxable Pay. |
+| `taxable_pence` | INTEGER | Taxable Pay in pence, if different from `gross_pence`. Can exceed `gross_pence` when Benefits in Kind (BIK) are included. NULL if equal to gross or not shown. |
+| `net_pence` | INTEGER | Net Pay in pence — take-home after all deductions. |
+| `paye_pence` | INTEGER | PAYE income tax deducted this period, in pence. |
+| `ni_employee_pence` | INTEGER | Employee National Insurance contribution this period, in pence. |
+| `pension_employee_pence` | INTEGER | Total employee pension contribution this period, in pence. Includes salary sacrifice (SMART/AVC) regardless of which payslip section they appear in. |
+| `pension_employer_pence` | INTEGER | Employer pension contribution this period, in pence. NULL if not shown. |
+| `currency` | TEXT | ISO 4217 code. Default `GBP`. |
+| `occurred_at` | TIMESTAMP | Midnight UTC on `pay_date`. |
+| `recorded_at` | TIMESTAMP | UTC timestamp when the row was written to the database. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `payload` | TEXT | JSON object holding descriptive payslip line items (`{"line_items": [{"description": "...", "amount_pence": N}]}`). Present when ingested via the upload widget. **Do not use `payload` as a source for arithmetic or aggregation** — use the typed spine columns above. The payload is for display and auditability only. |
+
+**Sign convention:** all amounts are positive integers. Deductions are stored as their absolute value — do not negate.
+
+---
+
+## Table: `pfa.pension_values`
+
+**Pattern: Snapshot.** Observed pension pot value at a point in time. Use LOCF to fill gaps.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `account_id` | INTEGER | FK to `accounts.id` (must be type `pension`). |
+| `value_pence` | INTEGER | Pot value in pence at observation date. |
+| `currency` | TEXT | Default `GBP`. |
+| `valid_from` | DATE | Statement date. |
+| `valid_to` | DATE | NULL = current row. Set when superseded. |
+| `recorded_at` | TIMESTAMP | When this row was written. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+
+---
+
+## Table: `pfa.mortgage_balance`
+
+**Pattern: Snapshot.** Observed mortgage state at a point in time.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `mortgage_id` | INTEGER | FK to `mortgages.id`. |
+| `outstanding_pence` | INTEGER | Outstanding balance in pence. |
+| `interest_rate_bps` | INTEGER | Current interest rate in basis points (e.g. 4.5% = 450). Integer to avoid floats. |
+| `property_value_pence` | INTEGER | Estimated property value in pence at observation date. |
+| `currency` | TEXT | Default `GBP`. |
+| `valid_from` | DATE | Observation date. |
+| `valid_to` | DATE | NULL = current row. |
+| `recorded_at` | TIMESTAMP | When written. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+
+**LTV query:** `outstanding_pence * 100 / property_value_pence` gives LTV as a percentage (integer arithmetic).
+
+---
+
+## Table: `pfa.asset_values`
+
+**Pattern: Snapshot.** Observed value of a non-account asset.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `asset_id` | INTEGER | FK to `assets.id`. |
+| `quantity` | INTEGER | Quantity in the asset's smallest unit (e.g. satoshis for BTC, shares × 10000 for fractional). |
+| `original_currency` | TEXT | Native currency of the asset. |
+| `gbp_equivalent_pence` | INTEGER | GBP equivalent at observation time. Never recomputed — stored at ingestion. |
+| `valid_from` | DATE | Observation date. |
+| `valid_to` | DATE | NULL = current row. |
+| `recorded_at` | TIMESTAMP | When written. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+
+---
+
+## Table: `pfa.person_profile`
+
+**Pattern: Snapshot.** Employment details valid over a date range. Close and reinsert on changes.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `employer_name` | TEXT | Employer name. |
+| `tax_code` | TEXT | PAYE tax code (e.g. `1257L`, `0T`). |
+| `salary_pence` | INTEGER | Annual gross salary in pence. |
+| `currency` | TEXT | Default `GBP`. |
+| `valid_from` | DATE | Date this profile became effective. |
+| `valid_to` | DATE | NULL = current profile. Set on change. |
+| `recorded_at` | TIMESTAMP | When written. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+
+---
+
 ## Table: `pfa.transactions`
 
 **Pattern: Event.** Immutable record of a cash movement. Never updated or deleted.
@@ -123,6 +263,8 @@ LIMIT 1
 
 ### 3. All account balances (latest per account)
 
+**IMPORTANT:** An account can have multiple rows in `account_balances` (one per observation). Always deduplicate to one row per `account_id` before aggregating. Never `SUM(balance_pence)` without this subquery — it will double-count.
+
 ```sql
 SELECT DISTINCT ON (account_id)
   account_id,
@@ -133,6 +275,22 @@ SELECT DISTINCT ON (account_id)
 FROM pfa.account_balances
 WHERE valid_to IS NULL
 ORDER BY account_id, valid_from DESC
+```
+
+### 3a. Total net worth across all accounts
+
+Always wrap the per-account deduplication in a subquery before summing. Never aggregate `account_balances` directly.
+
+```sql
+SELECT SUM(latest.balance_pence) AS net_worth_pence
+FROM (
+  SELECT DISTINCT ON (account_id)
+    account_id,
+    balance_pence
+  FROM pfa.account_balances
+  WHERE valid_to IS NULL
+  ORDER BY account_id, valid_from DESC
+) AS latest
 ```
 
 ### 4. Total credits to account 1 this calendar month
@@ -156,4 +314,49 @@ SELECT
 FROM pfa.account_balances
 WHERE account_id = 1
 ORDER BY valid_from ASC
+```
+
+### 6. Most recent payslip (gross, net, PAYE, pension)
+
+```sql
+SELECT
+  pay_date,
+  gross_pence,
+  net_pence,
+  paye_pence,
+  ni_employee_pence,
+  pension_employee_pence,
+  pension_employer_pence,
+  recorded_at
+FROM pfa.income_events
+ORDER BY pay_date DESC
+LIMIT 1
+```
+
+### 7. Total PAYE paid in the current tax year
+
+```sql
+SELECT
+  SUM(ie.paye_pence) AS total_paye_pence,
+  tp.tax_year
+FROM pfa.income_events ie
+JOIN pfa.tax_periods tp
+  ON ie.pay_date BETWEEN tp.starts_on AND tp.ends_on
+WHERE tp.starts_on <= CURRENT_DATE
+  AND tp.ends_on >= CURRENT_DATE
+GROUP BY tp.tax_year
+```
+
+### 8. Net pay trend — last 6 payslips
+
+```sql
+SELECT
+  pay_date,
+  gross_pence,
+  net_pence,
+  paye_pence,
+  recorded_at
+FROM pfa.income_events
+ORDER BY pay_date DESC
+LIMIT 6
 ```

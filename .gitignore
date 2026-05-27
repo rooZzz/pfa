@@ -7,3 +7,4 @@ dist/
 .env
 bun.lockb
 yarn.lock
+server/tests/live/fixtures/

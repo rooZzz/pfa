@@ -80,7 +80,7 @@ CREATE TABLE tax_periods (
 7. A `ui://data` resource renders the stored rows and reflects the current DB state — MCP server to UI round-trip confirmed with real persisted data.
 
 ## Stage 4: Real schema and ingestion (only if 1–3 pass)
-**Status**: not started
+**Status**: in progress
 
 - Full schema: `accounts`, `transactions`, `holdings`, `prices`, `liabilities`, `documents`, `entities`
 - `ingest_document` tool calling Haiku 4.5 vision on one UK payslip
@@ -88,6 +88,17 @@ CREATE TABLE tax_periods (
 - One real account, manually entered, one statement ingested
 
 **Exit criteria:** End-to-end flow works for one document, one account, with data auditable back to source file.
+
+### Exit criteria status
+
+1. Build passes — both `dist/mcp-app.html` and `dist/review.html` produced. PASSED.
+2. Unit tests — 23/23. PASSED.
+3. Vision parsing — `parsePayslipVision` extracts all fields from real Experian payslip. PASSED (live test).
+4. Review UI renders — requires Claude Desktop validation (manual).
+5. Confirm writes — requires Claude Desktop validation (manual).
+6. Auditable query — requires Claude Desktop validation (manual).
+7. Constraint enforced — `income_events` insert without `source_id` rejected. PASSED (schema test).
+8. One manual account — use existing `ingest_manual_entry` tool in Claude Desktop (manual).
 
 ---
 
