@@ -8,11 +8,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { initDb } from "./db.js";
+import { confirmStagedRows } from "./tools/confirm_staged_rows.js";
+import { ingestDocument } from "./tools/ingest_document.js";
 import { ingestManualEntry, ingestManualEntrySchema } from "./tools/ingest_manual_entry.js";
 import { queryNaturalLanguage } from "./tools/query_natural_language.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 const RESOURCE_URI = "ui://pfa/mcp-app.html";
+const REVIEW_URI = "ui://pfa/review.html";
 
 export function createServer(): McpServer {
   initDb();
@@ -55,6 +58,45 @@ export function createServer(): McpServer {
     },
   );
 
+  registerAppTool(
+    server,
+    "ingest_document",
+    {
+      title: "Ingest Document",
+      description:
+        "Parse a UK payslip or financial document via Haiku 4.5 vision. Extracts structured data and opens the review screen for confirmation before writing to the store.",
+      inputSchema: {
+        file_path: z
+          .string()
+          .describe("Absolute path to the document file on disk (PDF, JPEG, or PNG)."),
+        notes: z.string().optional().describe("Optional annotation for the document."),
+      },
+      _meta: { ui: { resourceUri: REVIEW_URI, visibility: ["model"] } },
+    },
+    async (input) => {
+      const result = await ingestDocument(input);
+      return { content: [{ type: "text", text: result }] };
+    },
+  );
+
+  registerAppTool(
+    server,
+    "confirm_staged_rows",
+    {
+      title: "Confirm Staged Rows",
+      description:
+        "Write staged rows from a document review session to the canonical store. Only callable from the review UI.",
+      inputSchema: {
+        review_id: z.string().describe("The review session ID returned by ingest_document."),
+      },
+      _meta: { ui: { resourceUri: REVIEW_URI, visibility: ["app"] } },
+    },
+    async (input) => {
+      const message = await confirmStagedRows(input);
+      return { content: [{ type: "text", text: message }] };
+    },
+  );
+
   server.tool(
     "query_natural_language",
     "Answer a question about your finances. Generates SQL via Haiku and executes it against the local database.",
@@ -74,6 +116,19 @@ export function createServer(): McpServer {
       const html = await fs.readFile(path.join(DIST_DIR, "mcp-app.html"), "utf-8");
       return {
         contents: [{ uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: html }],
+      };
+    },
+  );
+
+  registerAppResource(
+    server,
+    REVIEW_URI,
+    REVIEW_URI,
+    { mimeType: RESOURCE_MIME_TYPE },
+    async () => {
+      const html = await fs.readFile(path.join(DIST_DIR, "review.html"), "utf-8");
+      return {
+        contents: [{ uri: REVIEW_URI, mimeType: RESOURCE_MIME_TYPE, text: html }],
       };
     },
   );

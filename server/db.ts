@@ -19,6 +19,28 @@ CREATE TABLE IF NOT EXISTS documents (
   notes        TEXT
 );
 
+CREATE TABLE IF NOT EXISTS accounts (
+  id       INTEGER PRIMARY KEY,
+  name     TEXT NOT NULL,
+  type     TEXT NOT NULL CHECK (type IN ('current', 'savings', 'isa', 'pension', 'mortgage')),
+  currency TEXT NOT NULL DEFAULT 'GBP'
+);
+
+CREATE TABLE IF NOT EXISTS assets (
+  id            INTEGER PRIMARY KEY,
+  name          TEXT NOT NULL,
+  asset_type    TEXT NOT NULL,
+  base_currency TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS mortgages (
+  id                    INTEGER PRIMARY KEY,
+  lender                TEXT NOT NULL,
+  property              TEXT NOT NULL,
+  original_amount_pence INTEGER NOT NULL,
+  currency              TEXT NOT NULL DEFAULT 'GBP'
+);
+
 CREATE TABLE IF NOT EXISTS transactions (
   id           INTEGER PRIMARY KEY,
   account_id   INTEGER NOT NULL,
@@ -30,10 +52,75 @@ CREATE TABLE IF NOT EXISTS transactions (
   source_id    INTEGER NOT NULL REFERENCES documents(id)
 );
 
+CREATE TABLE IF NOT EXISTS income_events (
+  id                     INTEGER PRIMARY KEY,
+  pay_date               DATE NOT NULL,
+  tax_year               TEXT REFERENCES tax_periods(tax_year),
+  gross_pence            INTEGER NOT NULL,
+  taxable_pence          INTEGER,
+  net_pence              INTEGER NOT NULL,
+  paye_pence             INTEGER NOT NULL,
+  ni_employee_pence      INTEGER NOT NULL,
+  pension_employee_pence INTEGER NOT NULL,
+  pension_employer_pence INTEGER,
+  currency               TEXT NOT NULL DEFAULT 'GBP',
+  occurred_at            TIMESTAMP NOT NULL,
+  recorded_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id              INTEGER NOT NULL REFERENCES documents(id)
+);
+
 CREATE TABLE IF NOT EXISTS account_balances (
   id            INTEGER PRIMARY KEY,
   account_id    INTEGER NOT NULL,
   balance_pence INTEGER NOT NULL,
+  currency      TEXT NOT NULL DEFAULT 'GBP',
+  valid_from    DATE NOT NULL,
+  valid_to      DATE,
+  recorded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id     INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS pension_values (
+  id          INTEGER PRIMARY KEY,
+  account_id  INTEGER NOT NULL REFERENCES accounts(id),
+  value_pence INTEGER NOT NULL,
+  currency    TEXT NOT NULL DEFAULT 'GBP',
+  valid_from  DATE NOT NULL,
+  valid_to    DATE,
+  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id   INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS mortgage_balance (
+  id                   INTEGER PRIMARY KEY,
+  mortgage_id          INTEGER NOT NULL REFERENCES mortgages(id),
+  outstanding_pence    INTEGER NOT NULL,
+  interest_rate_bps    INTEGER NOT NULL,
+  property_value_pence INTEGER NOT NULL,
+  currency             TEXT NOT NULL DEFAULT 'GBP',
+  valid_from           DATE NOT NULL,
+  valid_to             DATE,
+  recorded_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id            INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS asset_values (
+  id                   INTEGER PRIMARY KEY,
+  asset_id             INTEGER NOT NULL REFERENCES assets(id),
+  quantity             INTEGER NOT NULL,
+  original_currency    TEXT NOT NULL,
+  gbp_equivalent_pence INTEGER NOT NULL,
+  valid_from           DATE NOT NULL,
+  valid_to             DATE,
+  recorded_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id            INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS person_profile (
+  id            INTEGER PRIMARY KEY,
+  employer_name TEXT NOT NULL,
+  tax_code      TEXT NOT NULL,
+  salary_pence  INTEGER NOT NULL,
   currency      TEXT NOT NULL DEFAULT 'GBP',
   valid_from    DATE NOT NULL,
   valid_to      DATE,

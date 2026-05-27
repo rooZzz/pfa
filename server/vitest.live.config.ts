@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     include: ["tests/live/**/*.test.ts"],
     setupFiles: ["tests/setup.ts"],
+    fileParallelism: false,
   },
 });
