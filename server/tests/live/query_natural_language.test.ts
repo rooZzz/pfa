@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { initDb, getDb } from "../../db.js";
-import { ingestManualEntry } from "../../tools/ingest_manual_entry.js";
+import { getDb, initDb } from "../../db.js";
+import { recordAccountBalance } from "../../tools/record_account_balance.js";
 import { generateSql, queryNaturalLanguage } from "../../tools/query_natural_language.js";
 import { sqlTranslationFixtures } from "./fixtures/sql-translations.js";
 
@@ -16,10 +16,11 @@ beforeAll(async () => {
   initDb();
   const db = getDb();
   db.exec(
-    "DELETE FROM account_balances; DELETE FROM transactions; DELETE FROM documents;",
+    "DELETE FROM account_balances; DELETE FROM accounts; DELETE FROM documents;",
   );
-  await ingestManualEntry({
-    account_id: 1,
+  await recordAccountBalance({
+    account_name: "Barclays Current",
+    account_type: "current",
     balance_pence: 250000,
     currency: "GBP",
     valid_from: "2026-01-01",

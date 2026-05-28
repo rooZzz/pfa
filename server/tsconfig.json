@@ -16,5 +16,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "server.ts", "main.ts", "db.ts", "query.ts", "tools", "tests", "vitest.config.ts"]
+  "include": ["src", "server.ts", "main.ts", "db.ts", "query.ts", "staging.ts", "references.ts", "net_worth.ts", "tools", "tests", "vitest.config.ts"]
 }

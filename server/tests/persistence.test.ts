@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, initDb } from "../db.js";
-import { ingestManualEntry } from "../tools/ingest_manual_entry.js";
 import { resetDuck, runQuery } from "../query.js";
+import { recordAccountBalance } from "../tools/record_account_balance.js";
 
 afterEach(() => {
   resetDuck();
@@ -11,14 +11,15 @@ beforeEach(() => {
   initDb();
   const db = getDb();
   db.exec(
-    "DELETE FROM account_balances; DELETE FROM transactions; DELETE FROM documents;",
+    "DELETE FROM account_balances; DELETE FROM transactions; DELETE FROM accounts; DELETE FROM documents;",
   );
 });
 
-describe("ingest_manual_entry", () => {
+describe("record_account_balance", () => {
   it("writes a documents row with source_type='manual'", async () => {
-    await ingestManualEntry({
-      account_id: 1,
+    await recordAccountBalance({
+      account_name: "Barclays Current",
+      account_type: "current",
       balance_pence: 250000,
       currency: "GBP",
       valid_from: "2026-01-01",
@@ -32,8 +33,9 @@ describe("ingest_manual_entry", () => {
   });
 
   it("writes an account_balances row linked to the document via source_id", async () => {
-    await ingestManualEntry({
-      account_id: 1,
+    await recordAccountBalance({
+      account_name: "Barclays Current",
+      account_type: "current",
       balance_pence: 250000,
       currency: "GBP",
       valid_from: "2026-01-01",
@@ -49,6 +51,33 @@ describe("ingest_manual_entry", () => {
     expect(row.source_id).toBe(row.id);
   });
 
+  it("upserts the account — calling twice returns the same account_id", async () => {
+    await recordAccountBalance({
+      account_name: "Barclays Current",
+      account_type: "current",
+      balance_pence: 100000,
+      currency: "GBP",
+      valid_from: "2026-01-01",
+    });
+    await recordAccountBalance({
+      account_name: "Barclays Current",
+      account_type: "current",
+      balance_pence: 200000,
+      currency: "GBP",
+      valid_from: "2026-02-01",
+    });
+
+    const accountCount = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM accounts").get() as { n: number }
+    ).n;
+    expect(accountCount).toBe(1);
+
+    const balanceCount = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM account_balances").get() as { n: number }
+    ).n;
+    expect(balanceCount).toBe(2);
+  });
+
   it("rejects an account_balances insert with no source_id at the constraint level", () => {
     expect(() => {
       getDb()
@@ -62,15 +91,16 @@ describe("ingest_manual_entry", () => {
 
 describe("DuckDB round-trip", () => {
   it("reads rows written by better-sqlite3", async () => {
-    await ingestManualEntry({
-      account_id: 1,
+    await recordAccountBalance({
+      account_name: "Nationwide Savings",
+      account_type: "savings",
       balance_pence: 250000,
       currency: "GBP",
       valid_from: "2026-01-01",
     });
 
     const rows = await runQuery(
-      "SELECT balance_pence FROM pfa.account_balances WHERE account_id = 1",
+      "SELECT balance_pence FROM pfa.account_balances LIMIT 1",
     );
 
     expect(rows).toHaveLength(1);
@@ -80,14 +110,16 @@ describe("DuckDB round-trip", () => {
 
 describe("LOCF gap-fill", () => {
   beforeEach(async () => {
-    await ingestManualEntry({
-      account_id: 1,
+    await recordAccountBalance({
+      account_name: "Nationwide Savings",
+      account_type: "savings",
       balance_pence: 250000,
       currency: "GBP",
       valid_from: "2026-01-01",
     });
-    await ingestManualEntry({
-      account_id: 1,
+    await recordAccountBalance({
+      account_name: "Nationwide Savings",
+      account_type: "savings",
       balance_pence: 300000,
       currency: "GBP",
       valid_from: "2026-03-01",
@@ -98,8 +130,7 @@ describe("LOCF gap-fill", () => {
     const rows = await runQuery(`
       SELECT balance_pence
       FROM pfa.account_balances
-      WHERE account_id = 1
-        AND valid_from <= DATE '2026-02-01'
+      WHERE valid_from <= DATE '2026-02-01'
         AND (valid_to IS NULL OR valid_to > DATE '2026-02-01')
       ORDER BY valid_from DESC
       LIMIT 1
@@ -113,8 +144,7 @@ describe("LOCF gap-fill", () => {
     const rows = await runQuery(`
       SELECT balance_pence
       FROM pfa.account_balances
-      WHERE account_id = 1
-        AND valid_from <= DATE '2026-02-15'
+      WHERE valid_from <= DATE '2026-02-15'
         AND (valid_to IS NULL OR valid_to > DATE '2026-02-15')
       ORDER BY valid_from DESC
       LIMIT 1

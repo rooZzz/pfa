@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, initDb } from "../db.js";
 import { stageReview } from "../staging.js";
 import { confirmStagedRows } from "../tools/confirm_staged_rows.js";

@@ -1,0 +1,268 @@
+import fs from "node:fs";
+import { beforeEach, describe, expect, it } from "vitest";
+import { getDb, initDb } from "../db.js";
+import { recordAccountBalance } from "../tools/record_account_balance.js";
+import { recordAssetValue } from "../tools/record_asset_value.js";
+import { recordEquityGrant } from "../tools/record_equity_grant.js";
+import { recordMortgageBalance } from "../tools/record_mortgage_balance.js";
+import { recordPensionValue } from "../tools/record_pension_value.js";
+import { recordVestingEvent } from "../tools/record_vesting_event.js";
+
+beforeEach(() => {
+  initDb();
+  getDb().exec(`
+    DELETE FROM equity_vesting_event;
+    DELETE FROM equity_grant;
+    DELETE FROM pension_values;
+    DELETE FROM mortgage_balance;
+    DELETE FROM asset_values;
+    DELETE FROM account_balances;
+    DELETE FROM documents;
+    DELETE FROM accounts;
+    DELETE FROM assets;
+    DELETE FROM mortgages;
+  `);
+});
+
+describe("recordAccountBalance", () => {
+  it("creates an account and writes a balance linked to a document", async () => {
+    await recordAccountBalance({
+      account_name: "Monzo",
+      account_type: "current",
+      balance_pence: 50000,
+      currency: "GBP",
+      valid_from: "2026-05-01",
+    });
+
+    const db = getDb();
+    const account = db.prepare("SELECT name, type FROM accounts LIMIT 1").get() as {
+      name: string;
+      type: string;
+    };
+    expect(account.name).toBe("Monzo");
+    expect(account.type).toBe("current");
+
+    const balance = db
+      .prepare("SELECT balance_pence, source_id FROM account_balances LIMIT 1")
+      .get() as { balance_pence: number; source_id: number };
+    expect(balance.balance_pence).toBe(50000);
+    expect(balance.source_id).toBeGreaterThan(0);
+  });
+
+  it("upserts the account on repeated calls", async () => {
+    await recordAccountBalance({
+      account_name: "Monzo",
+      account_type: "current",
+      balance_pence: 10000,
+      currency: "GBP",
+      valid_from: "2026-04-01",
+    });
+    await recordAccountBalance({
+      account_name: "Monzo",
+      account_type: "current",
+      balance_pence: 20000,
+      currency: "GBP",
+      valid_from: "2026-05-01",
+    });
+
+    const accountCount = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM accounts").get() as { n: number }
+    ).n;
+    expect(accountCount).toBe(1);
+  });
+
+  it("writes the audit JSON file to disk", async () => {
+    await recordAccountBalance({
+      account_name: "ISA",
+      account_type: "isa",
+      balance_pence: 200000,
+      currency: "GBP",
+      valid_from: "2026-05-01",
+    });
+
+    const doc = getDb()
+      .prepare("SELECT file_path FROM documents LIMIT 1")
+      .get() as { file_path: string };
+    expect(fs.existsSync(doc.file_path)).toBe(true);
+    const content = JSON.parse(fs.readFileSync(doc.file_path, "utf-8")) as {
+      entry_type: string;
+    };
+    expect(content.entry_type).toBe("account_balance");
+  });
+});
+
+describe("recordPensionValue", () => {
+  it("creates a pension account and writes a pension_values row", async () => {
+    await recordPensionValue({
+      account_name: "Nest",
+      value_pence: 4200000,
+      currency: "GBP",
+      valid_from: "2026-04-01",
+    });
+
+    const db = getDb();
+    const account = db
+      .prepare("SELECT name, type FROM accounts LIMIT 1")
+      .get() as { name: string; type: string };
+    expect(account.type).toBe("pension");
+
+    const row = db
+      .prepare("SELECT value_pence, source_id FROM pension_values LIMIT 1")
+      .get() as { value_pence: number; source_id: number };
+    expect(row.value_pence).toBe(4200000);
+    expect(row.source_id).toBeGreaterThan(0);
+  });
+});
+
+describe("recordMortgageBalance", () => {
+  it("creates a mortgage and writes a mortgage_balance row", async () => {
+    await recordMortgageBalance({
+      lender: "Nationwide",
+      property: "1 Main St",
+      outstanding_pence: 25000000,
+      interest_rate_bps: 450,
+      property_value_pence: 40000000,
+      currency: "GBP",
+      valid_from: "2026-05-01",
+    });
+
+    const db = getDb();
+    const mortgage = db
+      .prepare("SELECT lender, property FROM mortgages LIMIT 1")
+      .get() as { lender: string; property: string };
+    expect(mortgage.lender).toBe("Nationwide");
+
+    const row = db
+      .prepare("SELECT outstanding_pence, property_value_pence, source_id FROM mortgage_balance LIMIT 1")
+      .get() as { outstanding_pence: number; property_value_pence: number; source_id: number };
+    expect(row.outstanding_pence).toBe(25000000);
+    expect(row.property_value_pence).toBe(40000000);
+    expect(row.source_id).toBeGreaterThan(0);
+  });
+
+  it("upserts the mortgage on repeated calls", async () => {
+    await recordMortgageBalance({
+      lender: "Nationwide",
+      property: "1 Main St",
+      outstanding_pence: 25000000,
+      interest_rate_bps: 450,
+      property_value_pence: 40000000,
+      currency: "GBP",
+      valid_from: "2026-01-01",
+    });
+    await recordMortgageBalance({
+      lender: "Nationwide",
+      property: "1 Main St",
+      outstanding_pence: 24500000,
+      interest_rate_bps: 450,
+      property_value_pence: 41000000,
+      currency: "GBP",
+      valid_from: "2026-05-01",
+    });
+
+    const mortgageCount = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM mortgages").get() as { n: number }
+    ).n;
+    expect(mortgageCount).toBe(1);
+  });
+});
+
+describe("recordAssetValue", () => {
+  it("creates an asset and writes an asset_values row", async () => {
+    await recordAssetValue({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      quantity: 1500000000,
+      original_currency: "ETH",
+      gbp_equivalent_pence: 350000,
+      valid_from: "2026-05-01",
+    });
+
+    const db = getDb();
+    const asset = db
+      .prepare("SELECT name, asset_type FROM assets LIMIT 1")
+      .get() as { name: string; asset_type: string };
+    expect(asset.name).toBe("ETH");
+    expect(asset.asset_type).toBe("crypto");
+
+    const row = db
+      .prepare("SELECT gbp_equivalent_pence, source_id FROM asset_values LIMIT 1")
+      .get() as { gbp_equivalent_pence: number; source_id: number };
+    expect(row.gbp_equivalent_pence).toBe(350000);
+    expect(row.source_id).toBeGreaterThan(0);
+  });
+});
+
+describe("recordEquityGrant", () => {
+  it("writes an equity_grant row with payload and returns the grant ID", async () => {
+    const result = await recordEquityGrant({
+      scheme_type: "rsu",
+      units: 1000,
+      grant_date: "2025-01-01",
+      currency: "GBP",
+      current_price_pence: 50000,
+    });
+
+    expect(result).toMatch(/Grant ID: \d+/);
+
+    const db = getDb();
+    const grant = db
+      .prepare("SELECT scheme_type, units, payload FROM equity_grant LIMIT 1")
+      .get() as { scheme_type: string; units: number; payload: string };
+    expect(grant.scheme_type).toBe("rsu");
+    expect(grant.units).toBe(1000);
+
+    const grantPayload = JSON.parse(grant.payload) as { current_price_pence: number };
+    expect(grantPayload.current_price_pence).toBe(50000);
+  });
+});
+
+describe("recordVestingEvent", () => {
+  it("writes an equity_vesting_event row linked to the grant", async () => {
+    await recordEquityGrant({
+      scheme_type: "rsu",
+      units: 1000,
+      grant_date: "2025-01-01",
+      currency: "GBP",
+    });
+
+    const grantId = (
+      getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
+    ).id;
+
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-01-01",
+      units_vested: 250,
+      market_price_pence: 55000,
+    });
+
+    const row = getDb()
+      .prepare(
+        "SELECT grant_id, units_vested, market_price_pence, estimated_value_pence, source_id FROM equity_vesting_event LIMIT 1",
+      )
+      .get() as {
+      grant_id: number;
+      units_vested: number;
+      market_price_pence: number;
+      estimated_value_pence: number;
+      source_id: number;
+    };
+
+    expect(row.grant_id).toBe(grantId);
+    expect(row.units_vested).toBe(250);
+    expect(row.market_price_pence).toBe(55000);
+    expect(row.estimated_value_pence).toBe(250 * 55000);
+    expect(row.source_id).toBeGreaterThan(0);
+  });
+
+  it("throws when the grant does not exist", async () => {
+    await expect(
+      recordVestingEvent({
+        grant_id: 9999,
+        vest_date: "2026-01-01",
+        units_vested: 100,
+      }),
+    ).rejects.toThrow(/No equity grant found/);
+  });
+});
