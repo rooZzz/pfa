@@ -5,6 +5,7 @@ import { resetDuck } from "../query.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 import { recordAssetValue } from "../tools/record_asset_value.js";
 import { recordEquityGrant } from "../tools/record_equity_grant.js";
+import { recordMortgage } from "../tools/record_mortgage.js";
 import { recordMortgageBalance } from "../tools/record_mortgage_balance.js";
 import { recordPensionValue } from "../tools/record_pension_value.js";
 import { recordVestingEvent } from "../tools/record_vesting_event.js";
@@ -43,9 +44,16 @@ async function seedFullPicture() {
     currency: "GBP",
     valid_from: "2026-01-01",
   });
-  await recordMortgageBalance({
+  const mortgageResult = await recordMortgage({
     lender: "Nationwide",
     property: "1 Main St",
+    original_amount_pence: 30000000,
+    currency: "GBP",
+  });
+  const mortgageIdMatch = mortgageResult.match(/Mortgage ID:\s*(\d+)/);
+  const mortgageId = parseInt(mortgageIdMatch![1]!, 10);
+  await recordMortgageBalance({
+    mortgage_id: mortgageId,
     outstanding_pence: 25000000,
     interest_rate_bps: 450,
     property_value_pence: 40000000,

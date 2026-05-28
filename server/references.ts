@@ -60,22 +60,3 @@ export function ensureAsset(
     .run(name, asset_type, base_currency);
   return Number(result.lastInsertRowid);
 }
-
-export function ensureMortgage(
-  db: Database.Database,
-  lender: string,
-  property: string,
-  original_amount_pence: number,
-  currency: string,
-): number {
-  const existing = db
-    .prepare("SELECT id FROM mortgages WHERE lender = ? AND property = ?")
-    .get(lender, property) as { id: number } | undefined;
-  if (existing) return existing.id;
-  const result = db
-    .prepare(
-      "INSERT INTO mortgages (lender, property, original_amount_pence, currency) VALUES (?, ?, ?, ?)",
-    )
-    .run(lender, property, original_amount_pence, currency);
-  return Number(result.lastInsertRowid);
-}

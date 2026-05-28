@@ -25,6 +25,10 @@ import {
   recordEquityGrantSchema,
 } from "./tools/record_equity_grant.js";
 import {
+  recordMortgage,
+  recordMortgageSchema,
+} from "./tools/record_mortgage.js";
+import {
   recordMortgageBalance,
   recordMortgageBalanceSchema,
 } from "./tools/record_mortgage_balance.js";
@@ -95,8 +99,18 @@ export function createServer(): McpServer {
   );
 
   server.tool(
+    "record_mortgage",
+    "Register a mortgage (Reference). Call once to define the mortgage and obtain a mortgage ID. Use the returned ID with record_mortgage_balance to record balance snapshots.",
+    recordMortgageSchema,
+    async (input) => {
+      const message = await recordMortgage(input);
+      return { content: [{ type: "text", text: message }] };
+    },
+  );
+
+  server.tool(
     "record_mortgage_balance",
-    "Record a mortgage balance and current property value. Creates the mortgage if it does not exist. Writes an audit JSON file and persists the snapshot to SQLite.",
+    "Record a mortgage balance snapshot. Requires a mortgage ID from record_mortgage. Writes an audit JSON file and persists the snapshot to SQLite.",
     recordMortgageBalanceSchema,
     async (input) => {
       const message = await recordMortgageBalance(input);

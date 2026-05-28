@@ -4,6 +4,7 @@ import { DOCUMENTS_DIR, resetDb } from "../db.js";
 import { recordAccountBalance } from "./record_account_balance.js";
 import { recordAssetValue } from "./record_asset_value.js";
 import { recordEquityGrant } from "./record_equity_grant.js";
+import { recordMortgage } from "./record_mortgage.js";
 import { recordMortgageBalance } from "./record_mortgage_balance.js";
 import { recordPensionValue } from "./record_pension_value.js";
 import { recordVestingEvent } from "./record_vesting_event.js";
@@ -126,6 +127,14 @@ async function seedPensions(): Promise<void> {
 }
 
 async function seedMortgage(): Promise<void> {
+  const mortgageMessage = await recordMortgage({
+    lender: "Nationwide",
+    property: "12 Acacia Avenue",
+    original_amount_pence: 30000000,
+    currency: "GBP",
+  });
+  const mortgageId = parseMortgageId(mortgageMessage);
+
   const mortgageHistory: Array<[number, number, number, number]> = [
     [11, 28500000, 52000000, 425],
     [8, 28200000, 52500000, 425],
@@ -135,8 +144,7 @@ async function seedMortgage(): Promise<void> {
   ];
   for (const [ago, outstanding, propertyValue, rateBps] of mortgageHistory) {
     await recordMortgageBalance({
-      lender: "Nationwide",
-      property: "12 Acacia Avenue",
+      mortgage_id: mortgageId,
       outstanding_pence: outstanding,
       interest_rate_bps: rateBps,
       property_value_pence: propertyValue,
@@ -268,6 +276,14 @@ function parseGrantId(message: string): number {
   const match = message.match(/Grant ID:\s*(\d+)/);
   if (!match) {
     throw new Error(`Could not parse grant ID from message: ${message}`);
+  }
+  return parseInt(match[1]!, 10);
+}
+
+function parseMortgageId(message: string): number {
+  const match = message.match(/Mortgage ID:\s*(\d+)/);
+  if (!match) {
+    throw new Error(`Could not parse mortgage ID from message: ${message}`);
   }
   return parseInt(match[1]!, 10);
 }
