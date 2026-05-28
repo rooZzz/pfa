@@ -18,17 +18,14 @@ Prioritize correctness and clarity over cleverness. This handles real financial 
 - No emojis anywhere — in code, config, or responses.
 
 ## Workflow
-This project uses four skills that define the standard development loop:
+This project uses four skills:
 
 | Skill | Purpose | Input | Output |
 |-------|---------|-------|--------|
-| `/idea` | Commit to a direction | Vague problem | One clear decision |
 | `/refine` | Clean it up | Working code | Simpler code |
 | `/test` | Verify behavior | Feature | Passing tests |
 | `/research` | Verify assumptions | Claim or decision | Evidence-based verdict |
 | `/explore` | Survey a space | Unfamiliar territory | Landscape map + direction |
-
-Use them in order. Don't skip ahead. Don't loop back without finishing the current stage.
 
 ## Code standards
 
@@ -59,22 +56,29 @@ Use them in order. Don't skip ahead. Don't loop back without finishing the curre
 - Deterministic always. No `sleep()`, no time-sensitive assertions without mocking.
 
 ## What not to do
-- Don't add features mid-work. Finish what's in scope, then /idea a new one.
+- Don't add features mid-work. Finish what's in scope first.
 - Don't refactor while fixing a bug. Fix first, refine after.
 - Don't design for hypothetical future requirements.
 - Don't use AI-generated code you don't understand. If it's unclear, ask.
 
-## Current phase
-**POC — architecture validation before any real build.** Staged spike (4 stages). Currently: Stage 3.
+## Current state
+Working end-to-end on a thin slice. What exists today:
 
-- Stage 1: Confirm MCP Apps UI resource renders in Claude Desktop (ext-apps map-server example)
-- Stage 2: Custom server — one tool, one `ui://` resource, bidirectional comms confirmed
-- Stage 3: Persistent data round-trip with `better-sqlite3`
-- Stage 4 (only if 1–3 pass): real schema, Haiku 4.5 vision on a UK payslip, `ui://review` confirmation flow
+- Local stdio MCP server in `server/` registering tools and `ui://` resources for Claude Desktop.
+- SQLite write store via `better-sqlite3` and DuckDB read layer via the SQLite extension, sharing one `.sqlite` file on disk.
+- Schema in [server/db.ts](server/db.ts): `documents`, `accounts`, `assets`, `mortgages`, `transactions`, `income_events` (with `payload`), `account_balances`, `pension_values`, `mortgage_balance`, `asset_values`, `person_profile`, `tax_periods`, `equity_grant`, `equity_vesting_event`.
+- Ingest tools:
+  - `ingest_document` — base64 file in → Haiku 4.5 vision → staging buffer. Payslip only.
+  - `confirm_staged_rows` — writes a staged payslip to `income_events` with `source_id` enforced.
+  - `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_value`, `record_equity_grant`, `record_vesting_event` — manual-entry tools, one per series. Each creates the reference row if needed and writes the typed snapshot/event row.
+  - `query_natural_language` — Haiku text-to-SQL against [docs/schema_catalog.md](docs/schema_catalog.md), executed by DuckDB.
+- Net worth: `get_net_worth` tool plus `ui://pfa/net_worth.html` dashboard.
+- Dev utilities: `reset_schema` and `seed_data` tools.
+- UI resources: `ui://pfa/mcp-app.html`, `ui://pfa/upload.html`, `ui://pfa/net_worth.html`.
 
-See `.claude/poc-plan.md` for full exit criteria and known risks.
+The end-state target lives in [docs/end-state-flows.md](docs/end-state-flows.md); the architecture in [docs/architecture.md](docs/architecture.md).
 
-## Deferred until after POC
+## Deferred
 Open banking connectors, recommendations (observations only for now), multi-currency, mobile, prescriptive financial advice.
 
 ## Decision log

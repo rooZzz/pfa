@@ -71,10 +71,11 @@ flowchart TD
 
     subgraph MCP["MCP Server — stdio"]
         IT["ingest_document"]
-        ME["ingest_manual_entry"]
+        ME["record_* manual entry tools\nbalance · pension · mortgage · asset · grant · vesting"]
         SC["setup_connector"]
         QT["query_natural_language"]
         CT["confirm_staged_rows"]
+        NWT["get_net_worth"]
         STAGE[("staging buffer\nunconfirmed rows")]
         CAT[["schema_catalog.md + DDL\ninjected into every Haiku call"]]
     end
@@ -109,6 +110,12 @@ flowchart TD
 
     CHAT -->|"tool call"| ME
     ME -->|"generates JSON file"| DOCS
+    ME -->|"writes snapshot / event"| SN
+    ME -->|"writes snapshot / event"| EV
+
+    CHAT -->|"tool call"| NWT
+    NWT -.->|"reads via DuckDB"| READ
+    NWT -->|net worth data| NW
 
     CONNECTORS -->|"tool call"| SC
     SC -->|"store credentials"| CONN
@@ -232,11 +239,20 @@ Upload → ingest_document tool → Haiku vision → extracted rows → staging 
 
 ### Manual entry (medium trust)
 
-Values the user types directly into chat.
+Values the user types directly into chat. Manual entry is fanned out across one tool per series rather than a single dispatching tool — the LLM picks the right one from the conversation. Each tool ensures its reference row (account/asset/mortgage/grant), writes the audit JSON document, and writes the typed snapshot or event row in one transaction.
+
+| Tool | Writes to |
+|---|---|
+| `record_account_balance` | `account_balances` (creates `accounts` row if needed) |
+| `record_pension_value` | `pension_values` (creates pension `accounts` row if needed) |
+| `record_mortgage_balance` | `mortgage_balance` (creates `mortgages` row if needed) |
+| `record_asset_value` | `asset_values` (creates `assets` row if needed) |
+| `record_equity_grant` | `equity_grant` |
+| `record_vesting_event` | `equity_vesting_event` (requires existing grant) |
 
 ```
-Manual input → ingest_manual_entry tool → system generates JSON file → write document row
-→ write event/snapshot rows with source_id
+Manual input → record_* tool → writeManualDocument generates JSON → write document row
+→ ensure reference row → write event/snapshot row with source_id
 ```
 
 - `documents.source_type = 'manual'`
@@ -346,3 +362,5 @@ Not all questions are SQL questions. The schema catalog documents which question
 | 2026-05-26 | Staleness: always surface `recorded_at` | Every snapshot-derived value carries its observation date. Never imply live data. |
 | 2026-05-27 | Flex layer: bounded `payload` JSON on proven-tail tables | Typed spine for anything aggregated or trended; `payload` for the unmodelled long tail on `income_events` and the equity tables. Not blanket, not a query target, with a promotion path. Derived from the end-state flow refinement in `docs/end-state-flows.md`. See design rule 7. |
 | 2026-05-27 | Equity entities: `equity_grant` + `equity_vesting_event` | Typed primitives (scheme type, units, strike, vest dates) plus `payload` for scheme-specific terms. Valuation and vesting-tax methods remain open decisions. |
+| 2026-05-28 | Manual entry: fanned per series, not a single dispatching tool | Six `record_*` tools (`account_balance`, `pension_value`, `mortgage_balance`, `asset_value`, `equity_grant`, `vesting_event`). Each owns its own zod schema, ensures its reference row, writes the audit JSON, and inserts the typed row in one transaction. The LLM picks the right one from chat. Shared helpers in `references.ts`. |
+| 2026-05-28 | Net worth: dedicated `get_net_worth` tool, not text-to-SQL | Contingent (unvested) equity valuation isn't expressible as a single clean query and must not be confused with realised holdings. A typed module computes the split and is consumed by `ui://pfa/net_worth.html`. |

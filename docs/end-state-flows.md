@@ -61,11 +61,13 @@ Three source types, three trust levels, distinct entry surfaces, one canonical d
 
 **Surface.** Conversation.
 
-**What the model does.** Captures the raw input, writes a system-generated JSON file as the source document, and writes the event/snapshot row directly.
+**What the model does.** Picks the right tool from a fanned set, one per series — `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_value`, `record_equity_grant`, `record_vesting_event`. Each captures the raw input, writes a system-generated JSON file as the source document, ensures its reference row (account, asset, mortgage, grant) if needed, and writes the typed event/snapshot row — all in one transaction.
 
-**Read / written.** A `documents` row (source_type `manual`, the JSON file) plus the data row with `source_id`.
+The fan-out (rather than a single dispatching tool) keeps each tool's argument schema tight and unambiguous: the LLM picks the right tool from the conversation rather than threading a generic payload through a router. Shared helpers (`writeManualDocument`, `ensureAccount`, `ensureAsset`, `ensureMortgage`) live in `references.ts` so the per-series tools stay thin.
 
-**What the user sees.** Chat acknowledgement.
+**Read / written.** A `documents` row (source_type `manual`, the JSON file) plus the reference row (idempotent) plus the typed data row with `source_id`.
+
+**What the user sees.** Chat acknowledgement naming the series, the value, the date, and the document/reference IDs.
 
 **Failure / review.** No review step — the user is the source. The JSON file preserves the raw input as entered, as the audit trail.
 
