@@ -284,7 +284,25 @@ ORDER BY asset_id, as_of DESC
 | `amount_pence` | INTEGER | Amount in pence. Positive = inflow (credit). Negative = outflow (debit). |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
 | `description` | TEXT | Free-text description from the source (e.g. merchant name). |
+| `category` | TEXT | Spending category. Free-text, expected to follow Monzo vocabulary: `general`, `eating_out`, `expenses`, `transport`, `cash`, `bills`, `entertainment`, `shopping`, `holidays`, `groceries`. Use `income` for non-salary inflows. Default `general`. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+
+**Cashflow note.** Salary/payslip income is in `income_events`, not `transactions`. Do not look for salary in `transactions`. For full cashflow, combine `income_events` (for payslip net pay) and `transactions` (for discretionary inflows/outflows). To anchor to a UK tax year, join `transactions.occurred_at` to `tax_periods` using `CAST(occurred_at AS DATE) BETWEEN starts_on AND ends_on`.
+
+**Cashflow by category:**
+
+```sql
+SELECT
+  category,
+  SUM(amount_pence) FILTER (WHERE amount_pence > 0) AS inflow_pence,
+  ABS(SUM(amount_pence) FILTER (WHERE amount_pence < 0)) AS outflow_pence,
+  COUNT(*) AS count
+FROM pfa.transactions t
+JOIN pfa.tax_periods tp ON CAST(t.occurred_at AS DATE) BETWEEN tp.starts_on AND tp.ends_on
+WHERE tp.tax_year = '2025/26'
+GROUP BY category
+ORDER BY outflow_pence DESC
+```
 
 ---
 

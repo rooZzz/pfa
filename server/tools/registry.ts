@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { resetDb } from "../db.js";
+import { getCashflow } from "../cashflow/index.js";
 import { getNetWorth } from "../net_worth/index.js";
 import { confirmStagedRows } from "./confirm_staged_rows.js";
 import { ingestDocument } from "./ingest_document.js";
@@ -17,6 +18,10 @@ import {
   recordMortgageBalanceSchema,
 } from "./record_mortgage_balance.js";
 import { recordPensionValue, recordPensionValueSchema } from "./record_pension_value.js";
+import {
+  recordTransaction,
+  recordTransactionSchema,
+} from "./record_transaction.js";
 import { recordVestingEvent, recordVestingEventSchema } from "./record_vesting_event.js";
 import { refreshAssetPrice, refreshAssetPriceSchema } from "./refresh_asset_price.js";
 import { seedData } from "./seed_data.js";
@@ -24,6 +29,7 @@ import { seedData } from "./seed_data.js";
 export const RESOURCE_URI = "ui://pfa/mcp-app.html";
 export const UPLOAD_URI = "ui://pfa/upload.html";
 export const NET_WORTH_URI = "ui://pfa/net_worth.html";
+export const CASHFLOW_URI = "ui://pfa/cashflow.html";
 
 export type ToolResult = { content: { type: "text"; text: string }[] };
 
@@ -126,11 +132,44 @@ export const tools: ToolDescriptor[] = [
     handler: async (input) => text(await recordEquityGrant(input)),
   }),
   defineTool({
+    name: "record_transaction",
+    description:
+      "Record a single cash transaction manually. Positive amount = money in (credit), negative = money out (debit). Use for non-salary inflows and all outflows. Do not use for payslip salary — that is recorded via payslip ingestion.",
+    inputSchema: recordTransactionSchema,
+    handler: async (input) => text(await recordTransaction(input)),
+  }),
+  defineTool({
     name: "record_vesting_event",
     description:
       "Record a vesting event against an existing equity grant. Requires the grant ID returned by record_equity_grant.",
     inputSchema: recordVestingEventSchema,
     handler: async (input) => text(await recordVestingEvent(input)),
+  }),
+  defineTool({
+    name: "get_cashflow",
+    description:
+      "Compute cashflow for a UK tax year. Returns income from payslips (net/gross/PAYE/NI/pension breakdown), transactions grouped by category, net cashflow, and a monthly trend. Defaults to the tax year covering today. Supply tax_year (YYYY/YY) to target a specific year.",
+    inputSchema: {
+      tax_year: z
+        .string()
+        .regex(/^\d{4}\/\d{2}$/, "Expected YYYY/YY e.g. 2025/26")
+        .optional()
+        .describe("UK tax year to query. Defaults to the year covering today."),
+      as_of: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+        .optional()
+        .describe("Limit data to this date. Defaults to today (or period end if year is complete)."),
+    },
+    handler: async ({ tax_year, as_of }) => text(JSON.stringify(await getCashflow({ tax_year, as_of }))),
+  }),
+  defineTool({
+    name: "open_cashflow",
+    description:
+      "Open the cashflow dashboard. Shows income from payslips, spending by category, net cashflow, and a monthly trend — all anchored to the current UK tax year.",
+    inputSchema: {},
+    app: { title: "Cashflow", resourceUri: CASHFLOW_URI },
+    handler: async () => text("Cashflow dashboard opened."),
   }),
   defineTool({
     name: "get_net_worth",
@@ -222,4 +261,5 @@ export const resources: { uri: string; file: string }[] = [
   { uri: RESOURCE_URI, file: "mcp-app.html" },
   { uri: UPLOAD_URI, file: "upload.html" },
   { uri: NET_WORTH_URI, file: "net_worth.html" },
+  { uri: CASHFLOW_URI, file: "cashflow.html" },
 ];
