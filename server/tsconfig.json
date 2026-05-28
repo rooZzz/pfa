@@ -28,6 +28,7 @@
     "sql_util.ts",
     "schema.ts",
     "net_worth",
+    "cashflow",
     "migrations",
     "tools",
     "tests",

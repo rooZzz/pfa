@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DOCUMENTS_DIR, resetDb } from "../db.js";
+import { DOCUMENTS_DIR, getKysely, resetDb } from "../db.js";
+import { writeManualDocument } from "../references.js";
 import { recordAccountBalance } from "./record_account_balance.js";
 import { recordAssetHolding } from "./record_asset_holding.js";
 import { recordAssetPrice } from "./record_asset_price.js";
@@ -8,6 +9,7 @@ import { recordEquityGrant } from "./record_equity_grant.js";
 import { recordMortgage } from "./record_mortgage.js";
 import { recordMortgageBalance } from "./record_mortgage_balance.js";
 import { recordPensionValue } from "./record_pension_value.js";
+import { recordTransaction } from "./record_transaction.js";
 import { recordVestingEvent } from "./record_vesting_event.js";
 
 const TODAY = "2026-05-28";
@@ -352,6 +354,141 @@ async function seedEquity(): Promise<void> {
   });
 }
 
+async function seedIncome(): Promise<void> {
+  const payslips: Array<[number, number, number, number, number, number]> = [
+    [11, 620000, 460000, 124000, 22000, 14000],
+    [10, 620000, 461000, 123800, 22000, 14000],
+    [9, 620000, 459500, 124200, 22000, 14000],
+    [8, 620000, 460500, 123900, 22000, 14000],
+    [7, 620000, 462000, 123500, 22000, 14000],
+    [6, 620000, 460000, 124000, 22000, 14000],
+    [5, 620000, 461500, 123700, 22000, 14000],
+    [4, 620000, 460000, 124000, 22000, 14000],
+    [3, 620000, 459000, 124500, 22000, 14000],
+    [2, 620000, 461000, 123800, 22000, 14000],
+    [1, 620000, 460500, 123900, 22000, 14000],
+    [0, 620000, 460000, 124000, 22000, 14000],
+  ];
+
+  for (const [ago, gross, net, paye, ni, pension] of payslips) {
+    const payDate = monthsAgo(ago, 25);
+    await getKysely()
+      .transaction()
+      .execute(async (trx) => {
+        const sourceId = await writeManualDocument(trx, {
+          source_type: "manual",
+          entry_type: "income_event_seed",
+          pay_date: payDate,
+          gross_pence: gross,
+          net_pence: net,
+        });
+        await trx
+          .insertInto("income_events")
+          .values({
+            pay_date: payDate,
+            gross_pence: gross,
+            net_pence: net,
+            paye_pence: paye,
+            ni_employee_pence: ni,
+            pension_employee_pence: pension,
+            pension_employer_pence: Math.round(pension * 0.5),
+            occurred_at: `${payDate}T00:00:00.000Z`,
+            source_id: sourceId,
+          })
+          .execute();
+      });
+  }
+}
+
+async function seedTransactions(): Promise<void> {
+  const months = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+  for (const ago of months) {
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -8500,
+      category: "groceries",
+      description: "Waitrose",
+      occurred_at: monthsAgo(ago, 3),
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -7200,
+      category: "groceries",
+      description: "Tesco",
+      occurred_at: monthsAgo(ago, 17),
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -14500,
+      category: "bills",
+      description: "EDF Energy",
+      occurred_at: monthsAgo(ago, 2),
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -4800,
+      category: "transport",
+      description: "TfL",
+      occurred_at: monthsAgo(ago, 8),
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -6200,
+      category: "eating_out",
+      description: "Dishoom",
+      occurred_at: monthsAgo(ago, 14),
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -1099,
+      category: "bills",
+      description: "Spotify",
+      occurred_at: monthsAgo(ago, 1),
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Barclays Current",
+      account_type: "current",
+      amount_pence: -3500,
+      category: "shopping",
+      description: "Amazon",
+      occurred_at: monthsAgo(ago, 20),
+      currency: "GBP",
+    });
+  }
+
+  await recordTransaction({
+    account_name: "Barclays Current",
+    account_type: "current",
+    amount_pence: -180000,
+    category: "holidays",
+    description: "Airbnb Paris",
+    occurred_at: monthsAgo(3, 15),
+    currency: "GBP",
+  });
+
+  await recordTransaction({
+    account_name: "Barclays Current",
+    account_type: "current",
+    amount_pence: 25000,
+    category: "income",
+    description: "Freelance payment",
+    occurred_at: monthsAgo(2, 12),
+    currency: "GBP",
+  });
+}
+
 function parseGrantId(message: string): number {
   const match = message.match(/Grant ID:\s*(\d+)/);
   if (!match) {
@@ -377,6 +514,8 @@ export async function seedData(): Promise<string> {
   await seedMortgage();
   await seedAssets();
   await seedEquity();
+  await seedIncome();
+  await seedTransactions();
 
   return [
     "Seeded the database with realistic test data.",
@@ -385,5 +524,7 @@ export async function seedData(): Promise<string> {
     "Mortgage: Nationwide on 12 Acacia Avenue with 5 monthly snapshots. Property held as asset with separate price ticks.",
     "Assets: ETH, BTC, Vanguard FTSE All-World ETF, AAPL (USD), Premium Bonds — each with a holding and a price tick.",
     "Equity: RSU partially vested, EMI options partially vested, unapproved options unvested, SAYE fully vested. All linked to ACME Corp asset with a current price.",
+    "Income: 12 monthly payslips (gross £6,200, net ~£4,600, PAYE/NI/pension deductions).",
+    "Transactions: 12 months of spending (groceries, bills, transport, eating out, shopping) plus a holiday and a freelance inflow.",
   ].join(" ");
 }

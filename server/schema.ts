@@ -62,6 +62,7 @@ export interface TransactionsTable {
   amount_pence: number;
   currency: Generated<string>;
   description: string | null;
+  category: Generated<string>;
   source_id: number;
 }
 
