@@ -26,7 +26,7 @@ DROP TABLE IF EXISTS tax_periods;
 DROP TABLE IF EXISTS documents;
 `;
 
-const DDL = `
+export const DDL = `
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS documents (
