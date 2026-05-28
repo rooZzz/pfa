@@ -7,6 +7,25 @@ const PFA_DIR = process.env.PFA_DIR ?? path.join(os.homedir(), ".pfa");
 const DOCUMENTS_DIR = path.join(PFA_DIR, "documents");
 const DB_PATH = path.join(PFA_DIR, "data.sqlite");
 
+const DROP_ALL = `
+PRAGMA foreign_keys = OFF;
+
+DROP TABLE IF EXISTS equity_vesting_event;
+DROP TABLE IF EXISTS equity_grant;
+DROP TABLE IF EXISTS income_events;
+DROP TABLE IF EXISTS account_balances;
+DROP TABLE IF EXISTS pension_values;
+DROP TABLE IF EXISTS mortgage_balance;
+DROP TABLE IF EXISTS asset_values;
+DROP TABLE IF EXISTS person_profile;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS assets;
+DROP TABLE IF EXISTS mortgages;
+DROP TABLE IF EXISTS tax_periods;
+DROP TABLE IF EXISTS documents;
+`;
+
 const DDL = `
 PRAGMA foreign_keys = ON;
 
@@ -17,6 +36,12 @@ CREATE TABLE IF NOT EXISTS documents (
   content_hash TEXT NOT NULL,
   ingested_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   notes        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tax_periods (
+  tax_year  TEXT PRIMARY KEY,
+  starts_on DATE NOT NULL,
+  ends_on   DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
@@ -41,6 +66,17 @@ CREATE TABLE IF NOT EXISTS mortgages (
   currency              TEXT NOT NULL DEFAULT 'GBP'
 );
 
+CREATE TABLE IF NOT EXISTS equity_grant (
+  id          INTEGER PRIMARY KEY,
+  scheme_type TEXT NOT NULL CHECK (scheme_type IN ('rsu', 'emi', 'unapproved', 'saye')),
+  units       INTEGER NOT NULL,
+  strike_pence INTEGER,
+  grant_date  DATE NOT NULL,
+  currency    TEXT NOT NULL DEFAULT 'GBP',
+  source_id   INTEGER NOT NULL REFERENCES documents(id),
+  payload     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS transactions (
   id           INTEGER PRIMARY KEY,
   account_id   INTEGER NOT NULL,
@@ -50,6 +86,19 @@ CREATE TABLE IF NOT EXISTS transactions (
   currency     TEXT NOT NULL DEFAULT 'GBP',
   description  TEXT,
   source_id    INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS equity_vesting_event (
+  id                    INTEGER PRIMARY KEY,
+  grant_id              INTEGER NOT NULL REFERENCES equity_grant(id),
+  vest_date             DATE NOT NULL,
+  units_vested          INTEGER NOT NULL,
+  market_price_pence    INTEGER,
+  estimated_value_pence INTEGER,
+  occurred_at           TIMESTAMP NOT NULL,
+  recorded_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id             INTEGER NOT NULL REFERENCES documents(id),
+  payload               TEXT
 );
 
 CREATE TABLE IF NOT EXISTS income_events (
@@ -128,12 +177,6 @@ CREATE TABLE IF NOT EXISTS person_profile (
   recorded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   source_id     INTEGER NOT NULL REFERENCES documents(id)
 );
-
-CREATE TABLE IF NOT EXISTS tax_periods (
-  tax_year  TEXT PRIMARY KEY,
-  starts_on DATE NOT NULL,
-  ends_on   DATE NOT NULL
-);
 `;
 
 let db: Database.Database | null = null;
@@ -148,12 +191,18 @@ export function initDb(): void {
   fs.mkdirSync(DOCUMENTS_DIR, { recursive: true });
 
   db = new Database(DB_PATH);
-  db.pragma("foreign_keys = ON");
   db.exec(DDL);
-  try {
-    db.exec("ALTER TABLE income_events ADD COLUMN payload TEXT");
-  } catch {
+  db.pragma("foreign_keys = ON");
+}
+
+export function resetDb(): void {
+  const current = db;
+  if (!current) {
+    throw new Error("Database not initialised — call initDb() first");
   }
+  current.exec(DROP_ALL);
+  current.exec(DDL);
+  current.pragma("foreign_keys = ON");
 }
 
 export function getDb(): Database.Database {

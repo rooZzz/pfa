@@ -197,6 +197,46 @@ For the current balance (today), omit the date filter and just get the row with 
 
 ---
 
+## Table: `pfa.equity_grant`
+
+**Pattern: Reference.** Defines one equity award. One row per grant. Never updated.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. Referenced as `grant_id` in `equity_vesting_event`. |
+| `scheme_type` | TEXT | One of: `rsu`, `emi`, `unapproved`, `saye`. |
+| `units` | INTEGER | Total units granted. |
+| `strike_pence` | INTEGER | Exercise price per unit in pence. NULL for RSUs. |
+| `grant_date` | DATE | Date the award was granted. |
+| `currency` | TEXT | ISO 4217 code. Default `GBP`. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `payload` | TEXT | JSON holding scheme-specific terms and `current_price_pence` (placeholder for contingent valuation). **Do not use for arithmetic** — payload is for display only. |
+
+**Net worth note.** Contingent (unvested) equity is computed by a dedicated module, not by text-to-SQL. Unvested units = `units − SUM(equity_vesting_event.units_vested)` for vesting events up to the query date. Valuation method is an open decision — the placeholder uses `unvested_units × current_price_pence`.
+
+---
+
+## Table: `pfa.equity_vesting_event`
+
+**Pattern: Event.** Immutable record of one vesting tranche. Never updated or deleted.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `grant_id` | INTEGER | FK to `equity_grant.id`. |
+| `vest_date` | DATE | Date units vested. |
+| `units_vested` | INTEGER | Number of units that vested on this date. |
+| `market_price_pence` | INTEGER | Market price per unit at vesting in pence. NULL if not recorded. |
+| `estimated_value_pence` | INTEGER | `units_vested × market_price_pence` at time of recording. NULL if price unknown. |
+| `occurred_at` | TIMESTAMP | Midnight UTC on `vest_date`. |
+| `recorded_at` | TIMESTAMP | When this row was written. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `payload` | TEXT | JSON for scheme-specific detail (e.g. tax withholding method). **Do not use for arithmetic.** |
+
+**Sign convention.** `estimated_value_pence` is the gross estimated proceeds before tax. Tax liability is computed separately (deferred to cashflow flow).
+
+---
+
 ## Table: `pfa.transactions`
 
 **Pattern: Event.** Immutable record of a cash movement. Never updated or deleted.

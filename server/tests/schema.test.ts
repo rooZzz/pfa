@@ -4,6 +4,8 @@ import { getDb, initDb } from "../db.js";
 beforeEach(() => {
   initDb();
   getDb().exec(`
+    DELETE FROM equity_vesting_event;
+    DELETE FROM equity_grant;
     DELETE FROM income_events;
     DELETE FROM account_balances;
     DELETE FROM transactions;
@@ -33,6 +35,7 @@ describe("full schema", () => {
     expect(tables).toContain("assets");
     expect(tables).toContain("mortgages");
     expect(tables).toContain("tax_periods");
+    expect(tables).toContain("equity_grant");
   });
 
   it("creates all event tables", () => {
@@ -47,6 +50,7 @@ describe("full schema", () => {
 
     expect(tables).toContain("transactions");
     expect(tables).toContain("income_events");
+    expect(tables).toContain("equity_vesting_event");
   });
 
   it("creates all snapshot tables", () => {
@@ -74,6 +78,82 @@ describe("income_events columns", () => {
       db.prepare("PRAGMA table_info(income_events)").all() as { name: string }[]
     ).map((r) => r.name);
     expect(cols).toContain("payload");
+  });
+});
+
+describe("equity_grant columns", () => {
+  it("has the expected typed columns and payload", () => {
+    const db = getDb();
+    const cols = (
+      db.prepare("PRAGMA table_info(equity_grant)").all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(cols).toContain("scheme_type");
+    expect(cols).toContain("units");
+    expect(cols).toContain("strike_pence");
+    expect(cols).toContain("grant_date");
+    expect(cols).toContain("source_id");
+    expect(cols).toContain("payload");
+  });
+
+  it("rejects an invalid scheme_type", () => {
+    const db = getDb();
+    const doc = db
+      .prepare(
+        "INSERT INTO documents (source_type, file_path, content_hash) VALUES ('manual', '/tmp/x.json', 'abc')",
+      )
+      .run();
+    expect(() => {
+      db.prepare(
+        "INSERT INTO equity_grant (scheme_type, units, grant_date, source_id) VALUES ('invalid', 100, '2026-01-01', ?)",
+      ).run(doc.lastInsertRowid);
+    }).toThrow();
+  });
+
+  it("accepts a valid RSU grant with payload", () => {
+    const db = getDb();
+    const doc = db
+      .prepare(
+        "INSERT INTO documents (source_type, file_path, content_hash) VALUES ('manual', '/tmp/g.json', 'def')",
+      )
+      .run();
+    expect(() => {
+      db.prepare(
+        `INSERT INTO equity_grant (scheme_type, units, grant_date, source_id, payload)
+         VALUES ('rsu', 1000, '2026-01-01', ?, ?)`,
+      ).run(doc.lastInsertRowid, JSON.stringify({ current_price_pence: 500 }));
+    }).not.toThrow();
+  });
+});
+
+describe("equity_vesting_event columns", () => {
+  it("has the expected typed columns and payload", () => {
+    const db = getDb();
+    const cols = (
+      db.prepare("PRAGMA table_info(equity_vesting_event)").all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(cols).toContain("grant_id");
+    expect(cols).toContain("vest_date");
+    expect(cols).toContain("units_vested");
+    expect(cols).toContain("market_price_pence");
+    expect(cols).toContain("estimated_value_pence");
+    expect(cols).toContain("source_id");
+    expect(cols).toContain("payload");
+  });
+
+  it("enforces FK to equity_grant", () => {
+    const db = getDb();
+    const doc = db
+      .prepare(
+        "INSERT INTO documents (source_type, file_path, content_hash) VALUES ('manual', '/tmp/v.json', 'ghi')",
+      )
+      .run();
+    expect(() => {
+      db.prepare(
+        `INSERT INTO equity_vesting_event
+           (grant_id, vest_date, units_vested, occurred_at, source_id)
+         VALUES (9999, '2026-06-01', 100, '2026-06-01T00:00:00.000Z', ?)`,
+      ).run(doc.lastInsertRowid);
+    }).toThrow();
   });
 });
 
