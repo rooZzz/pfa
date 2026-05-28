@@ -58,14 +58,16 @@ describe("confirmStagedRows", () => {
 
     const db = getDb();
     const row = db
-      .prepare(`
+      .prepare(
+        `
         SELECT ie.gross_pence, ie.net_pence, ie.paye_pence,
                ie.pension_employee_pence,
                ie.source_id, d.id AS doc_id
         FROM income_events ie
         JOIN documents d ON d.id = ie.source_id
         LIMIT 1
-      `)
+      `,
+      )
       .get() as Record<string, unknown>;
 
     expect(row.gross_pence).toBe(974521);
@@ -76,14 +78,18 @@ describe("confirmStagedRows", () => {
   });
 
   it("stores payload JSON in income_events", async () => {
-    const payload = { line_items: [{ description: "Basic Salary", amount_pence: 974521 }] };
-    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-005", payload }));
+    const payload = {
+      line_items: [{ description: "Basic Salary", amount_pence: 974521 }],
+    };
+    const reviewId = stageReview(
+      makeStagedEntry({ content_hash: "test-hash-005", payload }),
+    );
 
     await confirmStagedRows({ review_id: reviewId });
 
-    const row = getDb()
-      .prepare("SELECT payload FROM income_events LIMIT 1")
-      .get() as { payload: string };
+    const row = getDb().prepare("SELECT payload FROM income_events LIMIT 1").get() as {
+      payload: string;
+    };
 
     expect(JSON.parse(row.payload)).toEqual(payload);
   });
@@ -93,9 +99,9 @@ describe("confirmStagedRows", () => {
 
     await confirmStagedRows({ review_id: reviewId });
 
-    const doc = getDb()
-      .prepare("SELECT file_path FROM documents LIMIT 1")
-      .get() as { file_path: string };
+    const doc = getDb().prepare("SELECT file_path FROM documents LIMIT 1").get() as {
+      file_path: string;
+    };
 
     expect(fs.existsSync(doc.file_path)).toBe(true);
     expect(fs.readFileSync(doc.file_path)).toEqual(FILE_BYTES);
@@ -114,9 +120,9 @@ describe("confirmStagedRows", () => {
   });
 
   it("throws loudly when review_id is not found", async () => {
-    await expect(
-      confirmStagedRows({ review_id: "nonexistent-id" }),
-    ).rejects.toThrow(/No staged review found/);
+    await expect(confirmStagedRows({ review_id: "nonexistent-id" })).rejects.toThrow(
+      /No staged review found/,
+    );
   });
 
   it("upserts the tax_year into tax_periods so the FK constraint is satisfied", async () => {
@@ -127,7 +133,9 @@ describe("confirmStagedRows", () => {
     await confirmStagedRows({ review_id: reviewId });
 
     const row = getDb()
-      .prepare("SELECT tax_year, starts_on, ends_on FROM tax_periods WHERE tax_year = '2026/27'")
+      .prepare(
+        "SELECT tax_year, starts_on, ends_on FROM tax_periods WHERE tax_year = '2026/27'",
+      )
       .get() as { tax_year: string; starts_on: string; ends_on: string };
 
     expect(row.tax_year).toBe("2026/27");
@@ -136,7 +144,11 @@ describe("confirmStagedRows", () => {
   });
 
   it("does not fail when tax_year is null", async () => {
-    const reviewId = stageReview(makeStagedEntry({ content_hash: "test-hash-007", tax_year: null }));
-    await expect(confirmStagedRows({ review_id: reviewId })).resolves.toMatch(/confirmed/);
+    const reviewId = stageReview(
+      makeStagedEntry({ content_hash: "test-hash-007", tax_year: null }),
+    );
+    await expect(confirmStagedRows({ review_id: reviewId })).resolves.toMatch(
+      /confirmed/,
+    );
   });
 });

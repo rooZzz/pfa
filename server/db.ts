@@ -2,209 +2,30 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Kysely, SqliteDialect } from "kysely";
+import type { DatabaseSchema } from "./schema.js";
+import { runMigrations, rollbackAll } from "./migrations/index.js";
 
 const PFA_DIR = process.env.PFA_DIR ?? path.join(os.homedir(), ".pfa");
 const DOCUMENTS_DIR = path.join(PFA_DIR, "documents");
 const DB_PATH = path.join(PFA_DIR, "data.sqlite");
 
-const DROP_ALL = `
-PRAGMA foreign_keys = OFF;
-
-DROP TABLE IF EXISTS equity_vesting_event;
-DROP TABLE IF EXISTS equity_grant;
-DROP TABLE IF EXISTS income_events;
-DROP TABLE IF EXISTS account_balances;
-DROP TABLE IF EXISTS pension_values;
-DROP TABLE IF EXISTS mortgage_balance;
-DROP TABLE IF EXISTS asset_prices;
-DROP TABLE IF EXISTS holdings;
-DROP TABLE IF EXISTS asset_values;
-DROP TABLE IF EXISTS person_profile;
-DROP TABLE IF EXISTS transactions;
-DROP TABLE IF EXISTS accounts;
-DROP TABLE IF EXISTS assets;
-DROP TABLE IF EXISTS mortgages;
-DROP TABLE IF EXISTS tax_periods;
-DROP TABLE IF EXISTS documents;
-`;
-
-export const DDL = `
-PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS documents (
-  id           INTEGER PRIMARY KEY,
-  source_type  TEXT NOT NULL CHECK (source_type IN ('upload', 'manual', 'connector')),
-  file_path    TEXT NOT NULL,
-  content_hash TEXT NOT NULL,
-  ingested_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  notes        TEXT
-);
-
-CREATE TABLE IF NOT EXISTS tax_periods (
-  tax_year  TEXT PRIMARY KEY,
-  starts_on DATE NOT NULL,
-  ends_on   DATE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS accounts (
-  id       INTEGER PRIMARY KEY,
-  name     TEXT NOT NULL,
-  type     TEXT NOT NULL CHECK (type IN ('current', 'savings', 'isa', 'pension', 'mortgage')),
-  currency TEXT NOT NULL DEFAULT 'GBP'
-);
-
-CREATE TABLE IF NOT EXISTS assets (
-  id            INTEGER PRIMARY KEY,
-  name          TEXT NOT NULL,
-  asset_type    TEXT NOT NULL,
-  base_currency TEXT NOT NULL,
-  price_source  TEXT NOT NULL DEFAULT 'manual'
-);
-
-CREATE TABLE IF NOT EXISTS mortgages (
-  id                    INTEGER PRIMARY KEY,
-  lender                TEXT NOT NULL,
-  property              TEXT NOT NULL,
-  original_amount_pence INTEGER NOT NULL,
-  currency              TEXT NOT NULL DEFAULT 'GBP'
-);
-
-CREATE TABLE IF NOT EXISTS equity_grant (
-  id           INTEGER PRIMARY KEY,
-  scheme_type  TEXT NOT NULL CHECK (scheme_type IN ('rsu', 'emi', 'unapproved', 'saye')),
-  units        INTEGER NOT NULL,
-  strike_pence INTEGER,
-  grant_date   DATE NOT NULL,
-  currency     TEXT NOT NULL DEFAULT 'GBP',
-  asset_id     INTEGER REFERENCES assets(id),
-  source_id    INTEGER NOT NULL REFERENCES documents(id),
-  payload      TEXT
-);
-
-CREATE TABLE IF NOT EXISTS transactions (
-  id           INTEGER PRIMARY KEY,
-  account_id   INTEGER NOT NULL,
-  occurred_at  TIMESTAMP NOT NULL,
-  recorded_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  amount_pence INTEGER NOT NULL,
-  currency     TEXT NOT NULL DEFAULT 'GBP',
-  description  TEXT,
-  source_id    INTEGER NOT NULL REFERENCES documents(id)
-);
-
-CREATE TABLE IF NOT EXISTS equity_vesting_event (
-  id                    INTEGER PRIMARY KEY,
-  grant_id              INTEGER NOT NULL REFERENCES equity_grant(id),
-  vest_date             DATE NOT NULL,
-  units_vested          INTEGER NOT NULL,
-  market_price_pence    INTEGER,
-  estimated_value_pence INTEGER,
-  occurred_at           TIMESTAMP NOT NULL,
-  recorded_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id             INTEGER NOT NULL REFERENCES documents(id),
-  payload               TEXT
-);
-
-CREATE TABLE IF NOT EXISTS income_events (
-  id                     INTEGER PRIMARY KEY,
-  pay_date               DATE NOT NULL,
-  tax_year               TEXT REFERENCES tax_periods(tax_year),
-  gross_pence            INTEGER NOT NULL,
-  taxable_pence          INTEGER,
-  net_pence              INTEGER NOT NULL,
-  paye_pence             INTEGER NOT NULL,
-  ni_employee_pence      INTEGER NOT NULL,
-  pension_employee_pence INTEGER NOT NULL,
-  pension_employer_pence INTEGER,
-  currency               TEXT NOT NULL DEFAULT 'GBP',
-  occurred_at            TIMESTAMP NOT NULL,
-  recorded_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id              INTEGER NOT NULL REFERENCES documents(id),
-  payload                TEXT
-);
-
-CREATE TABLE IF NOT EXISTS account_balances (
-  id            INTEGER PRIMARY KEY,
-  account_id    INTEGER NOT NULL,
-  balance_pence INTEGER NOT NULL,
-  currency      TEXT NOT NULL DEFAULT 'GBP',
-  valid_from    DATE NOT NULL,
-  valid_to      DATE,
-  recorded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id     INTEGER NOT NULL REFERENCES documents(id)
-);
-
-CREATE TABLE IF NOT EXISTS pension_values (
-  id          INTEGER PRIMARY KEY,
-  account_id  INTEGER NOT NULL REFERENCES accounts(id),
-  value_pence INTEGER NOT NULL,
-  currency    TEXT NOT NULL DEFAULT 'GBP',
-  valid_from  DATE NOT NULL,
-  valid_to    DATE,
-  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id   INTEGER NOT NULL REFERENCES documents(id)
-);
-
-CREATE TABLE IF NOT EXISTS mortgage_balance (
-  id                INTEGER PRIMARY KEY,
-  mortgage_id       INTEGER NOT NULL REFERENCES mortgages(id),
-  outstanding_pence INTEGER NOT NULL,
-  interest_rate_bps INTEGER NOT NULL,
-  currency          TEXT NOT NULL DEFAULT 'GBP',
-  valid_from        DATE NOT NULL,
-  valid_to          DATE,
-  recorded_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id         INTEGER NOT NULL REFERENCES documents(id)
-);
-
-CREATE TABLE IF NOT EXISTS holdings (
-  id          INTEGER PRIMARY KEY,
-  asset_id    INTEGER NOT NULL REFERENCES assets(id),
-  quantity    INTEGER NOT NULL,
-  valid_from  DATE NOT NULL,
-  valid_to    DATE,
-  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id   INTEGER NOT NULL REFERENCES documents(id)
-);
-
-CREATE TABLE IF NOT EXISTS asset_prices (
-  id               INTEGER PRIMARY KEY,
-  asset_id         INTEGER NOT NULL REFERENCES assets(id),
-  unit_price_pence INTEGER NOT NULL,
-  currency         TEXT NOT NULL,
-  as_of            TIMESTAMP NOT NULL,
-  source           TEXT NOT NULL,
-  recorded_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id        INTEGER REFERENCES documents(id)
-);
-
-CREATE TABLE IF NOT EXISTS person_profile (
-  id            INTEGER PRIMARY KEY,
-  employer_name TEXT NOT NULL,
-  tax_code      TEXT NOT NULL,
-  salary_pence  INTEGER NOT NULL,
-  currency      TEXT NOT NULL DEFAULT 'GBP',
-  valid_from    DATE NOT NULL,
-  valid_to      DATE,
-  recorded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id     INTEGER NOT NULL REFERENCES documents(id)
-);
-`;
-
 let db: Database.Database | null = null;
+let kysely: Kysely<DatabaseSchema> | null = null;
 
 export function initDb(): void {
   if (db) {
     db.close();
     db = null;
+    kysely = null;
   }
 
   fs.mkdirSync(PFA_DIR, { recursive: true });
   fs.mkdirSync(DOCUMENTS_DIR, { recursive: true });
 
   db = new Database(DB_PATH);
-  db.exec(DDL);
   db.pragma("foreign_keys = ON");
+  runMigrations(db);
 }
 
 export function resetDb(): void {
@@ -212,9 +33,8 @@ export function resetDb(): void {
   if (!current) {
     throw new Error("Database not initialised — call initDb() first");
   }
-  current.exec(DROP_ALL);
-  current.exec(DDL);
-  current.pragma("foreign_keys = ON");
+  rollbackAll(current);
+  runMigrations(current);
 }
 
 export function getDb(): Database.Database {
@@ -222,6 +42,35 @@ export function getDb(): Database.Database {
     throw new Error("Database not initialised — call initDb() first");
   }
   return db;
+}
+
+export function getSchemaSql(): string {
+  const rows = getDb()
+    .prepare(
+      `SELECT sql FROM sqlite_master
+       WHERE type = 'table'
+         AND name NOT LIKE 'sqlite_%'
+         AND name != 'schema_migrations'
+       ORDER BY name`,
+    )
+    .all() as { sql: string | null }[];
+  return rows
+    .map((r) => r.sql)
+    .filter((sql): sql is string => Boolean(sql))
+    .map((sql) => `${sql};`)
+    .join("\n\n");
+}
+
+export function getKysely(): Kysely<DatabaseSchema> {
+  if (!db) {
+    throw new Error("Database not initialised — call initDb() first");
+  }
+  if (!kysely) {
+    kysely = new Kysely<DatabaseSchema>({
+      dialect: new SqliteDialect({ database: db }),
+    });
+  }
+  return kysely;
 }
 
 export { DOCUMENTS_DIR, DB_PATH };

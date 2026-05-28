@@ -31,11 +31,11 @@ export function resetDuck(): void {
   duck = null;
 }
 
-export async function runQuery(sql: string): Promise<Row[]> {
+export async function runQuery(sql: string, params: unknown[] = []): Promise<Row[]> {
   const db = await getDuck();
 
   return new Promise((resolve, reject) => {
-    db.all(sql, (err: Error | null, rows: Row[]) => {
+    db.all(sql, ...params, (err: Error | null, rows: Row[]) => {
       if (err) reject(err);
       else resolve(rows);
     });

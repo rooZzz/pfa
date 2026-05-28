@@ -5,19 +5,13 @@ import { generateSql, queryNaturalLanguage } from "../../tools/query_natural_lan
 import { sqlTranslationFixtures } from "./fixtures/sql-translations.js";
 
 function normalizeSql(sql: string): string {
-  return sql
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/;$/, "")
-    .toLowerCase();
+  return sql.replace(/\s+/g, " ").trim().replace(/;$/, "").toLowerCase();
 }
 
 beforeAll(async () => {
   initDb();
   const db = getDb();
-  db.exec(
-    "DELETE FROM account_balances; DELETE FROM accounts; DELETE FROM documents;",
-  );
+  db.exec("DELETE FROM account_balances; DELETE FROM accounts; DELETE FROM documents;");
   await recordAccountBalance({
     account_name: "Barclays Current",
     account_type: "current",

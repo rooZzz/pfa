@@ -35,7 +35,7 @@ flowchart TD
         subgraph WRITE["SQLite — write store / better-sqlite3 / ACID"]
             DOCS["documents\nsource_type: upload or manual or connector"]
             EV["Events — immutable, append-only\ntransactions / income_events"]
-            SN["Snapshots — valid_from / valid_to / recorded_at\naccount_balances / pension_values / mortgage_balance\nasset_values / person_profile"]
+            SN["Snapshots — valid_from / valid_to / recorded_at\naccount_balances / pension_values / mortgage_balance\nholdings / asset_prices / person_profile"]
             RF["Reference\naccounts / assets / mortgages / tax_periods"]
         end
         READ["DuckDB — analytical read layer\nSQLite extension / LOCF / window functions / aggregations"]

@@ -26,9 +26,7 @@ describe("full schema", () => {
     const db = getDb();
     const tables = (
       db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         .all() as { name: string }[]
     ).map((r) => r.name);
 
@@ -43,9 +41,7 @@ describe("full schema", () => {
     const db = getDb();
     const tables = (
       db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         .all() as { name: string }[]
     ).map((r) => r.name);
 
@@ -58,9 +54,7 @@ describe("full schema", () => {
     const db = getDb();
     const tables = (
       db
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
-        )
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         .all() as { name: string }[]
     ).map((r) => r.name);
 
@@ -163,12 +157,14 @@ describe("income_events constraints", () => {
   it("rejects an insert with no source_id at the constraint level", () => {
     const db = getDb();
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO income_events (
           pay_date, gross_pence, net_pence, paye_pence,
           ni_employee_pence, pension_employee_pence, currency, occurred_at
         ) VALUES ('2026-05-22', 974521, 540832, 332767, 36240, 106016, 'GBP', '2026-05-22T00:00:00.000Z')
-      `).run();
+      `,
+      ).run();
     }).toThrow();
   });
 
@@ -181,12 +177,14 @@ describe("income_events constraints", () => {
       .run();
 
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO income_events (
           pay_date, gross_pence, net_pence, paye_pence,
           ni_employee_pence, pension_employee_pence, currency, occurred_at, source_id
         ) VALUES ('2026-05-22', 974521, 540832, 332767, 36240, 106016, 'GBP', '2026-05-22T00:00:00.000Z', ?)
-      `).run(docResult.lastInsertRowid);
+      `,
+      ).run(docResult.lastInsertRowid);
     }).not.toThrow();
 
     const row = db
@@ -205,7 +203,8 @@ describe("income_events constraints", () => {
       )
       .run();
 
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO income_events (
         pay_date, tax_year, gross_pence, taxable_pence, net_pence, paye_pence,
         ni_employee_pence, pension_employee_pence, pension_employer_pence,
@@ -215,11 +214,13 @@ describe("income_events constraints", () => {
         36240, 106016, 106015,
         'GBP', '2026-05-22T00:00:00.000Z', ?
       )
-    `).run(docResult.lastInsertRowid);
+    `,
+    ).run(docResult.lastInsertRowid);
 
-    const row = db
-      .prepare("SELECT * FROM income_events LIMIT 1")
-      .get() as Record<string, unknown>;
+    const row = db.prepare("SELECT * FROM income_events LIMIT 1").get() as Record<
+      string,
+      unknown
+    >;
 
     expect(row.gross_pence).toBe(974521);
     expect(row.taxable_pence).toBe(988965);

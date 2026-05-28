@@ -93,7 +93,7 @@ flowchart TD
         subgraph WRITE["SQLite — write store · better-sqlite3 · ACID"]
             DOCS["documents\nsource_type: upload | manual | connector"]
             EV["Events — immutable, append-only\ntransactions · income_events"]
-            SN["Snapshots — valid_from · valid_to · recorded_at\naccount_balances · pension_values · mortgage_balance\nasset_values · person_profile"]
+            SN["Snapshots — valid_from · valid_to · recorded_at\naccount_balances · pension_values · mortgage_balance\nholdings · asset_prices · person_profile"]
             RF["Reference\naccounts · assets · mortgages · tax_periods"]
         end
         READ["DuckDB — analytical read layer\nSQLite extension · LOCF · window functions · aggregations"]
@@ -219,7 +219,7 @@ These are invariants. They hold across all tables, all ingestion types, all stag
 
 4. **Snapshot staleness is always surfaced.** Every query over snapshot data returns `recorded_at` alongside the value. The UI displays it. "Your pension is £42,000" without a date is a misleading statement.
 
-5. **LOCF is a query contract.** The last known value for a snapshot is always returned for any query date, via `LAST_VALUE ... IGNORE NULLS` window functions in DuckDB. The application never interpolates or estimates. Unknown = last observed.
+5. **As-of lookup is a single query contract.** The value for a snapshot at any query date is the most recent observation whose validity range covers it — `valid_from <= as_of AND (valid_to IS NULL OR valid_to > as_of)`, taking the latest `valid_from` per series (`DISTINCT ON (series) ... ORDER BY series, valid_from DESC`). This last-observation-carried-forward (LOCF) semantic lives in one centralised helper (`server/snapshots.ts`), composed by every line query and by the trend points. The application never interpolates or estimates. Unknown = last observed; null = never tracked, distinguished from zero.
 
 6. **`external_id` on event rows.** Required for connector-ingested events. Inserts from connectors use `INSERT OR IGNORE` — deduplication is guaranteed at the database level, not application logic.
 
@@ -258,9 +258,12 @@ Values the user types directly into chat. Manual entry is fanned out across one 
 |---|---|
 | `record_account_balance` | `account_balances` (creates `accounts` row if needed) |
 | `record_pension_value` | `pension_values` (creates pension `accounts` row if needed) |
-| `record_mortgage_balance` | `mortgage_balance` (creates `mortgages` row if needed) |
-| `record_asset_value` | `asset_values` (creates `assets` row if needed) |
-| `record_equity_grant` | `equity_grant` |
+| `record_mortgage` | `mortgages` (returns a mortgage ID) |
+| `record_mortgage_balance` | `mortgage_balance` (requires existing mortgage) |
+| `record_asset_holding` | `holdings` (creates `assets` row if needed) |
+| `record_asset_price` | `asset_prices` (creates `assets` row if needed) |
+| `refresh_asset_price` | dispatches on `assets.price_source`; manual sources defer to `record_asset_price` |
+| `record_equity_grant` | `equity_grant` (returns a grant ID) |
 | `record_vesting_event` | `equity_vesting_event` (requires existing grant) |
 
 ```
@@ -337,6 +340,8 @@ Not all questions are SQL questions. The schema catalog documents which question
 
 ## Use case validation
 
+This table records **design fit** — whether the schema and architecture accommodate the use case — not what is built today. Several rows describe the end-state target; cashflow categorisation, connectors (and their deduplication), multi-currency, and projections are **deferred** (see the decision log and `CLAUDE.md` for current vs deferred scope). Built today: manual entry, payslip ingest with review, natural-language query, and net worth (realised + contingent) with a 12-month trend.
+
 | Use case | Design fit | Notes |
 |---|---|---|
 | Net worth at a point in time + trend | ✅ | LOCF across snapshot series; DuckDB windowed aggregation |
@@ -349,7 +354,7 @@ Not all questions are SQL questions. The schema catalog documents which question
 | Late / backfill ingestion | ✅ | `valid_from` = statement date, `recorded_at` = today; retroactive correction by design |
 | Historical correction without data loss | ✅ | Close old row, insert corrected row; old row preserved |
 | LLM natural language query | ✅ | Schema catalog + DuckDB execution; schema naming is the accuracy lever |
-| Crypto P&L | ✅ | `asset_values` snapshots + acquisition events; staleness must be surfaced |
+| Crypto P&L | ✅ | `holdings` quantity snapshots × `asset_prices` ticks + acquisition events; staleness must be surfaced |
 | Progressive data entry (sparse early data) | ✅ | LOCF returns last known value; null = never tracked, distinguished from zero |
 | Multi-currency assets | ✅ | Store original + GBP equivalent at observation; no live FX at query time |
 | Connector deduplication | ✅ | `external_id` + `INSERT OR IGNORE`; idempotent by design |
@@ -375,6 +380,8 @@ Not all questions are SQL questions. The schema catalog documents which question
 | 2026-05-26 | Staleness: always surface `recorded_at` | Every snapshot-derived value carries its observation date. Never imply live data. |
 | 2026-05-27 | Flex layer: bounded `payload` JSON on proven-tail tables | Typed spine for anything aggregated or trended; `payload` for the unmodelled long tail on `income_events` and the equity tables. Not blanket, not a query target, with a promotion path. Derived from the end-state flow refinement in `docs/end-state-flows.md`. See design rule 7. |
 | 2026-05-27 | Equity entities: `equity_grant` + `equity_vesting_event` | Typed primitives (scheme type, units, strike, vest dates) plus `payload` for scheme-specific terms. Valuation and vesting-tax methods remain open decisions. |
-| 2026-05-28 | Manual entry: fanned per series, not a single dispatching tool | Six `record_*` tools (`account_balance`, `pension_value`, `mortgage_balance`, `asset_value`, `equity_grant`, `vesting_event`). Each owns its own zod schema, ensures its reference row, writes the audit JSON, and inserts the typed row in one transaction. The LLM picks the right one from chat. Shared helpers in `references.ts`. |
+| 2026-05-28 | Manual entry: fanned per series, not a single dispatching tool | One `record_*` tool per series (`account_balance`, `pension_value`, `mortgage`, `mortgage_balance`, `asset_holding`, `asset_price`, `refresh_asset_price`, `equity_grant`, `vesting_event`). Each owns its own zod schema, ensures its reference row, writes the audit JSON, and inserts the typed row in one transaction. The LLM picks the right one from chat. Shared helpers in `references.ts`. |
 | 2026-05-28 | Net worth: dedicated `get_net_worth` tool, not text-to-SQL | Contingent (unvested) equity valuation isn't expressible as a single clean query and must not be confused with realised holdings. A typed module computes the split and is consumed by `ui://pfa/net_worth.html`. |
 | 2026-05-28 | Asset pricing: split inventory from valuation; event-locked prices stay on event rows | `holdings` (quantity, changes on transactions) + `asset_prices` (per-unit price ticks, source-tagged) replace the old `asset_values` table which bundled both. Property value moves to `asset_prices` against a `property` asset, removing it from `mortgage_balance`. Equity grant current price moves from `payload` to `asset_prices` via `equity_grant.asset_id`. Strike and market-at-vest remain on their respective event rows as immutable tax facts. `assets.price_source` is a strategy hint for future connectors. |
+| 2026-05-28 | Data access: Kysely typed query builder + migrator | Write path (`record_*` tools, `references.ts`) uses Kysely over `better-sqlite3` for typed inserts/selects and transactions. Schema lives once as the Kysely `DatabaseSchema` interface (`server/schema.ts`); a coverage test asserts every table/column appears in `docs/schema_catalog.md`. Versioned migrations (`server/migrations/`) replace the destructive `DDL` + `DROP_ALL` strings; `initDb()` runs `migrateToLatest()` on startup, `resetDb()` is test-only. The DuckDB read path keeps parameterised `sql` (no string interpolation); `runQuery(sql, params)` passes bind parameters. |
+| 2026-05-28 | As-of lookup: one centralised LOCF helper | The "latest snapshot covering a date" logic, previously hand-rolled per query, lives once in `server/snapshots.ts` and is composed by every net-worth line query and the trend points. See design rule 5. |

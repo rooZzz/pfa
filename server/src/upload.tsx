@@ -1,27 +1,9 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { IngestReviewResult } from "../tools/ingest_document.js";
 
-type LineItem = { description: string; amount_pence: number };
-
-type ParsedPayslip = {
-  pay_date: string;
-  tax_year: string | null;
-  gross_pence: number;
-  taxable_pence: number | null;
-  net_pence: number;
-  paye_pence: number;
-  ni_employee_pence: number;
-  pension_employee_pence: number;
-  pension_employer_pence: number | null;
-};
-
-type IngestResult = {
-  review_id: string;
-  filename: string;
-  parsed: ParsedPayslip;
-  payload: { line_items: LineItem[] };
-};
+type IngestResult = IngestReviewResult;
 
 type Status = "drop" | "parsing" | "review" | "confirming" | "confirmed" | "error";
 
@@ -73,9 +55,9 @@ function UploadApp() {
             },
           });
 
-          const text = result.content?.find((c: { type: string }) => c.type === "text") as
-            | { type: "text"; text: string }
-            | undefined;
+          const text = result.content?.find(
+            (c: { type: string }) => c.type === "text",
+          ) as { type: "text"; text: string } | undefined;
           if (!text) throw new Error("No response from ingest_document.");
 
           const data = JSON.parse(text.text) as IngestResult;
@@ -200,8 +182,14 @@ function UploadApp() {
             <Row label="Net pay" value={formatGbp(parsed.net_pence)} />
             <Row label="PAYE" value={formatGbp(parsed.paye_pence)} />
             <Row label="NI (employee)" value={formatGbp(parsed.ni_employee_pence)} />
-            <Row label="Pension (employee)" value={formatGbp(parsed.pension_employee_pence)} />
-            <Row label="Pension (employer)" value={formatGbp(parsed.pension_employer_pence)} />
+            <Row
+              label="Pension (employee)"
+              value={formatGbp(parsed.pension_employee_pence)}
+            />
+            <Row
+              label="Pension (employer)"
+              value={formatGbp(parsed.pension_employer_pence)}
+            />
           </tbody>
         </table>
 
@@ -211,7 +199,11 @@ function UploadApp() {
             <table style={styles.table}>
               <tbody>
                 {payload.line_items.map((item, i) => (
-                  <Row key={i} label={item.description} value={formatGbp(item.amount_pence)} />
+                  <Row
+                    key={i}
+                    label={item.description}
+                    value={formatGbp(item.amount_pence)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -256,7 +248,12 @@ function UploadApp() {
 const styles: Record<string, React.CSSProperties> = {
   container: { fontFamily: "system-ui", padding: "1rem", maxWidth: "28rem" },
   heading: { marginTop: 0, marginBottom: "0.5rem", fontSize: "1rem" },
-  subheading: { marginTop: "1rem", marginBottom: "0.5rem", fontSize: "0.875rem", color: "#555" },
+  subheading: {
+    marginTop: "1rem",
+    marginBottom: "0.5rem",
+    fontSize: "0.875rem",
+    color: "#555",
+  },
   source: { fontSize: "0.75rem", color: "#888", marginBottom: "1rem" },
   table: { borderCollapse: "collapse", width: "100%", marginBottom: "1.25rem" },
   label: { padding: "0.3rem 0.75rem 0.3rem 0", color: "#666", whiteSpace: "nowrap" },

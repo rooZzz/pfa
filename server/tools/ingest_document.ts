@@ -3,11 +3,7 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import { stageReview } from "../staging.js";
 
-const SUPPORTED_MIME_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "application/pdf",
-]);
+const SUPPORTED_MIME_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -33,15 +29,18 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       },
       tax_year: {
         type: ["string", "null"] as unknown as "string",
-        description: "UK tax year as YYYY/YY (e.g. 2026/27). Derive from pay_date if not explicitly shown.",
+        description:
+          "UK tax year as YYYY/YY (e.g. 2026/27). Derive from pay_date if not explicitly shown.",
       },
       gross_pence: {
         type: "integer",
-        description: "Gross Pay in pence — total earnings before deductions. Use the Gross Pay summary figure, not Taxable Pay.",
+        description:
+          "Gross Pay in pence — total earnings before deductions. Use the Gross Pay summary figure, not Taxable Pay.",
       },
       taxable_pence: {
         type: ["integer", "null"] as unknown as "integer",
-        description: "Taxable Pay in pence if shown and different from gross_pence. Can exceed gross when Benefits in Kind are included. Null if same as gross or absent.",
+        description:
+          "Taxable Pay in pence if shown and different from gross_pence. Can exceed gross when Benefits in Kind are included. Null if same as gross or absent.",
       },
       net_pence: {
         type: "integer",
@@ -57,20 +56,29 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       },
       pension_employee_pence: {
         type: "integer",
-        description: "Employee pension contribution this period in pence. Salary sacrifice pension appears as NEGATIVE entries in the Payments section (reducing gross pay) rather than in Deductions — include those. Sum all pension-labelled lines. Do not include SAYE, Share Save, insurance, car, or loan scheme entries.",
+        description:
+          "Employee pension contribution this period in pence. Salary sacrifice pension appears as NEGATIVE entries in the Payments section (reducing gross pay) rather than in Deductions — include those. Sum all pension-labelled lines. Do not include SAYE, Share Save, insurance, car, or loan scheme entries.",
       },
       pension_employer_pence: {
         type: ["integer", "null"] as unknown as "integer",
-        description: "Employer pension contribution this period in pence, if shown. Null if absent.",
+        description:
+          "Employer pension contribution this period in pence, if shown. Null if absent.",
       },
       line_items: {
         type: ["array", "null"] as unknown as "array",
-        description: "Every individual line from the Payments and Deductions sections. Amounts are positive integers in pence.",
+        description:
+          "Every individual line from the Payments and Deductions sections. Amounts are positive integers in pence.",
         items: {
           type: "object",
           properties: {
-            description: { type: "string", description: "Line item label as shown on the payslip." },
-            amount_pence: { type: "integer", description: "Amount in pence, always positive." },
+            description: {
+              type: "string",
+              description: "Line item label as shown on the payslip.",
+            },
+            amount_pence: {
+              type: "integer",
+              description: "Amount in pence, always positive.",
+            },
           },
           required: ["description", "amount_pence"],
         },
@@ -110,6 +118,13 @@ const ParsedPayslipSchema = z.object({
 
 export type ParsedPayslip = z.infer<typeof ParsedPayslipSchema>;
 export type LineItem = z.infer<typeof LineItemSchema>;
+export type PayslipSpine = Omit<ParsedPayslip, "line_items">;
+export type IngestReviewResult = {
+  review_id: string;
+  filename: string;
+  parsed: PayslipSpine;
+  payload: { line_items: LineItem[] };
+};
 
 let client: Anthropic | null = null;
 
@@ -162,9 +177,7 @@ export async function parsePayslipVision(
 
   const result = ParsedPayslipSchema.safeParse(toolBlock.input);
   if (!result.success) {
-    throw new Error(
-      `Haiku tool response failed validation: ${result.error.message}`,
-    );
+    throw new Error(`Haiku tool response failed validation: ${result.error.message}`);
   }
 
   return result.data;
@@ -203,10 +216,7 @@ export async function ingestDocument(input: {
     );
   }
 
-  const contentHash = crypto
-    .createHash("sha256")
-    .update(fileBuffer)
-    .digest("hex");
+  const contentHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
 
   const extracted = await parsePayslipVision(input.file_base64, input.mime_type);
   const { line_items, ...spine } = extracted;

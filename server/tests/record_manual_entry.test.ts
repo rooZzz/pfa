@@ -83,9 +83,9 @@ describe("recordAccountBalance", () => {
       valid_from: "2026-05-01",
     });
 
-    const doc = getDb()
-      .prepare("SELECT file_path FROM documents LIMIT 1")
-      .get() as { file_path: string };
+    const doc = getDb().prepare("SELECT file_path FROM documents LIMIT 1").get() as {
+      file_path: string;
+    };
     expect(fs.existsSync(doc.file_path)).toBe(true);
     const content = JSON.parse(fs.readFileSync(doc.file_path, "utf-8")) as {
       entry_type: string;
@@ -104,9 +104,10 @@ describe("recordPensionValue", () => {
     });
 
     const db = getDb();
-    const account = db
-      .prepare("SELECT name, type FROM accounts LIMIT 1")
-      .get() as { name: string; type: string };
+    const account = db.prepare("SELECT name, type FROM accounts LIMIT 1").get() as {
+      name: string;
+      type: string;
+    };
     expect(account.type).toBe("pension");
 
     const row = db
@@ -130,8 +131,15 @@ describe("recordMortgage", () => {
 
     const db = getDb();
     const mortgage = db
-      .prepare("SELECT lender, property, original_amount_pence, currency FROM mortgages LIMIT 1")
-      .get() as { lender: string; property: string; original_amount_pence: number; currency: string };
+      .prepare(
+        "SELECT lender, property, original_amount_pence, currency FROM mortgages LIMIT 1",
+      )
+      .get() as {
+      lender: string;
+      property: string;
+      original_amount_pence: number;
+      currency: string;
+    };
     expect(mortgage.lender).toBe("Nationwide");
     expect(mortgage.property).toBe("1 Main St");
     expect(mortgage.original_amount_pence).toBe(30000000);
@@ -159,8 +167,14 @@ describe("recordMortgageBalance", () => {
 
     const db = getDb();
     const row = db
-      .prepare("SELECT outstanding_pence, interest_rate_bps, source_id FROM mortgage_balance LIMIT 1")
-      .get() as { outstanding_pence: number; interest_rate_bps: number; source_id: number };
+      .prepare(
+        "SELECT outstanding_pence, interest_rate_bps, source_id FROM mortgage_balance LIMIT 1",
+      )
+      .get() as {
+      outstanding_pence: number;
+      interest_rate_bps: number;
+      source_id: number;
+    };
     expect(row.outstanding_pence).toBe(25000000);
     expect(row.interest_rate_bps).toBe(450);
     expect(row.source_id).toBeGreaterThan(0);
@@ -231,15 +245,17 @@ describe("recordAssetHolding", () => {
     });
 
     const db = getDb();
-    const asset = db
-      .prepare("SELECT name, asset_type FROM assets LIMIT 1")
-      .get() as { name: string; asset_type: string };
+    const asset = db.prepare("SELECT name, asset_type FROM assets LIMIT 1").get() as {
+      name: string;
+      asset_type: string;
+    };
     expect(asset.name).toBe("ETH");
     expect(asset.asset_type).toBe("crypto");
 
-    const row = db
-      .prepare("SELECT quantity, source_id FROM holdings LIMIT 1")
-      .get() as { quantity: number; source_id: number };
+    const row = db.prepare("SELECT quantity, source_id FROM holdings LIMIT 1").get() as {
+      quantity: number;
+      source_id: number;
+    };
     expect(row.quantity).toBe(1500000000);
     expect(row.source_id).toBeGreaterThan(0);
   });
@@ -286,8 +302,15 @@ describe("recordAssetPrice", () => {
 
     const db = getDb();
     const row = db
-      .prepare("SELECT unit_price_pence, currency, source, source_id FROM asset_prices LIMIT 1")
-      .get() as { unit_price_pence: number; currency: string; source: string; source_id: number };
+      .prepare(
+        "SELECT unit_price_pence, currency, source, source_id FROM asset_prices LIMIT 1",
+      )
+      .get() as {
+      unit_price_pence: number;
+      currency: string;
+      source: string;
+      source_id: number;
+    };
     expect(row.unit_price_pence).toBe(350000);
     expect(row.currency).toBe("GBP");
     expect(row.source).toBe("manual");
@@ -326,9 +349,9 @@ describe("recordEquityGrant", () => {
     });
 
     const db = getDb();
-    const grant = db
-      .prepare("SELECT asset_id FROM equity_grant LIMIT 1")
-      .get() as { asset_id: number };
+    const grant = db.prepare("SELECT asset_id FROM equity_grant LIMIT 1").get() as {
+      asset_id: number;
+    };
     expect(grant.asset_id).toBeGreaterThan(0);
 
     const asset = db

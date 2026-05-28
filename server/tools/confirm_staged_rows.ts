@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DOCUMENTS_DIR, getDb } from "../db.js";
+import { DOCUMENTS_DIR, getKysely } from "../db.js";
 import { clearReview, getReview } from "../staging.js";
 
 function taxYearDates(taxYear: string): { starts_on: string; ends_on: string } {
@@ -11,9 +11,7 @@ function taxYearDates(taxYear: string): { starts_on: string; ends_on: string } {
   };
 }
 
-export async function confirmStagedRows(input: {
-  review_id: string;
-}): Promise<string> {
+export async function confirmStagedRows(input: { review_id: string }): Promise<string> {
   const staged = getReview(input.review_id);
   if (!staged) {
     throw new Error(
@@ -26,53 +24,51 @@ export async function confirmStagedRows(input: {
   const destFilename = `upload_${timestamp}${ext}`;
   const destPath = path.join(DOCUMENTS_DIR, destFilename);
 
-  const db = getDb();
+  const sourceId = await getKysely()
+    .transaction()
+    .execute(async (trx) => {
+      if (staged.tax_year) {
+        const { starts_on, ends_on } = taxYearDates(staged.tax_year);
+        await trx
+          .insertInto("tax_periods")
+          .values({ tax_year: staged.tax_year, starts_on, ends_on })
+          .onConflict((oc) => oc.column("tax_year").doNothing())
+          .execute();
+      }
 
-  const upsertTaxPeriod = db.prepare(`
-    INSERT OR IGNORE INTO tax_periods (tax_year, starts_on, ends_on)
-    VALUES (?, ?, ?)
-  `);
+      const doc = await trx
+        .insertInto("documents")
+        .values({
+          source_type: "upload",
+          file_path: destPath,
+          content_hash: staged.content_hash,
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+      const txSourceId = Number(doc.id);
 
-  const insertDoc = db.prepare(`
-    INSERT INTO documents (source_type, file_path, content_hash)
-    VALUES ('upload', ?, ?)
-  `);
+      await trx
+        .insertInto("income_events")
+        .values({
+          pay_date: staged.pay_date,
+          tax_year: staged.tax_year ?? null,
+          gross_pence: staged.gross_pence,
+          taxable_pence: staged.taxable_pence ?? null,
+          net_pence: staged.net_pence,
+          paye_pence: staged.paye_pence,
+          ni_employee_pence: staged.ni_employee_pence,
+          pension_employee_pence: staged.pension_employee_pence,
+          pension_employer_pence: staged.pension_employer_pence ?? null,
+          currency: staged.currency,
+          occurred_at: new Date(staged.pay_date + "T00:00:00.000Z").toISOString(),
+          source_id: txSourceId,
+          payload: staged.payload != null ? JSON.stringify(staged.payload) : null,
+        })
+        .execute();
 
-  const insertIncomeEvent = db.prepare(`
-    INSERT INTO income_events (
-      pay_date, tax_year, gross_pence, taxable_pence, net_pence,
-      paye_pence, ni_employee_pence, pension_employee_pence,
-      pension_employer_pence, currency, occurred_at, source_id, payload
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const doInsert = db.transaction(() => {
-    if (staged.tax_year) {
-      const { starts_on, ends_on } = taxYearDates(staged.tax_year);
-      upsertTaxPeriod.run(staged.tax_year, starts_on, ends_on);
-    }
-    const docResult = insertDoc.run(destPath, staged.content_hash);
-    const txSourceId = docResult.lastInsertRowid;
-    insertIncomeEvent.run(
-      staged.pay_date,
-      staged.tax_year,
-      staged.gross_pence,
-      staged.taxable_pence ?? null,
-      staged.net_pence,
-      staged.paye_pence,
-      staged.ni_employee_pence,
-      staged.pension_employee_pence,
-      staged.pension_employer_pence ?? null,
-      staged.currency,
-      new Date(staged.pay_date + "T00:00:00.000Z").toISOString(),
-      txSourceId,
-      staged.payload != null ? JSON.stringify(staged.payload) : null,
-    );
-    fs.writeFileSync(destPath, staged.file_bytes);
-    return txSourceId;
-  });
-
-  const sourceId = doInsert();
+      fs.writeFileSync(destPath, staged.file_bytes);
+      return txSourceId;
+    });
   clearReview(input.review_id);
 
   return [
