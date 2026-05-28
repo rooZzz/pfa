@@ -18,10 +18,7 @@ import {
   recordMortgageBalanceSchema,
 } from "./record_mortgage_balance.js";
 import { recordPensionValue, recordPensionValueSchema } from "./record_pension_value.js";
-import {
-  recordTransaction,
-  recordTransactionSchema,
-} from "./record_transaction.js";
+import { recordTransaction, recordTransactionSchema } from "./record_transaction.js";
 import { recordVestingEvent, recordVestingEventSchema } from "./record_vesting_event.js";
 import { refreshAssetPrice, refreshAssetPriceSchema } from "./refresh_asset_price.js";
 import { seedData } from "./seed_data.js";
@@ -159,9 +156,12 @@ export const tools: ToolDescriptor[] = [
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
         .optional()
-        .describe("Limit data to this date. Defaults to today (or period end if year is complete)."),
+        .describe(
+          "Limit data to this date. Defaults to today (or period end if year is complete).",
+        ),
     },
-    handler: async ({ tax_year, as_of }) => text(JSON.stringify(await getCashflow({ tax_year, as_of }))),
+    handler: async ({ tax_year, as_of }) =>
+      text(JSON.stringify(await getCashflow({ tax_year, as_of }))),
   }),
   defineTool({
     name: "open_cashflow",

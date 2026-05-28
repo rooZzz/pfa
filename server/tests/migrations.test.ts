@@ -24,7 +24,11 @@ beforeEach(() => {
 
 describe("migration runner", () => {
   it("records applied migrations in schema_migrations", () => {
-    expect(appliedMigrations()).toEqual(["0001_initial", "0002_transaction_category", "0003_seed_tax_periods"]);
+    expect(appliedMigrations()).toEqual([
+      "0001_initial",
+      "0002_transaction_category",
+      "0003_seed_tax_periods",
+    ]);
   });
 
   it("creates the full schema on initial migration", () => {
@@ -37,7 +41,11 @@ describe("migration runner", () => {
   it("is idempotent — a second initDb does not re-run or duplicate", () => {
     initDb();
     initDb();
-    expect(appliedMigrations()).toEqual(["0001_initial", "0002_transaction_category", "0003_seed_tax_periods"]);
+    expect(appliedMigrations()).toEqual([
+      "0001_initial",
+      "0002_transaction_category",
+      "0003_seed_tax_periods",
+    ]);
   });
 
   it("does not recreate the dead asset_values table", () => {
@@ -67,7 +75,11 @@ describe("migration runner", () => {
 
     resetDb();
 
-    expect(appliedMigrations()).toEqual(["0001_initial", "0002_transaction_category", "0003_seed_tax_periods"]);
+    expect(appliedMigrations()).toEqual([
+      "0001_initial",
+      "0002_transaction_category",
+      "0003_seed_tax_periods",
+    ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,
     ).toBe(0);

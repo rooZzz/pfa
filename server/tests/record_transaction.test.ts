@@ -110,12 +110,15 @@ describe("recordTransaction", () => {
 
     const db = getDb();
     const accountCount = (
-      db.prepare("SELECT COUNT(*) AS c FROM accounts WHERE name = 'Monzo'").get() as { c: number }
+      db.prepare("SELECT COUNT(*) AS c FROM accounts WHERE name = 'Monzo'").get() as {
+        c: number;
+      }
     ).c;
     expect(accountCount).toBe(1);
 
-    const txCount = (db.prepare("SELECT COUNT(*) AS c FROM transactions").get() as { c: number })
-      .c;
+    const txCount = (
+      db.prepare("SELECT COUNT(*) AS c FROM transactions").get() as { c: number }
+    ).c;
     expect(txCount).toBe(2);
   });
 
@@ -129,9 +132,9 @@ describe("recordTransaction", () => {
       currency: "GBP",
     });
 
-    const tx = getDb()
-      .prepare("SELECT category FROM transactions LIMIT 1")
-      .get() as { category: string };
+    const tx = getDb().prepare("SELECT category FROM transactions LIMIT 1").get() as {
+      category: string;
+    };
     expect(tx.category).toBe("general");
   });
 });

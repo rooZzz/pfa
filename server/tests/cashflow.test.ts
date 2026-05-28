@@ -141,7 +141,9 @@ describe("getCashflow", () => {
     });
 
     const result = await getCashflow({ tax_year: "2025/26" });
-    const groceries = result.transactions_by_category.find((l) => l.category === "groceries");
+    const groceries = result.transactions_by_category.find(
+      (l) => l.category === "groceries",
+    );
     const bills = result.transactions_by_category.find((l) => l.category === "bills");
 
     expect(groceries?.outflow_pence).toBe(8000);

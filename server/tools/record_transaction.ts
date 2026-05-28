@@ -3,7 +3,9 @@ import { getKysely } from "../db.js";
 import { ensureAccount, writeManualDocument } from "../references.js";
 
 export const recordTransactionSchema = {
-  account_name: z.string().describe("Human-readable account name, e.g. 'Barclays Current'."),
+  account_name: z
+    .string()
+    .describe("Human-readable account name, e.g. 'Barclays Current'."),
   account_type: z
     .enum(["current", "savings", "isa"])
     .describe("Account type: current, savings, or isa."),
@@ -19,7 +21,10 @@ export const recordTransactionSchema = {
     .describe(
       "Spending category. Use Monzo vocabulary: general, eating_out, expenses, transport, cash, bills, entertainment, shopping, holidays, groceries. Use 'income' for non-salary inflows such as freelance payments or interest. Do not use 'income' for payslip salary — salary is recorded via payslip ingestion, not this tool.",
     ),
-  description: z.string().optional().describe("Free-text description, e.g. merchant name."),
+  description: z
+    .string()
+    .optional()
+    .describe("Free-text description, e.g. merchant name."),
   occurred_at: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")

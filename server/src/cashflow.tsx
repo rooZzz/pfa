@@ -90,7 +90,9 @@ function CashflowApp() {
   const hasTransactions = data.transactions_by_category.length > 0;
   const hasIncome = data.income.payslip_count > 0;
 
-  const outflowCategories = data.transactions_by_category.filter((l) => l.outflow_pence > 0);
+  const outflowCategories = data.transactions_by_category.filter(
+    (l) => l.outflow_pence > 0,
+  );
   const inflowCategories = data.transactions_by_category.filter(
     (l) => l.inflow_pence > 0 && l.outflow_pence === 0,
   );
@@ -155,7 +157,9 @@ function CashflowApp() {
               {data.income.pension_employer_pence > 0 && (
                 <tr style={s.deductionRow}>
                   <td style={{ ...s.nameCell, ...s.indent }}>Pension (employer)</td>
-                  <td style={s.amountCell}>{formatGbp(data.income.pension_employer_pence)}</td>
+                  <td style={s.amountCell}>
+                    {formatGbp(data.income.pension_employer_pence)}
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -166,7 +170,9 @@ function CashflowApp() {
       {!hasIncome && (
         <section>
           <h3 style={s.sectionHeading}>Income</h3>
-          <p style={s.emptyNote}>No payslips recorded in this period. Upload a payslip to add income.</p>
+          <p style={s.emptyNote}>
+            No payslips recorded in this period. Upload a payslip to add income.
+          </p>
         </section>
       )}
 
@@ -216,7 +222,8 @@ function CashflowApp() {
         <section>
           <h3 style={s.sectionHeading}>Transactions</h3>
           <p style={s.emptyNote}>
-            No transactions recorded in this period. Use record_transaction to add spending.
+            No transactions recorded in this period. Use record_transaction to add
+            spending.
           </p>
         </section>
       )}

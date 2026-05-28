@@ -118,7 +118,10 @@ export async function getCashflow(params: {
     queryMonthlyTrend(period_start, as_of),
   ]);
 
-  const transaction_inflow_total_pence = byCategory.reduce((sum, l) => sum + l.inflow_pence, 0);
+  const transaction_inflow_total_pence = byCategory.reduce(
+    (sum, l) => sum + l.inflow_pence,
+    0,
+  );
   const transaction_outflow_total_pence = byCategory.reduce(
     (sum, l) => sum + l.outflow_pence,
     0,

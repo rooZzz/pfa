@@ -27,7 +27,6 @@ function monthsAgo(months: number, day: number = 1): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-
 function clearDocumentsDir(): void {
   if (!fs.existsSync(DOCUMENTS_DIR)) return;
   for (const name of fs.readdirSync(DOCUMENTS_DIR)) {
