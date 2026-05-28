@@ -17,9 +17,17 @@ import {
   recordAccountBalanceSchema,
 } from "./tools/record_account_balance.js";
 import {
-  recordAssetValue,
-  recordAssetValueSchema,
-} from "./tools/record_asset_value.js";
+  recordAssetHolding,
+  recordAssetHoldingSchema,
+} from "./tools/record_asset_holding.js";
+import {
+  recordAssetPrice,
+  recordAssetPriceSchema,
+} from "./tools/record_asset_price.js";
+import {
+  refreshAssetPrice,
+  refreshAssetPriceSchema,
+} from "./tools/refresh_asset_price.js";
 import {
   recordEquityGrant,
   recordEquityGrantSchema,
@@ -119,11 +127,31 @@ export function createServer(): McpServer {
   );
 
   server.tool(
-    "record_asset_value",
-    "Record the current value of a non-account asset (crypto, ETF, stock, other). Creates the asset if it does not exist. GBP value is frozen at ingestion — no live FX at query time.",
-    recordAssetValueSchema,
+    "record_asset_holding",
+    "Record the quantity held for an asset (crypto, ETF, stock, property, other). Creates the asset if it does not exist. Quantity is inventory — record a separate price with record_asset_price for valuation.",
+    recordAssetHoldingSchema,
     async (input) => {
-      const message = await recordAssetValue(input);
+      const message = await recordAssetHolding(input);
+      return { content: [{ type: "text", text: message }] };
+    },
+  );
+
+  server.tool(
+    "record_asset_price",
+    "Record a per-unit price observation for an asset. Used for valuation of holdings and unvested equity. Creates the asset if it does not exist. Call this whenever the price changes — holdings stay unchanged.",
+    recordAssetPriceSchema,
+    async (input) => {
+      const message = await recordAssetPrice(input);
+      return { content: [{ type: "text", text: message }] };
+    },
+  );
+
+  server.tool(
+    "refresh_asset_price",
+    "Refresh the price for an asset according to its price_source. For manual assets, returns instructions to call record_asset_price. Connector sources are not yet implemented.",
+    refreshAssetPriceSchema,
+    async (input) => {
+      const message = await refreshAssetPrice(input);
       return { content: [{ type: "text", text: message }] };
     },
   );

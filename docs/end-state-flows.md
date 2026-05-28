@@ -61,9 +61,11 @@ Three source types, three trust levels, distinct entry surfaces, one canonical d
 
 **Surface.** Conversation.
 
-**What the model does.** Picks the right tool from a fanned set, one per series — `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_value`, `record_equity_grant`, `record_vesting_event`. Each captures the raw input, writes a system-generated JSON file as the source document, ensures its reference row (account, asset, mortgage, grant) if needed, and writes the typed event/snapshot row — all in one transaction.
+**What the model does.** Picks the right tool from a fanned set, one per series — `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_holding`, `record_asset_price`, `record_equity_grant`, `record_vesting_event`. Each captures the raw input, writes a system-generated JSON file as the source document, ensures its reference row (account, asset, mortgage, grant) if needed, and writes the typed event/snapshot row — all in one transaction.
 
-The fan-out (rather than a single dispatching tool) keeps each tool's argument schema tight and unambiguous: the LLM picks the right tool from the conversation rather than threading a generic payload through a router. Shared helpers (`writeManualDocument`, `ensureAccount`, `ensureAsset`, `ensureMortgage`) live in `references.ts` so the per-series tools stay thin.
+Asset entry is a two-step pair: `record_asset_holding` records inventory (quantity, effective date); `record_asset_price` records valuation (per-unit price, as-of timestamp, source). Refreshing the price calls `record_asset_price` again without touching the holding. `refresh_asset_price` dispatches on `assets.price_source` — for `manual` it instructs the user; future connectors implement the other cases.
+
+The fan-out (rather than a single dispatching tool) keeps each tool's argument schema tight and unambiguous: the LLM picks the right tool from the conversation rather than threading a generic payload through a router. Shared helpers (`writeManualDocument`, `ensureAccount`, `ensureAsset`) live in `references.ts` so the per-series tools stay thin.
 
 **Read / written.** A `documents` row (source_type `manual`, the JSON file) plus the reference row (idempotent) plus the typed data row with `source_id`.
 

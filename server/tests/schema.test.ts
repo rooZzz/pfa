@@ -11,7 +11,8 @@ beforeEach(() => {
     DELETE FROM transactions;
     DELETE FROM pension_values;
     DELETE FROM mortgage_balance;
-    DELETE FROM asset_values;
+    DELETE FROM asset_prices;
+    DELETE FROM holdings;
     DELETE FROM person_profile;
     DELETE FROM documents;
     DELETE FROM accounts;
@@ -66,7 +67,8 @@ describe("full schema", () => {
     expect(tables).toContain("account_balances");
     expect(tables).toContain("pension_values");
     expect(tables).toContain("mortgage_balance");
-    expect(tables).toContain("asset_values");
+    expect(tables).toContain("holdings");
+    expect(tables).toContain("asset_prices");
     expect(tables).toContain("person_profile");
   });
 });

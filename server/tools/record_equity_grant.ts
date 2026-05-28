@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getDb } from "../db.js";
-import { writeManualDocument } from "../references.js";
+import { ensureAsset, writeManualDocument } from "../references.js";
 
 export const recordEquityGrantSchema = {
   scheme_type: z
@@ -21,15 +21,14 @@ export const recordEquityGrantSchema = {
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
     .describe("Grant date."),
   currency: z.string().default("GBP").describe("ISO 4217 currency code."),
-  current_price_pence: z
-    .number()
-    .int()
+  underlying_asset_name: z
+    .string()
     .optional()
-    .describe(
-      "Current market price per share. Must be an integer number of pence — e.g. 2565 for a 2,565p / £25.65 share price. " +
-      "UK prices are commonly quoted in pence (e.g. '2,565p', '2565p'): use that number directly, do NOT multiply by 100. " +
-      "Only convert if the price was given in pounds: £25.65 → 2565.",
-    ),
+    .describe("Name of the underlying share asset, e.g. 'ACME Corp'. Used to link the grant to asset_prices for mark-to-market valuation of unvested units."),
+  underlying_asset_type: z
+    .string()
+    .optional()
+    .describe("Asset type for the underlying share, e.g. 'stock'. Required if underlying_asset_name is provided."),
 };
 
 export async function recordEquityGrant(input: {
@@ -38,13 +37,10 @@ export async function recordEquityGrant(input: {
   strike_pence?: number;
   grant_date: string;
   currency: string;
-  current_price_pence?: number;
+  underlying_asset_name?: string;
+  underlying_asset_type?: string;
 }): Promise<string> {
   const db = getDb();
-
-  const grantPayload = {
-    current_price_pence: input.current_price_pence ?? null,
-  };
 
   const doInsert = db.transaction(() => {
     const sourceId = writeManualDocument(db, {
@@ -55,13 +51,19 @@ export async function recordEquityGrant(input: {
       strike_pence: input.strike_pence ?? null,
       grant_date: input.grant_date,
       currency: input.currency,
-      current_price_pence: input.current_price_pence ?? null,
+      underlying_asset_name: input.underlying_asset_name ?? null,
     });
+
+    let assetId: number | null = null;
+    if (input.underlying_asset_name) {
+      const assetType = input.underlying_asset_type ?? "stock";
+      assetId = ensureAsset(db, input.underlying_asset_name, assetType, input.currency);
+    }
 
     const result = db
       .prepare(
-        `INSERT INTO equity_grant (scheme_type, units, strike_pence, grant_date, currency, source_id, payload)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO equity_grant (scheme_type, units, strike_pence, grant_date, currency, asset_id, source_id, payload)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.scheme_type,
@@ -69,18 +71,26 @@ export async function recordEquityGrant(input: {
         input.strike_pence ?? null,
         input.grant_date,
         input.currency,
+        assetId,
         sourceId,
-        JSON.stringify(grantPayload),
+        null,
       );
 
-    return { sourceId, grantId: Number(result.lastInsertRowid) };
+    return { sourceId, grantId: Number(result.lastInsertRowid), assetId };
   });
 
-  const { sourceId, grantId } = doInsert();
+  const { sourceId, grantId, assetId } = doInsert();
 
-  return [
+  const lines = [
     `Recorded ${input.scheme_type.toUpperCase()} equity grant of ${input.units} units on ${input.grant_date}.`,
     `Grant ID: ${grantId}, document ID: ${sourceId}.`,
-    `Use grant ID ${grantId} when recording vesting events.`,
-  ].join(" ");
+  ];
+  if (assetId != null) {
+    lines.push(`Linked to underlying asset ID: ${assetId} (${input.underlying_asset_name}). Use record_asset_price to record a price for unvested-unit valuation.`);
+  } else {
+    lines.push(`No underlying asset linked — unvested unit valuation will be unavailable. Re-record with underlying_asset_name to enable mark-to-market.`);
+  }
+  lines.push(`Use grant ID ${grantId} when recording vesting events.`);
+
+  return lines.join(" ");
 }

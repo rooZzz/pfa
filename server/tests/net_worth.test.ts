@@ -3,7 +3,8 @@ import { getDb, initDb } from "../db.js";
 import { getNetWorth } from "../net_worth.js";
 import { resetDuck } from "../query.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
-import { recordAssetValue } from "../tools/record_asset_value.js";
+import { recordAssetHolding } from "../tools/record_asset_holding.js";
+import { recordAssetPrice } from "../tools/record_asset_price.js";
 import { recordEquityGrant } from "../tools/record_equity_grant.js";
 import { recordMortgage } from "../tools/record_mortgage.js";
 import { recordMortgageBalance } from "../tools/record_mortgage_balance.js";
@@ -21,7 +22,8 @@ beforeEach(() => {
     DELETE FROM equity_grant;
     DELETE FROM pension_values;
     DELETE FROM mortgage_balance;
-    DELETE FROM asset_values;
+    DELETE FROM asset_prices;
+    DELETE FROM holdings;
     DELETE FROM account_balances;
     DELETE FROM documents;
     DELETE FROM accounts;
@@ -52,21 +54,44 @@ async function seedFullPicture() {
   });
   const mortgageIdMatch = mortgageResult.match(/Mortgage ID:\s*(\d+)/);
   const mortgageId = parseInt(mortgageIdMatch![1]!, 10);
+  await recordAssetHolding({
+    asset_name: "1 Main St",
+    asset_type: "property",
+    base_currency: "GBP",
+    quantity: 1,
+    valid_from: "2026-01-01",
+  });
+  await recordAssetPrice({
+    asset_name: "1 Main St",
+    asset_type: "property",
+    base_currency: "GBP",
+    unit_price_pence: 40000000,
+    currency: "GBP",
+    as_of: "2026-01-01",
+    source: "manual",
+  });
   await recordMortgageBalance({
     mortgage_id: mortgageId,
     outstanding_pence: 25000000,
     interest_rate_bps: 450,
-    property_value_pence: 40000000,
     currency: "GBP",
     valid_from: "2026-01-01",
   });
-  await recordAssetValue({
+  await recordAssetHolding({
     asset_name: "ETH",
     asset_type: "crypto",
+    base_currency: "ETH",
     quantity: 100,
-    original_currency: "ETH",
-    gbp_equivalent_pence: 200000,
     valid_from: "2026-01-01",
+  });
+  await recordAssetPrice({
+    asset_name: "ETH",
+    asset_type: "crypto",
+    base_currency: "ETH",
+    unit_price_pence: 2000,
+    currency: "GBP",
+    as_of: "2026-01-01",
+    source: "manual",
   });
 }
 
@@ -105,7 +130,7 @@ describe("getNetWorth — realised", () => {
       4200000 +
       40000000 +
       -25000000 +
-      200000;
+      100 * 2000;
     expect(result.realised_total_pence).toBe(expected);
   });
 
@@ -125,6 +150,19 @@ describe("getNetWorth — realised", () => {
     for (const line of result.realised) {
       expect(line.valid_from).toMatch(/^\d{4}-\d{2}-\d{2}/);
     }
+  });
+
+  it("asset and property lines carry price_as_of and price_source", async () => {
+    await seedFullPicture();
+    const result = await getNetWorth("2026-05-01");
+
+    const assetLine = result.realised.find((l) => l.kind === "asset");
+    expect(assetLine?.price_as_of).toBeDefined();
+    expect(assetLine?.price_source).toBe("manual");
+
+    const propertyLine = result.realised.find((l) => l.kind === "property");
+    expect(propertyLine?.price_as_of).toBeDefined();
+    expect(propertyLine?.price_source).toBe("manual");
   });
 });
 
@@ -171,6 +209,38 @@ describe("getNetWorth — LOCF", () => {
     expect(accountLines).toHaveLength(1);
     expect(accountLines[0]!.value_pence).toBe(200000);
   });
+
+  it("asset value reflects latest price tick, not holding date", async () => {
+    await recordAssetHolding({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      base_currency: "ETH",
+      quantity: 10,
+      valid_from: "2026-01-01",
+    });
+    await recordAssetPrice({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      base_currency: "ETH",
+      unit_price_pence: 100000,
+      currency: "GBP",
+      as_of: "2026-01-01",
+      source: "manual",
+    });
+    await recordAssetPrice({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      base_currency: "ETH",
+      unit_price_pence: 200000,
+      currency: "GBP",
+      as_of: "2026-03-01",
+      source: "manual",
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    const assetLine = result.realised.find((l) => l.kind === "asset");
+    expect(assetLine?.value_pence).toBe(10 * 200000);
+  });
 });
 
 describe("getNetWorth — unknown series", () => {
@@ -185,7 +255,7 @@ describe("getNetWorth — unknown series", () => {
 
     const result = await getNetWorth("2026-05-01");
     expect(result.unknown).toContain("pension");
-    expect(result.unknown).toContain("property / mortgage");
+    expect(result.unknown).toContain("property");
     expect(result.unknown).toContain("assets");
     expect(result.unknown).not.toContain("accounts");
   });
@@ -211,7 +281,17 @@ describe("getNetWorth — contingent equity", () => {
       units: 1000,
       grant_date: "2025-01-01",
       currency: "GBP",
-      current_price_pence: 50000,
+      underlying_asset_name: "ACME Corp",
+      underlying_asset_type: "stock",
+    });
+    await recordAssetPrice({
+      asset_name: "ACME Corp",
+      asset_type: "stock",
+      base_currency: "GBP",
+      unit_price_pence: 50000,
+      currency: "GBP",
+      as_of: "2026-01-01",
+      source: "manual",
     });
 
     const grantId = (
@@ -238,24 +318,42 @@ describe("getNetWorth — contingent equity", () => {
     expect(realisedKinds).not.toContain("equity");
   });
 
-  it("uses the latest vesting market price for valuation", async () => {
+  it("uses the current asset_prices entry for unvested valuation", async () => {
     await recordEquityGrant({
       scheme_type: "rsu",
       units: 1000,
       grant_date: "2025-01-01",
       currency: "GBP",
-      current_price_pence: 50000,
+      underlying_asset_name: "ACME Corp",
+      underlying_asset_type: "stock",
+    });
+    await recordAssetPrice({
+      asset_name: "ACME Corp",
+      asset_type: "stock",
+      base_currency: "GBP",
+      unit_price_pence: 48000,
+      currency: "GBP",
+      as_of: "2026-01-01",
+      source: "manual",
+    });
+    await recordAssetPrice({
+      asset_name: "ACME Corp",
+      asset_type: "stock",
+      base_currency: "GBP",
+      unit_price_pence: 52000,
+      currency: "GBP",
+      as_of: "2026-04-01",
+      source: "manual",
     });
 
     const grantId = (
       getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
     ).id;
-
     await recordVestingEvent({
       grant_id: grantId,
       vest_date: "2026-01-01",
       units_vested: 250,
-      market_price_pence: 52000,
+      market_price_pence: 48000,
     });
 
     const result = await getNetWorth("2026-05-01");
@@ -265,20 +363,19 @@ describe("getNetWorth — contingent equity", () => {
     expect(line.est_value_pence).toBe(750 * 52000);
   });
 
-  it("falls back to grant payload price when no vesting events exist yet", async () => {
+  it("shows no price when grant has no underlying asset linked", async () => {
     await recordEquityGrant({
       scheme_type: "rsu",
       units: 1000,
       grant_date: "2025-01-01",
       currency: "GBP",
-      current_price_pence: 48000,
     });
 
     const result = await getNetWorth("2026-05-01");
     const line = result.contingent[0]!;
 
-    expect(line.price_per_unit_pence).toBe(48000);
-    expect(line.est_value_pence).toBe(1000 * 48000);
+    expect(line.price_per_unit_pence).toBeNull();
+    expect(line.est_value_pence).toBeNull();
   });
 
   it("contingent equity does not contribute to realised_total_pence", async () => {
@@ -287,7 +384,17 @@ describe("getNetWorth — contingent equity", () => {
       units: 1000,
       grant_date: "2025-01-01",
       currency: "GBP",
-      current_price_pence: 50000,
+      underlying_asset_name: "ACME Corp",
+      underlying_asset_type: "stock",
+    });
+    await recordAssetPrice({
+      asset_name: "ACME Corp",
+      asset_type: "stock",
+      base_currency: "GBP",
+      unit_price_pence: 50000,
+      currency: "GBP",
+      as_of: "2026-01-01",
+      source: "manual",
     });
 
     const result = await getNetWorth("2026-05-01");
