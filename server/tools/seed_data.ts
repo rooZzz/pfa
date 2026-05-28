@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DOCUMENTS_DIR, initDb } from "../db.js";
+import { DOCUMENTS_DIR, resetDb } from "../db.js";
 import { recordAccountBalance } from "./record_account_balance.js";
 import { recordAssetValue } from "./record_asset_value.js";
 import { recordEquityGrant } from "./record_equity_grant.js";
@@ -273,7 +273,7 @@ function parseGrantId(message: string): number {
 }
 
 export async function seedData(): Promise<string> {
-  initDb();
+  resetDb();
   clearDocumentsDir();
 
   await seedAccounts();

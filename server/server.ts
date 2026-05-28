@@ -7,7 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { initDb } from "./db.js";
+import { initDb, resetDb } from "./db.js";
 import { getNetWorth } from "./net_worth.js";
 import { confirmStagedRows } from "./tools/confirm_staged_rows.js";
 import { ingestDocument } from "./tools/ingest_document.js";
@@ -218,6 +218,16 @@ export function createServer(): McpServer {
     async (input) => {
       const message = await confirmStagedRows(input);
       return { content: [{ type: "text", text: message }] };
+    },
+  );
+
+  server.tool(
+    "reset_schema",
+    "Development utility. Drops all tables and recreates them with the current schema. All data is permanently deleted. Does not reseed — call seed_data afterwards if you want representative data.",
+    {},
+    async () => {
+      resetDb();
+      return { content: [{ type: "text", text: "Schema reset. All tables dropped and recreated. Database is empty." }] };
     },
   );
 
