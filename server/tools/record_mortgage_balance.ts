@@ -1,10 +1,13 @@
 import { z } from "zod";
 import { getDb } from "../db.js";
-import { ensureMortgage, writeManualDocument } from "../references.js";
+import { writeManualDocument } from "../references.js";
 
 export const recordMortgageBalanceSchema = {
-  lender: z.string().describe("Lender name, e.g. 'Nationwide'."),
-  property: z.string().describe("Property address or identifier, e.g. '1 Main St'."),
+  mortgage_id: z
+    .number()
+    .int()
+    .positive()
+    .describe("The mortgage ID returned by record_mortgage."),
   outstanding_pence: z
     .number()
     .int()
@@ -25,8 +28,7 @@ export const recordMortgageBalanceSchema = {
 };
 
 export async function recordMortgageBalance(input: {
-  lender: string;
-  property: string;
+  mortgage_id: number;
   outstanding_pence: number;
   interest_rate_bps: number;
   property_value_pence: number;
@@ -35,12 +37,21 @@ export async function recordMortgageBalance(input: {
 }): Promise<string> {
   const db = getDb();
 
+  const mortgage = db
+    .prepare("SELECT id, lender, property FROM mortgages WHERE id = ?")
+    .get(input.mortgage_id) as { id: number; lender: string; property: string } | undefined;
+
+  if (!mortgage) {
+    throw new Error(
+      `No mortgage with ID ${input.mortgage_id}. Record the mortgage first using record_mortgage.`,
+    );
+  }
+
   const doInsert = db.transaction(() => {
     const sourceId = writeManualDocument(db, {
       source_type: "manual",
       entry_type: "mortgage_balance",
-      lender: input.lender,
-      property: input.property,
+      mortgage_id: input.mortgage_id,
       outstanding_pence: input.outstanding_pence,
       interest_rate_bps: input.interest_rate_bps,
       property_value_pence: input.property_value_pence,
@@ -48,20 +59,12 @@ export async function recordMortgageBalance(input: {
       valid_from: input.valid_from,
     });
 
-    const mortgageId = ensureMortgage(
-      db,
-      input.lender,
-      input.property,
-      input.outstanding_pence,
-      input.currency,
-    );
-
     db.prepare(
       `INSERT INTO mortgage_balance
          (mortgage_id, outstanding_pence, interest_rate_bps, property_value_pence, currency, valid_from, source_id)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      mortgageId,
+      input.mortgage_id,
       input.outstanding_pence,
       input.interest_rate_bps,
       input.property_value_pence,
@@ -70,15 +73,15 @@ export async function recordMortgageBalance(input: {
       sourceId,
     );
 
-    return { sourceId, mortgageId };
+    return sourceId;
   });
 
-  const { sourceId, mortgageId } = doInsert();
+  const sourceId = doInsert();
 
   const ltv = Math.round((input.outstanding_pence * 100) / input.property_value_pence);
   return [
-    `Recorded mortgage balance for ${input.lender} — ${input.property}.`,
+    `Recorded mortgage balance for ${mortgage.lender} — ${mortgage.property}.`,
     `Outstanding: ${input.outstanding_pence} ${input.currency}, property value: ${input.property_value_pence} ${input.currency}, LTV: ${ltv}%.`,
-    `Mortgage ID: ${mortgageId}, document ID: ${sourceId}.`,
+    `Mortgage ID: ${input.mortgage_id}, document ID: ${sourceId}.`,
   ].join(" ");
 }

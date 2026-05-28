@@ -4,6 +4,7 @@ import { getDb, initDb } from "../db.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 import { recordAssetValue } from "../tools/record_asset_value.js";
 import { recordEquityGrant } from "../tools/record_equity_grant.js";
+import { recordMortgage } from "../tools/record_mortgage.js";
 import { recordMortgageBalance } from "../tools/record_mortgage_balance.js";
 import { recordPensionValue } from "../tools/record_pension_value.js";
 import { recordVestingEvent } from "../tools/record_vesting_event.js";
@@ -114,11 +115,40 @@ describe("recordPensionValue", () => {
   });
 });
 
-describe("recordMortgageBalance", () => {
-  it("creates a mortgage and writes a mortgage_balance row", async () => {
-    await recordMortgageBalance({
+describe("recordMortgage", () => {
+  it("writes a mortgages row with the supplied original_amount_pence and returns a usable ID", async () => {
+    const result = await recordMortgage({
       lender: "Nationwide",
       property: "1 Main St",
+      original_amount_pence: 30000000,
+      currency: "GBP",
+    });
+
+    expect(result).toMatch(/Mortgage ID: \d+/);
+
+    const db = getDb();
+    const mortgage = db
+      .prepare("SELECT lender, property, original_amount_pence, currency FROM mortgages LIMIT 1")
+      .get() as { lender: string; property: string; original_amount_pence: number; currency: string };
+    expect(mortgage.lender).toBe("Nationwide");
+    expect(mortgage.property).toBe("1 Main St");
+    expect(mortgage.original_amount_pence).toBe(30000000);
+    expect(mortgage.currency).toBe("GBP");
+  });
+});
+
+describe("recordMortgageBalance", () => {
+  it("writes a mortgage_balance row linked to a registered mortgage", async () => {
+    const registerResult = await recordMortgage({
+      lender: "Nationwide",
+      property: "1 Main St",
+      original_amount_pence: 30000000,
+      currency: "GBP",
+    });
+    const mortgageId = parseMortgageId(registerResult);
+
+    await recordMortgageBalance({
+      mortgage_id: mortgageId,
       outstanding_pence: 25000000,
       interest_rate_bps: 450,
       property_value_pence: 40000000,
@@ -127,11 +157,6 @@ describe("recordMortgageBalance", () => {
     });
 
     const db = getDb();
-    const mortgage = db
-      .prepare("SELECT lender, property FROM mortgages LIMIT 1")
-      .get() as { lender: string; property: string };
-    expect(mortgage.lender).toBe("Nationwide");
-
     const row = db
       .prepare("SELECT outstanding_pence, property_value_pence, source_id FROM mortgage_balance LIMIT 1")
       .get() as { outstanding_pence: number; property_value_pence: number; source_id: number };
@@ -140,10 +165,30 @@ describe("recordMortgageBalance", () => {
     expect(row.source_id).toBeGreaterThan(0);
   });
 
-  it("upserts the mortgage on repeated calls", async () => {
-    await recordMortgageBalance({
+  it("throws when mortgage_id does not exist", async () => {
+    await expect(
+      recordMortgageBalance({
+        mortgage_id: 9999,
+        outstanding_pence: 25000000,
+        interest_rate_bps: 450,
+        property_value_pence: 40000000,
+        currency: "GBP",
+        valid_from: "2026-05-01",
+      }),
+    ).rejects.toThrow(/No mortgage with ID 9999/);
+  });
+
+  it("two balance snapshots against the same mortgage leave exactly one mortgages row with the original amount", async () => {
+    const registerResult = await recordMortgage({
       lender: "Nationwide",
       property: "1 Main St",
+      original_amount_pence: 30000000,
+      currency: "GBP",
+    });
+    const mortgageId = parseMortgageId(registerResult);
+
+    await recordMortgageBalance({
+      mortgage_id: mortgageId,
       outstanding_pence: 25000000,
       interest_rate_bps: 450,
       property_value_pence: 40000000,
@@ -151,8 +196,7 @@ describe("recordMortgageBalance", () => {
       valid_from: "2026-01-01",
     });
     await recordMortgageBalance({
-      lender: "Nationwide",
-      property: "1 Main St",
+      mortgage_id: mortgageId,
       outstanding_pence: 24500000,
       interest_rate_bps: 450,
       property_value_pence: 41000000,
@@ -160,10 +204,21 @@ describe("recordMortgageBalance", () => {
       valid_from: "2026-05-01",
     });
 
+    const db = getDb();
     const mortgageCount = (
-      getDb().prepare("SELECT COUNT(*) AS n FROM mortgages").get() as { n: number }
+      db.prepare("SELECT COUNT(*) AS n FROM mortgages").get() as { n: number }
     ).n;
     expect(mortgageCount).toBe(1);
+
+    const balanceCount = (
+      db.prepare("SELECT COUNT(*) AS n FROM mortgage_balance").get() as { n: number }
+    ).n;
+    expect(balanceCount).toBe(2);
+
+    const mortgage = db
+      .prepare("SELECT original_amount_pence FROM mortgages WHERE id = ?")
+      .get(mortgageId) as { original_amount_pence: number };
+    expect(mortgage.original_amount_pence).toBe(30000000);
   });
 });
 
@@ -266,3 +321,11 @@ describe("recordVestingEvent", () => {
     ).rejects.toThrow(/No equity grant found/);
   });
 });
+
+function parseMortgageId(message: string): number {
+  const match = message.match(/Mortgage ID:\s*(\d+)/);
+  if (!match) {
+    throw new Error(`Could not parse mortgage ID from message: ${message}`);
+  }
+  return parseInt(match[1]!, 10);
+}
