@@ -1,11 +1,15 @@
 import { z } from "zod";
-import { getDb } from "../db.js";
+import { getKysely } from "../db.js";
 import { ensureAsset, writeManualDocument } from "../references.js";
 
 export const recordAssetHoldingSchema = {
   asset_name: z.string().describe("Asset name, e.g. 'ETH', 'Vanguard FTSE All-World'."),
-  asset_type: z.string().describe("Asset type, e.g. 'crypto', 'etf', 'stock', 'property', 'other'."),
-  base_currency: z.string().describe("Native currency of the asset, e.g. 'ETH', 'USD', 'GBP'."),
+  asset_type: z
+    .string()
+    .describe("Asset type, e.g. 'crypto', 'etf', 'stock', 'property', 'other'."),
+  base_currency: z
+    .string()
+    .describe("Native currency of the asset, e.g. 'ETH', 'USD', 'GBP'."),
   quantity: z
     .number()
     .int()
@@ -25,29 +29,38 @@ export async function recordAssetHolding(input: {
   quantity: number;
   valid_from: string;
 }): Promise<string> {
-  const db = getDb();
+  const { sourceId, assetId } = await getKysely()
+    .transaction()
+    .execute(async (trx) => {
+      const sourceId = await writeManualDocument(trx, {
+        source_type: "manual",
+        entry_type: "asset_holding",
+        asset_name: input.asset_name,
+        asset_type: input.asset_type,
+        base_currency: input.base_currency,
+        quantity: input.quantity,
+        valid_from: input.valid_from,
+      });
 
-  const doInsert = db.transaction(() => {
-    const sourceId = writeManualDocument(db, {
-      source_type: "manual",
-      entry_type: "asset_holding",
-      asset_name: input.asset_name,
-      asset_type: input.asset_type,
-      base_currency: input.base_currency,
-      quantity: input.quantity,
-      valid_from: input.valid_from,
+      const assetId = await ensureAsset(
+        trx,
+        input.asset_name,
+        input.asset_type,
+        input.base_currency,
+      );
+
+      await trx
+        .insertInto("holdings")
+        .values({
+          asset_id: assetId,
+          quantity: input.quantity,
+          valid_from: input.valid_from,
+          source_id: sourceId,
+        })
+        .execute();
+
+      return { sourceId, assetId };
     });
-
-    const assetId = ensureAsset(db, input.asset_name, input.asset_type, input.base_currency);
-
-    db.prepare(
-      `INSERT INTO holdings (asset_id, quantity, valid_from, source_id) VALUES (?, ?, ?, ?)`,
-    ).run(assetId, input.quantity, input.valid_from, sourceId);
-
-    return { sourceId, assetId };
-  });
-
-  const { sourceId, assetId } = doInsert();
 
   return [
     `Recorded holding for ${input.asset_name} (${input.asset_type}): quantity ${input.quantity} as of ${input.valid_from}.`,

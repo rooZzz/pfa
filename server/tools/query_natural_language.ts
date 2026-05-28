@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import path from "node:path";
-import { DDL } from "../db.js";
+import { getSchemaSql } from "../db.js";
 import { runQuery } from "../query.js";
 
 const CATALOG_PATH = path.join(
@@ -31,6 +31,7 @@ function extractSql(text: string): string {
 
 export async function generateSql(question: string): Promise<string> {
   const catalog = readCatalog();
+  const ddl = getSchemaSql();
 
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
@@ -44,7 +45,7 @@ export async function generateSql(question: string): Promise<string> {
       },
       {
         type: "text",
-        text: `DDL:\n${DDL}\n\nSchema catalog:\n${catalog}`,
+        text: `DDL:\n${ddl}\n\nSchema catalog:\n${catalog}`,
         cache_control: { type: "ephemeral" },
       },
     ],

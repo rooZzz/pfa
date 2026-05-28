@@ -3,11 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { parsePayslipVision } from "../../tools/ingest_document.js";
 
-const FIXTURE_PATH = path.join(
-  import.meta.dirname,
-  "fixtures",
-  "Payslip_20260522.pdf",
-);
+const FIXTURE_PATH = path.join(import.meta.dirname, "fixtures", "Payslip_20260522.pdf");
 
 const GOLDEN = {
   pay_date: "2026-05-22",

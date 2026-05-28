@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getDb } from "../db.js";
+import { getKysely } from "../db.js";
 import { ensureAccount, writeManualDocument } from "../references.js";
 
 export const recordPensionValueSchema = {
@@ -18,29 +18,38 @@ export async function recordPensionValue(input: {
   currency: string;
   valid_from: string;
 }): Promise<string> {
-  const db = getDb();
+  const { sourceId, accountId } = await getKysely()
+    .transaction()
+    .execute(async (trx) => {
+      const sourceId = await writeManualDocument(trx, {
+        source_type: "manual",
+        entry_type: "pension_value",
+        account_name: input.account_name,
+        value_pence: input.value_pence,
+        currency: input.currency,
+        valid_from: input.valid_from,
+      });
 
-  const doInsert = db.transaction(() => {
-    const sourceId = writeManualDocument(db, {
-      source_type: "manual",
-      entry_type: "pension_value",
-      account_name: input.account_name,
-      value_pence: input.value_pence,
-      currency: input.currency,
-      valid_from: input.valid_from,
+      const accountId = await ensureAccount(
+        trx,
+        input.account_name,
+        "pension",
+        input.currency,
+      );
+
+      await trx
+        .insertInto("pension_values")
+        .values({
+          account_id: accountId,
+          value_pence: input.value_pence,
+          currency: input.currency,
+          valid_from: input.valid_from,
+          source_id: sourceId,
+        })
+        .execute();
+
+      return { sourceId, accountId };
     });
-
-    const accountId = ensureAccount(db, input.account_name, "pension", input.currency);
-
-    db.prepare(
-      `INSERT INTO pension_values (account_id, value_pence, currency, valid_from, source_id)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(accountId, input.value_pence, input.currency, input.valid_from, sourceId);
-
-    return { sourceId, accountId };
-  });
-
-  const { sourceId, accountId } = doInsert();
 
   return [
     `Recorded pension value for ${input.account_name}.`,

@@ -25,9 +25,9 @@ describe("record_account_balance", () => {
       valid_from: "2026-01-01",
     });
 
-    const row = getDb()
-      .prepare("SELECT source_type FROM documents LIMIT 1")
-      .get() as { source_type: string };
+    const row = getDb().prepare("SELECT source_type FROM documents LIMIT 1").get() as {
+      source_type: string;
+    };
 
     expect(row.source_type).toBe("manual");
   });
@@ -99,9 +99,7 @@ describe("DuckDB round-trip", () => {
       valid_from: "2026-01-01",
     });
 
-    const rows = await runQuery(
-      "SELECT balance_pence FROM pfa.account_balances LIMIT 1",
-    );
+    const rows = await runQuery("SELECT balance_pence FROM pfa.account_balances LIMIT 1");
 
     expect(rows).toHaveLength(1);
     expect(Number((rows[0] as { balance_pence: bigint }).balance_pence)).toBe(250000);

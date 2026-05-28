@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, initDb } from "../db.js";
-import { getNetWorth } from "../net_worth.js";
+import { getNetWorth } from "../net_worth/index.js";
 import { resetDuck } from "../query.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 import { recordAssetHolding } from "../tools/record_asset_holding.js";
@@ -125,12 +125,7 @@ describe("getNetWorth — realised", () => {
     const manualSum = result.realised.reduce((acc, l) => acc + l.value_pence, 0);
     expect(result.realised_total_pence).toBe(manualSum);
 
-    const expected =
-      500000 +
-      4200000 +
-      40000000 +
-      -25000000 +
-      100 * 2000;
+    const expected = 500000 + 4200000 + 40000000 + -25000000 + 100 * 2000;
     expect(result.realised_total_pence).toBe(expected);
   });
 

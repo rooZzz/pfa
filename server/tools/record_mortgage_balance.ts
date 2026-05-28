@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getDb } from "../db.js";
+import { getKysely } from "../db.js";
 import { writeManualDocument } from "../references.js";
 
 export const recordMortgageBalanceSchema = {
@@ -30,11 +30,13 @@ export async function recordMortgageBalance(input: {
   currency: string;
   valid_from: string;
 }): Promise<string> {
-  const db = getDb();
+  const kysely = getKysely();
 
-  const mortgage = db
-    .prepare("SELECT id, lender, property FROM mortgages WHERE id = ?")
-    .get(input.mortgage_id) as { id: number; lender: string; property: string } | undefined;
+  const mortgage = await kysely
+    .selectFrom("mortgages")
+    .select(["id", "lender", "property"])
+    .where("id", "=", input.mortgage_id)
+    .executeTakeFirst();
 
   if (!mortgage) {
     throw new Error(
@@ -42,8 +44,8 @@ export async function recordMortgageBalance(input: {
     );
   }
 
-  const doInsert = db.transaction(() => {
-    const sourceId = writeManualDocument(db, {
+  const sourceId = await kysely.transaction().execute(async (trx) => {
+    const sourceId = await writeManualDocument(trx, {
       source_type: "manual",
       entry_type: "mortgage_balance",
       mortgage_id: input.mortgage_id,
@@ -53,23 +55,20 @@ export async function recordMortgageBalance(input: {
       valid_from: input.valid_from,
     });
 
-    db.prepare(
-      `INSERT INTO mortgage_balance
-         (mortgage_id, outstanding_pence, interest_rate_bps, currency, valid_from, source_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(
-      input.mortgage_id,
-      input.outstanding_pence,
-      input.interest_rate_bps,
-      input.currency,
-      input.valid_from,
-      sourceId,
-    );
+    await trx
+      .insertInto("mortgage_balance")
+      .values({
+        mortgage_id: input.mortgage_id,
+        outstanding_pence: input.outstanding_pence,
+        interest_rate_bps: input.interest_rate_bps,
+        currency: input.currency,
+        valid_from: input.valid_from,
+        source_id: sourceId,
+      })
+      .execute();
 
     return sourceId;
   });
-
-  const sourceId = doInsert();
 
   return [
     `Recorded mortgage balance for ${mortgage.lender} — ${mortgage.property}.`,

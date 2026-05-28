@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getDb } from "../db.js";
+import { getKysely } from "../db.js";
 import { writeManualDocument } from "../references.js";
 
 export const recordVestingEventSchema = {
@@ -19,8 +19,8 @@ export const recordVestingEventSchema = {
     .optional()
     .describe(
       "Market price per unit at vesting date. Must be an integer number of pence — e.g. 2565 for a 2,565p / £25.65 share price. " +
-      "UK prices are commonly quoted in pence (e.g. '2,565p', '2565p'): use that number directly, do NOT multiply by 100. " +
-      "Only convert if the price was given in pounds: £25.65 → 2565.",
+        "UK prices are commonly quoted in pence (e.g. '2,565p', '2565p'): use that number directly, do NOT multiply by 100. " +
+        "Only convert if the price was given in pounds: £25.65 → 2565.",
     ),
 };
 
@@ -30,11 +30,13 @@ export async function recordVestingEvent(input: {
   units_vested: number;
   market_price_pence?: number;
 }): Promise<string> {
-  const db = getDb();
+  const kysely = getKysely();
 
-  const grant = db
-    .prepare("SELECT id, scheme_type, units FROM equity_grant WHERE id = ?")
-    .get(input.grant_id) as { id: number; scheme_type: string; units: number } | undefined;
+  const grant = await kysely
+    .selectFrom("equity_grant")
+    .select(["id", "scheme_type", "units"])
+    .where("id", "=", input.grant_id)
+    .executeTakeFirst();
 
   if (!grant) {
     throw new Error(
@@ -47,8 +49,8 @@ export async function recordVestingEvent(input: {
       ? input.units_vested * input.market_price_pence
       : null;
 
-  const doInsert = db.transaction(() => {
-    const sourceId = writeManualDocument(db, {
+  const sourceId = await kysely.transaction().execute(async (trx) => {
+    const sourceId = await writeManualDocument(trx, {
       source_type: "manual",
       entry_type: "vesting_event",
       grant_id: input.grant_id,
@@ -58,29 +60,24 @@ export async function recordVestingEvent(input: {
       estimated_value_pence: estimatedValuePence,
     });
 
-    db.prepare(
-      `INSERT INTO equity_vesting_event
-         (grant_id, vest_date, units_vested, market_price_pence, estimated_value_pence, occurred_at, source_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      input.grant_id,
-      input.vest_date,
-      input.units_vested,
-      input.market_price_pence ?? null,
-      estimatedValuePence,
-      new Date(input.vest_date + "T00:00:00.000Z").toISOString(),
-      sourceId,
-    );
+    await trx
+      .insertInto("equity_vesting_event")
+      .values({
+        grant_id: input.grant_id,
+        vest_date: input.vest_date,
+        units_vested: input.units_vested,
+        market_price_pence: input.market_price_pence ?? null,
+        estimated_value_pence: estimatedValuePence,
+        occurred_at: new Date(input.vest_date + "T00:00:00.000Z").toISOString(),
+        source_id: sourceId,
+      })
+      .execute();
 
     return sourceId;
   });
 
-  const sourceId = doInsert();
-
   const valuePart =
-    estimatedValuePence != null
-      ? `, estimated value: ${estimatedValuePence} pence`
-      : "";
+    estimatedValuePence != null ? `, estimated value: ${estimatedValuePence} pence` : "";
 
   return [
     `Recorded vesting event for grant ${input.grant_id} (${grant.scheme_type.toUpperCase()}).`,

@@ -1,13 +1,14 @@
-import type Database from "better-sqlite3";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type { Transaction } from "kysely";
 import { DOCUMENTS_DIR } from "./db.js";
+import type { AccountType, DatabaseSchema } from "./schema.js";
 
-export function writeManualDocument(
-  db: Database.Database,
+export async function writeManualDocument(
+  trx: Transaction<DatabaseSchema>,
   payload: object,
-): number {
+): Promise<number> {
   const recorded_at = new Date().toISOString();
   const fullPayload = { ...payload, recorded_at };
   const json = JSON.stringify(fullPayload, null, 2);
@@ -16,47 +17,61 @@ export function writeManualDocument(
   const filePath = path.join(DOCUMENTS_DIR, filename);
   const contentHash = crypto.createHash("sha256").update(json).digest("hex");
 
-  const docResult = db
-    .prepare(
-      "INSERT INTO documents (source_type, file_path, content_hash) VALUES ('manual', ?, ?)",
-    )
-    .run(filePath, contentHash);
+  const row = await trx
+    .insertInto("documents")
+    .values({
+      source_type: "manual",
+      file_path: filePath,
+      content_hash: contentHash,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
 
   fs.writeFileSync(filePath, json, "utf-8");
 
-  return Number(docResult.lastInsertRowid);
+  return Number(row.id);
 }
 
-export function ensureAccount(
-  db: Database.Database,
+export async function ensureAccount(
+  trx: Transaction<DatabaseSchema>,
   name: string,
-  type: string,
+  type: AccountType,
   currency: string,
-): number {
-  const existing = db
-    .prepare("SELECT id FROM accounts WHERE name = ? AND type = ?")
-    .get(name, type) as { id: number } | undefined;
-  if (existing) return existing.id;
-  const result = db
-    .prepare("INSERT INTO accounts (name, type, currency) VALUES (?, ?, ?)")
-    .run(name, type, currency);
-  return Number(result.lastInsertRowid);
+): Promise<number> {
+  const existing = await trx
+    .selectFrom("accounts")
+    .select("id")
+    .where("name", "=", name)
+    .where("type", "=", type)
+    .executeTakeFirst();
+  if (existing) return Number(existing.id);
+
+  const row = await trx
+    .insertInto("accounts")
+    .values({ name, type, currency })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  return Number(row.id);
 }
 
-export function ensureAsset(
-  db: Database.Database,
+export async function ensureAsset(
+  trx: Transaction<DatabaseSchema>,
   name: string,
   asset_type: string,
   base_currency: string,
-): number {
-  const existing = db
-    .prepare("SELECT id FROM assets WHERE name = ? AND asset_type = ?")
-    .get(name, asset_type) as { id: number } | undefined;
-  if (existing) return existing.id;
-  const result = db
-    .prepare(
-      "INSERT INTO assets (name, asset_type, base_currency) VALUES (?, ?, ?)",
-    )
-    .run(name, asset_type, base_currency);
-  return Number(result.lastInsertRowid);
+): Promise<number> {
+  const existing = await trx
+    .selectFrom("assets")
+    .select("id")
+    .where("name", "=", name)
+    .where("asset_type", "=", asset_type)
+    .executeTakeFirst();
+  if (existing) return Number(existing.id);
+
+  const row = await trx
+    .insertInto("assets")
+    .values({ name, asset_type, base_currency })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  return Number(row.id);
 }
