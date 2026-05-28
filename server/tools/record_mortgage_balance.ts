@@ -16,10 +16,6 @@ export const recordMortgageBalanceSchema = {
     .number()
     .int()
     .describe("Current interest rate in basis points. E.g. 4.5% = 450."),
-  property_value_pence: z
-    .number()
-    .int()
-    .describe("Estimated property value in pence (integer)."),
   currency: z.string().default("GBP").describe("ISO 4217 currency code."),
   valid_from: z
     .string()
@@ -31,7 +27,6 @@ export async function recordMortgageBalance(input: {
   mortgage_id: number;
   outstanding_pence: number;
   interest_rate_bps: number;
-  property_value_pence: number;
   currency: string;
   valid_from: string;
 }): Promise<string> {
@@ -54,20 +49,18 @@ export async function recordMortgageBalance(input: {
       mortgage_id: input.mortgage_id,
       outstanding_pence: input.outstanding_pence,
       interest_rate_bps: input.interest_rate_bps,
-      property_value_pence: input.property_value_pence,
       currency: input.currency,
       valid_from: input.valid_from,
     });
 
     db.prepare(
       `INSERT INTO mortgage_balance
-         (mortgage_id, outstanding_pence, interest_rate_bps, property_value_pence, currency, valid_from, source_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (mortgage_id, outstanding_pence, interest_rate_bps, currency, valid_from, source_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(
       input.mortgage_id,
       input.outstanding_pence,
       input.interest_rate_bps,
-      input.property_value_pence,
       input.currency,
       input.valid_from,
       sourceId,
@@ -78,10 +71,10 @@ export async function recordMortgageBalance(input: {
 
   const sourceId = doInsert();
 
-  const ltv = Math.round((input.outstanding_pence * 100) / input.property_value_pence);
   return [
     `Recorded mortgage balance for ${mortgage.lender} — ${mortgage.property}.`,
-    `Outstanding: ${input.outstanding_pence} ${input.currency}, property value: ${input.property_value_pence} ${input.currency}, LTV: ${ltv}%.`,
+    `Outstanding: ${input.outstanding_pence} ${input.currency}, rate: ${input.interest_rate_bps} bps.`,
+    `To record the property value, use record_asset_price against the property asset.`,
     `Mortgage ID: ${input.mortgage_id}, document ID: ${sourceId}.`,
   ].join(" ");
 }

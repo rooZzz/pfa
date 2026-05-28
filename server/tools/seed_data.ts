@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { DOCUMENTS_DIR, resetDb } from "../db.js";
 import { recordAccountBalance } from "./record_account_balance.js";
-import { recordAssetValue } from "./record_asset_value.js";
+import { recordAssetHolding } from "./record_asset_holding.js";
+import { recordAssetPrice } from "./record_asset_price.js";
 import { recordEquityGrant } from "./record_equity_grant.js";
 import { recordMortgage } from "./record_mortgage.js";
 import { recordMortgageBalance } from "./record_mortgage_balance.js";
@@ -135,19 +136,45 @@ async function seedMortgage(): Promise<void> {
   });
   const mortgageId = parseMortgageId(mortgageMessage);
 
-  const mortgageHistory: Array<[number, number, number, number]> = [
-    [11, 28500000, 52000000, 425],
-    [8, 28200000, 52500000, 425],
-    [5, 27900000, 53000000, 475],
-    [2, 27600000, 53500000, 475],
-    [0, 27410000, 54000000, 475],
+  await recordAssetHolding({
+    asset_name: "12 Acacia Avenue",
+    asset_type: "property",
+    base_currency: "GBP",
+    quantity: 1,
+    valid_from: monthsAgo(11, 1),
+  });
+
+  const propertyPriceHistory: Array<[number, number]> = [
+    [11, 52000000],
+    [8, 52500000],
+    [5, 53000000],
+    [2, 53500000],
+    [0, 54000000],
   ];
-  for (const [ago, outstanding, propertyValue, rateBps] of mortgageHistory) {
+  for (const [ago, price] of propertyPriceHistory) {
+    await recordAssetPrice({
+      asset_name: "12 Acacia Avenue",
+      asset_type: "property",
+      base_currency: "GBP",
+      unit_price_pence: price,
+      currency: "GBP",
+      as_of: monthsAgo(ago, 1),
+      source: "manual",
+    });
+  }
+
+  const mortgageHistory: Array<[number, number, number]> = [
+    [11, 28500000, 425],
+    [8, 28200000, 425],
+    [5, 27900000, 475],
+    [2, 27600000, 475],
+    [0, 27410000, 475],
+  ];
+  for (const [ago, outstanding, rateBps] of mortgageHistory) {
     await recordMortgageBalance({
       mortgage_id: mortgageId,
       outstanding_pence: outstanding,
       interest_rate_bps: rateBps,
-      property_value_pence: propertyValue,
       currency: "GBP",
       valid_from: monthsAgo(ago, 1),
     });
@@ -155,49 +182,89 @@ async function seedMortgage(): Promise<void> {
 }
 
 async function seedAssets(): Promise<void> {
-  await recordAssetValue({
+  await recordAssetHolding({
     asset_name: "ETH",
     asset_type: "crypto",
+    base_currency: "ETH",
     quantity: 42500,
-    original_currency: "ETH",
-    gbp_equivalent_pence: 1180000,
     valid_from: monthsAgo(0, 25),
   });
+  await recordAssetPrice({
+    asset_name: "ETH",
+    asset_type: "crypto",
+    base_currency: "ETH",
+    unit_price_pence: 27765,
+    currency: "GBP",
+    as_of: monthsAgo(0, 25),
+    source: "manual",
+  });
 
-  await recordAssetValue({
+  await recordAssetHolding({
     asset_name: "BTC",
     asset_type: "crypto",
+    base_currency: "BTC",
     quantity: 1250,
-    original_currency: "BTC",
-    gbp_equivalent_pence: 845000,
     valid_from: monthsAgo(0, 25),
   });
+  await recordAssetPrice({
+    asset_name: "BTC",
+    asset_type: "crypto",
+    base_currency: "BTC",
+    unit_price_pence: 676000,
+    currency: "GBP",
+    as_of: monthsAgo(0, 25),
+    source: "manual",
+  });
 
-  await recordAssetValue({
+  await recordAssetHolding({
     asset_name: "Vanguard FTSE All-World",
     asset_type: "etf",
+    base_currency: "GBP",
     quantity: 320,
-    original_currency: "GBP",
-    gbp_equivalent_pence: 3520000,
     valid_from: monthsAgo(1, 12),
   });
-
-  await recordAssetValue({
-    asset_name: "AAPL",
-    asset_type: "stock",
-    quantity: 45,
-    original_currency: "USD",
-    gbp_equivalent_pence: 685000,
-    valid_from: monthsAgo(2, 8),
+  await recordAssetPrice({
+    asset_name: "Vanguard FTSE All-World",
+    asset_type: "etf",
+    base_currency: "GBP",
+    unit_price_pence: 1100000,
+    currency: "GBP",
+    as_of: monthsAgo(1, 12),
+    source: "manual",
   });
 
-  await recordAssetValue({
+  await recordAssetHolding({
+    asset_name: "AAPL",
+    asset_type: "stock",
+    base_currency: "USD",
+    quantity: 45,
+    valid_from: monthsAgo(2, 8),
+  });
+  await recordAssetPrice({
+    asset_name: "AAPL",
+    asset_type: "stock",
+    base_currency: "USD",
+    unit_price_pence: 15222,
+    currency: "GBP",
+    as_of: monthsAgo(2, 8),
+    source: "manual",
+  });
+
+  await recordAssetHolding({
     asset_name: "Series I Premium Bonds",
     asset_type: "other",
+    base_currency: "GBP",
     quantity: 1,
-    original_currency: "GBP",
-    gbp_equivalent_pence: 5000000,
     valid_from: monthsAgo(9, 1),
+  });
+  await recordAssetPrice({
+    asset_name: "Series I Premium Bonds",
+    asset_type: "other",
+    base_currency: "GBP",
+    unit_price_pence: 5000000,
+    currency: "GBP",
+    as_of: monthsAgo(9, 1),
+    source: "manual",
   });
 }
 
@@ -207,9 +274,19 @@ async function seedEquity(): Promise<void> {
     units: 4000,
     grant_date: monthsAgo(24, 1),
     currency: "GBP",
-    current_price_pence: 4250,
+    underlying_asset_name: "ACME Corp",
+    underlying_asset_type: "stock",
   });
   const rsuId = parseGrantId(rsuMessage);
+  await recordAssetPrice({
+    asset_name: "ACME Corp",
+    asset_type: "stock",
+    base_currency: "GBP",
+    unit_price_pence: 4250,
+    currency: "GBP",
+    as_of: TODAY,
+    source: "manual",
+  });
   await recordVestingEvent({
     grant_id: rsuId,
     vest_date: monthsAgo(18, 1),
@@ -229,7 +306,8 @@ async function seedEquity(): Promise<void> {
     strike_pence: 50,
     grant_date: monthsAgo(36, 1),
     currency: "GBP",
-    current_price_pence: 1850,
+    underlying_asset_name: "ACME Corp",
+    underlying_asset_type: "stock",
   });
   const emiId = parseGrantId(emiMessage);
   await recordVestingEvent({
@@ -251,7 +329,8 @@ async function seedEquity(): Promise<void> {
     strike_pence: 1200,
     grant_date: monthsAgo(8, 1),
     currency: "GBP",
-    current_price_pence: 1450,
+    underlying_asset_name: "ACME Corp",
+    underlying_asset_type: "stock",
   });
   parseGrantId(unapprovedMessage);
 
@@ -261,7 +340,8 @@ async function seedEquity(): Promise<void> {
     strike_pence: 800,
     grant_date: monthsAgo(20, 1),
     currency: "GBP",
-    current_price_pence: 1120,
+    underlying_asset_name: "ACME Corp",
+    underlying_asset_type: "stock",
   });
   const sayeId = parseGrantId(sayeMessage);
   await recordVestingEvent({
@@ -302,8 +382,8 @@ export async function seedData(): Promise<string> {
     "Seeded the database with realistic test data.",
     "Accounts: Barclays Current (12 months, includes overdraft), Nationwide Savings, Vanguard ISA, Monzo Joint (stale, 8 months old).",
     "Pensions: Aviva Workplace Pension (current), Old Employer SIPP (stale, 14 months old).",
-    "Mortgage: Nationwide on 12 Acacia Avenue with 5 monthly snapshots.",
-    "Assets: ETH, BTC, Vanguard FTSE All-World ETF, AAPL (USD), Premium Bonds (stale).",
-    "Equity: RSU partially vested, EMI options partially vested, unapproved options unvested, SAYE fully vested.",
+    "Mortgage: Nationwide on 12 Acacia Avenue with 5 monthly snapshots. Property held as asset with separate price ticks.",
+    "Assets: ETH, BTC, Vanguard FTSE All-World ETF, AAPL (USD), Premium Bonds — each with a holding and a price tick.",
+    "Equity: RSU partially vested, EMI options partially vested, unapproved options unvested, SAYE fully vested. All linked to ACME Corp asset with a current price.",
   ].join(" ");
 }

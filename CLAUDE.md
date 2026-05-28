@@ -66,11 +66,11 @@ Working end-to-end on a thin slice. What exists today:
 
 - Local stdio MCP server in `server/` registering tools and `ui://` resources for Claude Desktop.
 - SQLite write store via `better-sqlite3` and DuckDB read layer via the SQLite extension, sharing one `.sqlite` file on disk.
-- Schema in [server/db.ts](server/db.ts): `documents`, `accounts`, `assets`, `mortgages`, `transactions`, `income_events` (with `payload`), `account_balances`, `pension_values`, `mortgage_balance`, `asset_values`, `person_profile`, `tax_periods`, `equity_grant`, `equity_vesting_event`.
+- Schema in [server/db.ts](server/db.ts): `documents`, `accounts`, `assets` (with `price_source`), `mortgages`, `transactions`, `income_events` (with `payload`), `account_balances`, `pension_values`, `mortgage_balance`, `holdings`, `asset_prices`, `person_profile`, `tax_periods`, `equity_grant` (with `asset_id`), `equity_vesting_event`.
 - Ingest tools:
   - `ingest_document` — base64 file in → Haiku 4.5 vision → staging buffer. Payslip only.
   - `confirm_staged_rows` — writes a staged payslip to `income_events` with `source_id` enforced.
-  - `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_value`, `record_equity_grant`, `record_vesting_event` — manual-entry tools, one per series. Each creates the reference row if needed and writes the typed snapshot/event row.
+  - `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_holding`, `record_asset_price`, `refresh_asset_price`, `record_equity_grant`, `record_vesting_event` — manual-entry tools, one per series. Asset entry is a holding + price pair. `refresh_asset_price` dispatches on `assets.price_source` (skeleton for future connectors).
   - `query_natural_language` — Haiku text-to-SQL against [docs/schema_catalog.md](docs/schema_catalog.md), executed by DuckDB.
 - Net worth: `get_net_worth` tool plus `ui://pfa/net_worth.html` dashboard.
 - Dev utilities: `reset_schema` and `seed_data` tools.
@@ -92,3 +92,6 @@ Automated parsing (Haiku 4.5 vision) always goes through staged confirmation (`u
 
 ### 2026-05-26: Recommendations — observations only
 Start with facts ("ISA 60% funded, 47 days left"). No buy/sell/overpay advice until trust is established through demonstrated accuracy.
+
+### 2026-05-28: Asset pricing — split inventory from valuation; event-locked prices kept on event rows
+`holdings` (quantity snapshot) + `asset_prices` (per-unit price tick, source-tagged) replace `asset_values`. Property value moves from `mortgage_balance.property_value_pence` to `asset_prices` against a `property` asset. Equity grant current price moves from payload JSON to `asset_prices` via `equity_grant.asset_id`. Strike and market-at-vest remain on their event rows as immutable tax facts. `assets.price_source` is a strategy hint for future connectors — no connectors built yet.

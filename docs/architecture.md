@@ -182,17 +182,30 @@ Some tables carry a long tail of attributes that vary per source and resist typi
 | `documents` | Reference | Source anchor for every ingested row — file, manual JSON, connector run |
 | `transactions` | Event | Every cash movement; linked to account |
 | `income_events` | Event | Per-payslip: gross, net, PAYE, NI, pension contribution, employer contribution; variable line items in `payload` |
-| `equity_vesting_event` | Event | A vesting tranche — vest date, units, estimated value; scheme-specific detail in `payload` |
+| `equity_vesting_event` | Event | A vesting tranche — vest date, units, market-at-vest price (event-locked tax fact), estimated value; scheme-specific detail in `payload` |
+| `asset_prices` | Event (price tick) | Per-unit price for an asset at a point in time; source-tagged for future connector attribution |
 | `account_balances` | Snapshot | Current account, savings balances at observation time |
 | `pension_values` | Snapshot | Pot value at statement date |
-| `mortgage_balance` | Snapshot | Outstanding balance, current interest rate, property value |
-| `asset_values` | Snapshot | Crypto, investments — original currency + GBP equivalent at observation |
+| `mortgage_balance` | Snapshot | Outstanding balance and current interest rate; no property value (tracked separately via `asset_prices`) |
+| `holdings` | Snapshot | Quantity of an asset held — inventory without valuation |
 | `person_profile` | Snapshot | Salary, tax code, employer — valid_from/valid_to tracks changes |
 | `accounts` | Reference | Account definitions (bank, type, ISA subtype, currency) |
-| `assets` | Reference | Asset definitions (name, type, currency) |
+| `assets` | Reference | Asset definitions (name, type, base currency, price_source strategy hint) |
 | `mortgages` | Reference | Mortgage definitions (lender, property, original amount) |
-| `equity_grant` | Reference | Equity award definition — scheme type, units, strike, vest schedule; variable terms in `payload` |
+| `equity_grant` | Reference | Equity award definition — scheme type, units, strike (event-locked), asset_id link to underlying share, vest schedule; variable terms in `payload` |
 | `tax_periods` | Reference | UK tax years — `starts_on` (April 6), `ends_on` (April 5) |
+
+### Three-layer pricing model
+
+Asset pricing separates three concepts that change at different cadences:
+
+| Layer | Table | Cadence | Immutable? |
+|---|---|---|---|
+| Inventory | `holdings` | Changes on transactions (buy, sell, vest) | No — new row when quantity changes |
+| Valuation | `asset_prices` | Changes with the market; source-tagged for future connectors | Append-only — add a new row per tick |
+| Event-locked prices | `equity_grant.strike_pence`, `equity_vesting_event.market_price_pence` | Set once at the event; tax fact, never refreshed | Yes |
+
+This means refreshing a price (new `asset_prices` row) never touches holdings or event rows. The `assets.price_source` column is a strategy hint (`manual`, future `coingecko`, `zoopla`) for how to dispatch a price refresh without a schema change.
 
 ### Design rules
 
@@ -200,7 +213,7 @@ These are invariants. They hold across all tables, all ingestion types, all stag
 
 1. **`source_id` is non-negotiable.** Every event and snapshot row carries a FK to `documents`. A row with no source is a schema violation, not a warning. Enforced as a `NOT NULL` constraint, not application logic.
 
-2. **Amounts are integers, currency is explicit.** `amount_pence INTEGER NOT NULL`. Never `REAL`. Every monetary column specifies its unit in the name. Every table with monetary data has `currency TEXT NOT NULL DEFAULT 'GBP'`. Multi-currency assets store both `original_amount`, `original_currency`, and `gbp_equivalent_pence` at observation time — never rely on a live FX rate at query time.
+2. **Amounts are integers, currency is explicit.** `amount_pence INTEGER NOT NULL`. Never `REAL`. Every monetary column specifies its unit in the name. Every table with monetary data has `currency TEXT NOT NULL DEFAULT 'GBP'`. Asset prices store `unit_price_pence` in the asset's native currency alongside the `currency` field — FX conversion is a separate concern, not bundled into the price row.
 
 3. **UK tax year is explicit.** The `tax_periods` table is the single source of truth for April 6 → April 5 boundaries. All ISA and PAYE queries anchor to this table. The schema catalog documents this so Haiku never assumes calendar year.
 
@@ -364,3 +377,4 @@ Not all questions are SQL questions. The schema catalog documents which question
 | 2026-05-27 | Equity entities: `equity_grant` + `equity_vesting_event` | Typed primitives (scheme type, units, strike, vest dates) plus `payload` for scheme-specific terms. Valuation and vesting-tax methods remain open decisions. |
 | 2026-05-28 | Manual entry: fanned per series, not a single dispatching tool | Six `record_*` tools (`account_balance`, `pension_value`, `mortgage_balance`, `asset_value`, `equity_grant`, `vesting_event`). Each owns its own zod schema, ensures its reference row, writes the audit JSON, and inserts the typed row in one transaction. The LLM picks the right one from chat. Shared helpers in `references.ts`. |
 | 2026-05-28 | Net worth: dedicated `get_net_worth` tool, not text-to-SQL | Contingent (unvested) equity valuation isn't expressible as a single clean query and must not be confused with realised holdings. A typed module computes the split and is consumed by `ui://pfa/net_worth.html`. |
+| 2026-05-28 | Asset pricing: split inventory from valuation; event-locked prices stay on event rows | `holdings` (quantity, changes on transactions) + `asset_prices` (per-unit price ticks, source-tagged) replace the old `asset_values` table which bundled both. Property value moves to `asset_prices` against a `property` asset, removing it from `mortgage_balance`. Equity grant current price moves from `payload` to `asset_prices` via `equity_grant.asset_id`. Strike and market-at-vest remain on their respective event rows as immutable tax facts. `assets.price_source` is a strategy hint for future connectors. |

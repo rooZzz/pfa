@@ -43,6 +43,8 @@ export type RealisedLine = {
   recorded_at: string;
   source_id: number;
   currency: string;
+  price_as_of?: string;
+  price_source?: string;
 };
 
 export type ContingentLine = {
@@ -126,11 +128,12 @@ async function queryPensionLines(asOf: string): Promise<RealisedLine[]> {
 }
 
 async function queryMortgageLines(asOf: string): Promise<RealisedLine[]> {
-  const rows = await runQuery(`
+  const mortgageRows = await runQuery(`
     SELECT DISTINCT ON (mb.mortgage_id)
+      m.id AS mortgage_id,
+      m.property,
       (m.lender || ' — ' || m.property) AS name,
       mb.outstanding_pence,
-      mb.property_value_pence,
       mb.valid_from,
       mb.recorded_at,
       mb.source_id,
@@ -141,17 +144,39 @@ async function queryMortgageLines(asOf: string): Promise<RealisedLine[]> {
       AND (mb.valid_to IS NULL OR mb.valid_to > DATE '${asOf}')
     ORDER BY mb.mortgage_id, mb.valid_from DESC
   `);
+
   const lines: RealisedLine[] = [];
-  for (const r of rows) {
-    lines.push({
-      kind: "property" as const,
-      name: toStr(r.name),
-      value_pence: toNum(r.property_value_pence),
-      valid_from: toStr(r.valid_from),
-      recorded_at: toStr(r.recorded_at),
-      source_id: toNum(r.source_id),
-      currency: toStr(r.currency),
-    });
+  for (const r of mortgageRows) {
+    const propertyName = toStr(r.property);
+    const priceRows = await runQuery(`
+      SELECT DISTINCT ON (ap.asset_id)
+        ap.unit_price_pence,
+        ap.currency,
+        ap.as_of,
+        ap.source
+      FROM pfa.asset_prices ap
+      JOIN pfa.assets a ON a.id = ap.asset_id
+      WHERE a.name = '${propertyName.replace(/'/g, "''")}'
+        AND a.asset_type = 'property'
+        AND ap.as_of <= TIMESTAMP '${asOf} 23:59:59'
+      ORDER BY ap.asset_id, ap.as_of DESC
+    `);
+
+    if (priceRows.length > 0) {
+      const pr = priceRows[0]!;
+      lines.push({
+        kind: "property" as const,
+        name: toStr(r.name),
+        value_pence: toNum(pr.unit_price_pence),
+        valid_from: toStr(r.valid_from),
+        recorded_at: toStr(r.recorded_at),
+        source_id: toNum(r.source_id),
+        currency: toStr(pr.currency),
+        price_as_of: toStr(pr.as_of).split("T")[0] ?? toStr(pr.as_of),
+        price_source: toStr(pr.source),
+      });
+    }
+
     lines.push({
       kind: "mortgage" as const,
       name: toStr(r.name),
@@ -167,33 +192,70 @@ async function queryMortgageLines(asOf: string): Promise<RealisedLine[]> {
 
 async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
   const rows = await runQuery(`
-    SELECT DISTINCT ON (av.asset_id)
-      COALESCE(a.name, 'Asset #' || CAST(av.asset_id AS TEXT)) AS name,
-      av.gbp_equivalent_pence,
-      av.valid_from,
-      av.recorded_at,
-      av.source_id,
-      av.original_currency
-    FROM pfa.asset_values av
-    LEFT JOIN pfa.assets a ON a.id = av.asset_id
-    WHERE av.valid_from <= DATE '${asOf}'
-      AND (av.valid_to IS NULL OR av.valid_to > DATE '${asOf}')
-    ORDER BY av.asset_id, av.valid_from DESC
+    WITH latest_holdings AS (
+      SELECT DISTINCT ON (asset_id)
+        asset_id,
+        quantity,
+        valid_from,
+        recorded_at,
+        source_id
+      FROM pfa.holdings
+      WHERE valid_from <= DATE '${asOf}'
+        AND (valid_to IS NULL OR valid_to > DATE '${asOf}')
+      ORDER BY asset_id, valid_from DESC
+    ),
+    latest_prices AS (
+      SELECT DISTINCT ON (asset_id)
+        asset_id,
+        unit_price_pence,
+        currency,
+        as_of,
+        source
+      FROM pfa.asset_prices
+      WHERE as_of <= TIMESTAMP '${asOf} 23:59:59'
+      ORDER BY asset_id, as_of DESC
+    )
+    SELECT
+      COALESCE(a.name, 'Asset #' || CAST(h.asset_id AS TEXT)) AS name,
+      a.asset_type,
+      h.quantity,
+      h.valid_from,
+      h.recorded_at,
+      h.source_id,
+      p.unit_price_pence,
+      p.currency,
+      p.as_of AS price_as_of,
+      p.source AS price_source,
+      CAST(h.quantity AS BIGINT) * p.unit_price_pence AS gbp_equivalent_pence
+    FROM latest_holdings h
+    JOIN pfa.assets a ON a.id = h.asset_id
+    LEFT JOIN latest_prices p ON p.asset_id = h.asset_id
+    WHERE a.asset_type != 'property'
   `);
-  return rows.map((r) => ({
-    kind: "asset" as const,
-    name: toStr(r.name),
-    value_pence: toNum(r.gbp_equivalent_pence),
-    valid_from: toStr(r.valid_from),
-    recorded_at: toStr(r.recorded_at),
-    source_id: toNum(r.source_id),
-    currency: toStr(r.original_currency) || "GBP",
-  }));
+
+  const lines: RealisedLine[] = [];
+  for (const r of rows) {
+    if (toNum(r.unit_price_pence) === 0 && r.unit_price_pence == null) {
+      continue;
+    }
+    lines.push({
+      kind: "asset" as const,
+      name: toStr(r.name),
+      value_pence: toNum(r.gbp_equivalent_pence),
+      valid_from: toStr(r.valid_from),
+      recorded_at: toStr(r.recorded_at),
+      source_id: toNum(r.source_id),
+      currency: toStr(r.currency) || "GBP",
+      price_as_of: toStr(r.price_as_of).split("T")[0] ?? toStr(r.price_as_of),
+      price_source: toStr(r.price_source),
+    });
+  }
+  return lines;
 }
 
 async function queryContingentLines(asOf: string): Promise<ContingentLine[]> {
   const grants = await runQuery(
-    `SELECT id, scheme_type, units, grant_date, payload FROM pfa.equity_grant`,
+    `SELECT id, scheme_type, units, grant_date, asset_id FROM pfa.equity_grant`,
   );
   if (grants.length === 0) return [];
 
@@ -206,24 +268,33 @@ async function queryContingentLines(asOf: string): Promise<ContingentLine[]> {
     GROUP BY grant_id
   `);
 
-  const latestPriceRows = await runQuery(`
-    SELECT DISTINCT ON (grant_id)
-      grant_id,
-      market_price_pence
-    FROM pfa.equity_vesting_event
-    WHERE vest_date <= DATE '${asOf}'
-      AND market_price_pence IS NOT NULL
-    ORDER BY grant_id, vest_date DESC
-  `);
-
   const vestedByGrant = new Map<number, number>();
   for (const r of vestingRows) {
     vestedByGrant.set(toNum(r.grant_id), toNum(r.total_vested));
   }
 
-  const latestPriceByGrant = new Map<number, number>();
-  for (const r of latestPriceRows) {
-    latestPriceByGrant.set(toNum(r.grant_id), toNum(r.market_price_pence));
+  const assetIds = grants
+    .map((g) => toNum(g.asset_id))
+    .filter((id) => id > 0);
+
+  const priceByAsset = new Map<number, { price: number; source: string }>();
+  if (assetIds.length > 0) {
+    const priceRows = await runQuery(`
+      SELECT DISTINCT ON (asset_id)
+        asset_id,
+        unit_price_pence,
+        source
+      FROM pfa.asset_prices
+      WHERE asset_id IN (${assetIds.join(",")})
+        AND as_of <= TIMESTAMP '${asOf} 23:59:59'
+      ORDER BY asset_id, as_of DESC
+    `);
+    for (const r of priceRows) {
+      priceByAsset.set(toNum(r.asset_id), {
+        price: toNum(r.unit_price_pence),
+        source: toStr(r.source),
+      });
+    }
   }
 
   const lines: ContingentLine[] = [];
@@ -235,17 +306,10 @@ async function queryContingentLines(asOf: string): Promise<ContingentLine[]> {
 
     if (unvestedUnits <= 0) continue;
 
-    let pricePerUnit: number | null = latestPriceByGrant.get(grantId) ?? null;
-    if (pricePerUnit == null && g.payload != null) {
-      try {
-        const parsed = JSON.parse(toStr(g.payload)) as {
-          current_price_pence?: number;
-        };
-        pricePerUnit = parsed.current_price_pence ?? null;
-      } catch {
-        pricePerUnit = null;
-      }
-    }
+    const assetId = toNum(g.asset_id);
+    const priceEntry = assetId > 0 ? priceByAsset.get(assetId) : undefined;
+    const pricePerUnit = priceEntry?.price ?? null;
+    const source = priceEntry?.source ?? null;
 
     lines.push({
       grant_id: grantId,
@@ -256,7 +320,7 @@ async function queryContingentLines(asOf: string): Promise<ContingentLine[]> {
       unvested_units: unvestedUnits,
       est_value_pence: pricePerUnit != null ? unvestedUnits * pricePerUnit : null,
       price_per_unit_pence: pricePerUnit,
-      basis: "intrinsic estimate — valuation method pending",
+      basis: source != null ? `${source} price` : "no price recorded",
       not_owned: true,
     });
   }
@@ -287,29 +351,50 @@ async function getRealisedTotalPenceAtDate(asOf: string): Promise<number> {
         ) AS p
       ),
       mortgage_equity AS (
-        SELECT
-          COALESCE(SUM(mb.property_value_pence), 0) - COALESCE(SUM(mb.outstanding_pence), 0) AS total
+        SELECT COALESCE(SUM(mb.outstanding_pence), 0) AS total_outstanding
         FROM (
-          SELECT DISTINCT ON (mortgage_id) property_value_pence, outstanding_pence
+          SELECT DISTINCT ON (mortgage_id) outstanding_pence
           FROM pfa.mortgage_balance
           WHERE valid_from <= DATE '${asOf}'
             AND (valid_to IS NULL OR valid_to > DATE '${asOf}')
           ORDER BY mortgage_id, valid_from DESC
         ) AS mb
       ),
-      asset_total AS (
-        SELECT COALESCE(SUM(av.gbp_equivalent_pence), 0) AS total
+      property_total AS (
+        SELECT COALESCE(SUM(latest.unit_price_pence), 0) AS total
         FROM (
-          SELECT DISTINCT ON (asset_id) gbp_equivalent_pence
-          FROM pfa.asset_values
+          SELECT DISTINCT ON (ap.asset_id)
+            ap.unit_price_pence
+          FROM pfa.asset_prices ap
+          JOIN pfa.assets a ON a.id = ap.asset_id
+          WHERE a.asset_type = 'property'
+            AND ap.as_of <= TIMESTAMP '${asOf} 23:59:59'
+          ORDER BY ap.asset_id, ap.as_of DESC
+        ) AS latest
+      ),
+      asset_total AS (
+        SELECT COALESCE(SUM(CAST(h.quantity AS BIGINT) * p.unit_price_pence), 0) AS total
+        FROM (
+          SELECT DISTINCT ON (asset_id) asset_id, quantity
+          FROM pfa.holdings
           WHERE valid_from <= DATE '${asOf}'
             AND (valid_to IS NULL OR valid_to > DATE '${asOf}')
           ORDER BY asset_id, valid_from DESC
-        ) AS av
+        ) AS h
+        JOIN (
+          SELECT DISTINCT ON (asset_id) asset_id, unit_price_pence
+          FROM pfa.asset_prices
+          WHERE as_of <= TIMESTAMP '${asOf} 23:59:59'
+          ORDER BY asset_id, as_of DESC
+        ) AS p ON p.asset_id = h.asset_id
+        JOIN pfa.assets a ON a.id = h.asset_id
+        WHERE a.asset_type != 'property'
       )
     SELECT
-      account_total.total + pension_total.total + mortgage_equity.total + asset_total.total AS realised_total
-    FROM account_total, pension_total, mortgage_equity, asset_total
+      account_total.total + pension_total.total
+        + property_total.total - mortgage_equity.total_outstanding
+        + asset_total.total AS realised_total
+    FROM account_total, pension_total, mortgage_equity, property_total, asset_total
   `);
   if (rows.length === 0) return 0;
   return toNum(rows[0]!.realised_total);
@@ -337,7 +422,7 @@ export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
   const unknown: string[] = [];
   if (accountLines.length === 0) unknown.push("accounts");
   if (pensionLines.length === 0) unknown.push("pension");
-  if (mortgageLines.length === 0) unknown.push("property / mortgage");
+  if (mortgageLines.filter((l) => l.kind === "property").length === 0) unknown.push("property");
   if (assetLines.length === 0) unknown.push("assets");
 
   const trendDates = monthStartDatesUpTo(asOf, 12);

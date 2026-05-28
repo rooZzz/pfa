@@ -16,6 +16,8 @@ DROP TABLE IF EXISTS income_events;
 DROP TABLE IF EXISTS account_balances;
 DROP TABLE IF EXISTS pension_values;
 DROP TABLE IF EXISTS mortgage_balance;
+DROP TABLE IF EXISTS asset_prices;
+DROP TABLE IF EXISTS holdings;
 DROP TABLE IF EXISTS asset_values;
 DROP TABLE IF EXISTS person_profile;
 DROP TABLE IF EXISTS transactions;
@@ -55,7 +57,8 @@ CREATE TABLE IF NOT EXISTS assets (
   id            INTEGER PRIMARY KEY,
   name          TEXT NOT NULL,
   asset_type    TEXT NOT NULL,
-  base_currency TEXT NOT NULL
+  base_currency TEXT NOT NULL,
+  price_source  TEXT NOT NULL DEFAULT 'manual'
 );
 
 CREATE TABLE IF NOT EXISTS mortgages (
@@ -67,14 +70,15 @@ CREATE TABLE IF NOT EXISTS mortgages (
 );
 
 CREATE TABLE IF NOT EXISTS equity_grant (
-  id          INTEGER PRIMARY KEY,
-  scheme_type TEXT NOT NULL CHECK (scheme_type IN ('rsu', 'emi', 'unapproved', 'saye')),
-  units       INTEGER NOT NULL,
+  id           INTEGER PRIMARY KEY,
+  scheme_type  TEXT NOT NULL CHECK (scheme_type IN ('rsu', 'emi', 'unapproved', 'saye')),
+  units        INTEGER NOT NULL,
   strike_pence INTEGER,
-  grant_date  DATE NOT NULL,
-  currency    TEXT NOT NULL DEFAULT 'GBP',
-  source_id   INTEGER NOT NULL REFERENCES documents(id),
-  payload     TEXT
+  grant_date   DATE NOT NULL,
+  currency     TEXT NOT NULL DEFAULT 'GBP',
+  asset_id     INTEGER REFERENCES assets(id),
+  source_id    INTEGER NOT NULL REFERENCES documents(id),
+  payload      TEXT
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -142,28 +146,36 @@ CREATE TABLE IF NOT EXISTS pension_values (
 );
 
 CREATE TABLE IF NOT EXISTS mortgage_balance (
-  id                   INTEGER PRIMARY KEY,
-  mortgage_id          INTEGER NOT NULL REFERENCES mortgages(id),
-  outstanding_pence    INTEGER NOT NULL,
-  interest_rate_bps    INTEGER NOT NULL,
-  property_value_pence INTEGER NOT NULL,
-  currency             TEXT NOT NULL DEFAULT 'GBP',
-  valid_from           DATE NOT NULL,
-  valid_to             DATE,
-  recorded_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id            INTEGER NOT NULL REFERENCES documents(id)
+  id                INTEGER PRIMARY KEY,
+  mortgage_id       INTEGER NOT NULL REFERENCES mortgages(id),
+  outstanding_pence INTEGER NOT NULL,
+  interest_rate_bps INTEGER NOT NULL,
+  currency          TEXT NOT NULL DEFAULT 'GBP',
+  valid_from        DATE NOT NULL,
+  valid_to          DATE,
+  recorded_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id         INTEGER NOT NULL REFERENCES documents(id)
 );
 
-CREATE TABLE IF NOT EXISTS asset_values (
-  id                   INTEGER PRIMARY KEY,
-  asset_id             INTEGER NOT NULL REFERENCES assets(id),
-  quantity             INTEGER NOT NULL,
-  original_currency    TEXT NOT NULL,
-  gbp_equivalent_pence INTEGER NOT NULL,
-  valid_from           DATE NOT NULL,
-  valid_to             DATE,
-  recorded_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  source_id            INTEGER NOT NULL REFERENCES documents(id)
+CREATE TABLE IF NOT EXISTS holdings (
+  id          INTEGER PRIMARY KEY,
+  asset_id    INTEGER NOT NULL REFERENCES assets(id),
+  quantity    INTEGER NOT NULL,
+  valid_from  DATE NOT NULL,
+  valid_to    DATE,
+  recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id   INTEGER NOT NULL REFERENCES documents(id)
+);
+
+CREATE TABLE IF NOT EXISTS asset_prices (
+  id               INTEGER PRIMARY KEY,
+  asset_id         INTEGER NOT NULL REFERENCES assets(id),
+  unit_price_pence INTEGER NOT NULL,
+  currency         TEXT NOT NULL,
+  as_of            TIMESTAMP NOT NULL,
+  source           TEXT NOT NULL,
+  recorded_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source_id        INTEGER REFERENCES documents(id)
 );
 
 CREATE TABLE IF NOT EXISTS person_profile (

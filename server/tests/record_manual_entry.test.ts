@@ -2,7 +2,8 @@ import fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, initDb } from "../db.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
-import { recordAssetValue } from "../tools/record_asset_value.js";
+import { recordAssetHolding } from "../tools/record_asset_holding.js";
+import { recordAssetPrice } from "../tools/record_asset_price.js";
 import { recordEquityGrant } from "../tools/record_equity_grant.js";
 import { recordMortgage } from "../tools/record_mortgage.js";
 import { recordMortgageBalance } from "../tools/record_mortgage_balance.js";
@@ -16,7 +17,8 @@ beforeEach(() => {
     DELETE FROM equity_grant;
     DELETE FROM pension_values;
     DELETE FROM mortgage_balance;
-    DELETE FROM asset_values;
+    DELETE FROM asset_prices;
+    DELETE FROM holdings;
     DELETE FROM account_balances;
     DELETE FROM documents;
     DELETE FROM accounts;
@@ -151,17 +153,16 @@ describe("recordMortgageBalance", () => {
       mortgage_id: mortgageId,
       outstanding_pence: 25000000,
       interest_rate_bps: 450,
-      property_value_pence: 40000000,
       currency: "GBP",
       valid_from: "2026-05-01",
     });
 
     const db = getDb();
     const row = db
-      .prepare("SELECT outstanding_pence, property_value_pence, source_id FROM mortgage_balance LIMIT 1")
-      .get() as { outstanding_pence: number; property_value_pence: number; source_id: number };
+      .prepare("SELECT outstanding_pence, interest_rate_bps, source_id FROM mortgage_balance LIMIT 1")
+      .get() as { outstanding_pence: number; interest_rate_bps: number; source_id: number };
     expect(row.outstanding_pence).toBe(25000000);
-    expect(row.property_value_pence).toBe(40000000);
+    expect(row.interest_rate_bps).toBe(450);
     expect(row.source_id).toBeGreaterThan(0);
   });
 
@@ -171,14 +172,13 @@ describe("recordMortgageBalance", () => {
         mortgage_id: 9999,
         outstanding_pence: 25000000,
         interest_rate_bps: 450,
-        property_value_pence: 40000000,
         currency: "GBP",
         valid_from: "2026-05-01",
       }),
     ).rejects.toThrow(/No mortgage with ID 9999/);
   });
 
-  it("two balance snapshots against the same mortgage leave exactly one mortgages row with the original amount", async () => {
+  it("two balance snapshots against the same mortgage leave exactly one mortgages row", async () => {
     const registerResult = await recordMortgage({
       lender: "Nationwide",
       property: "1 Main St",
@@ -191,7 +191,6 @@ describe("recordMortgageBalance", () => {
       mortgage_id: mortgageId,
       outstanding_pence: 25000000,
       interest_rate_bps: 450,
-      property_value_pence: 40000000,
       currency: "GBP",
       valid_from: "2026-01-01",
     });
@@ -199,7 +198,6 @@ describe("recordMortgageBalance", () => {
       mortgage_id: mortgageId,
       outstanding_pence: 24500000,
       interest_rate_bps: 450,
-      property_value_pence: 41000000,
       currency: "GBP",
       valid_from: "2026-05-01",
     });
@@ -222,14 +220,13 @@ describe("recordMortgageBalance", () => {
   });
 });
 
-describe("recordAssetValue", () => {
-  it("creates an asset and writes an asset_values row", async () => {
-    await recordAssetValue({
+describe("recordAssetHolding", () => {
+  it("creates an asset and writes a holdings row linked to a document", async () => {
+    await recordAssetHolding({
       asset_name: "ETH",
       asset_type: "crypto",
+      base_currency: "ETH",
       quantity: 1500000000,
-      original_currency: "ETH",
-      gbp_equivalent_pence: 350000,
       valid_from: "2026-05-01",
     });
 
@@ -241,34 +238,103 @@ describe("recordAssetValue", () => {
     expect(asset.asset_type).toBe("crypto");
 
     const row = db
-      .prepare("SELECT gbp_equivalent_pence, source_id FROM asset_values LIMIT 1")
-      .get() as { gbp_equivalent_pence: number; source_id: number };
-    expect(row.gbp_equivalent_pence).toBe(350000);
+      .prepare("SELECT quantity, source_id FROM holdings LIMIT 1")
+      .get() as { quantity: number; source_id: number };
+    expect(row.quantity).toBe(1500000000);
+    expect(row.source_id).toBeGreaterThan(0);
+  });
+
+  it("upserts the asset on repeated calls", async () => {
+    await recordAssetHolding({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      base_currency: "ETH",
+      quantity: 100,
+      valid_from: "2026-01-01",
+    });
+    await recordAssetHolding({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      base_currency: "ETH",
+      quantity: 200,
+      valid_from: "2026-05-01",
+    });
+
+    const assetCount = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM assets").get() as { n: number }
+    ).n;
+    expect(assetCount).toBe(1);
+
+    const holdingCount = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM holdings").get() as { n: number }
+    ).n;
+    expect(holdingCount).toBe(2);
+  });
+});
+
+describe("recordAssetPrice", () => {
+  it("creates an asset and writes an asset_prices row", async () => {
+    await recordAssetPrice({
+      asset_name: "ETH",
+      asset_type: "crypto",
+      base_currency: "ETH",
+      unit_price_pence: 350000,
+      currency: "GBP",
+      as_of: "2026-05-01",
+      source: "manual",
+    });
+
+    const db = getDb();
+    const row = db
+      .prepare("SELECT unit_price_pence, currency, source, source_id FROM asset_prices LIMIT 1")
+      .get() as { unit_price_pence: number; currency: string; source: string; source_id: number };
+    expect(row.unit_price_pence).toBe(350000);
+    expect(row.currency).toBe("GBP");
+    expect(row.source).toBe("manual");
     expect(row.source_id).toBeGreaterThan(0);
   });
 });
 
 describe("recordEquityGrant", () => {
-  it("writes an equity_grant row with payload and returns the grant ID", async () => {
+  it("writes an equity_grant row and returns the grant ID", async () => {
     const result = await recordEquityGrant({
       scheme_type: "rsu",
       units: 1000,
       grant_date: "2025-01-01",
       currency: "GBP",
-      current_price_pence: 50000,
     });
 
     expect(result).toMatch(/Grant ID: \d+/);
 
     const db = getDb();
     const grant = db
-      .prepare("SELECT scheme_type, units, payload FROM equity_grant LIMIT 1")
-      .get() as { scheme_type: string; units: number; payload: string };
+      .prepare("SELECT scheme_type, units, asset_id FROM equity_grant LIMIT 1")
+      .get() as { scheme_type: string; units: number; asset_id: number | null };
     expect(grant.scheme_type).toBe("rsu");
     expect(grant.units).toBe(1000);
+    expect(grant.asset_id).toBeNull();
+  });
 
-    const grantPayload = JSON.parse(grant.payload) as { current_price_pence: number };
-    expect(grantPayload.current_price_pence).toBe(50000);
+  it("links the grant to an underlying asset when underlying_asset_name is supplied", async () => {
+    await recordEquityGrant({
+      scheme_type: "rsu",
+      units: 1000,
+      grant_date: "2025-01-01",
+      currency: "GBP",
+      underlying_asset_name: "ACME Corp",
+      underlying_asset_type: "stock",
+    });
+
+    const db = getDb();
+    const grant = db
+      .prepare("SELECT asset_id FROM equity_grant LIMIT 1")
+      .get() as { asset_id: number };
+    expect(grant.asset_id).toBeGreaterThan(0);
+
+    const asset = db
+      .prepare("SELECT name FROM assets WHERE id = ?")
+      .get(grant.asset_id) as { name: string };
+    expect(asset.name).toBe("ACME Corp");
   });
 });
 

@@ -72,14 +72,66 @@ For the current balance (today), omit the date filter and just get the row with 
 
 ## Table: `pfa.assets`
 
-**Pattern: Reference.** Defines a non-account asset (crypto, investments). Rows are inserted once.
+**Pattern: Reference.** Defines a non-account asset (crypto, investments, property). Rows are inserted once.
 
 | Column | Type | Meaning |
 |---|---|---|
-| `id` | INTEGER | Primary key. Referenced as `asset_id` in `asset_values`. |
-| `name` | TEXT | Human-readable name (e.g. "ETH", "Vanguard FTSE All-World"). |
-| `asset_type` | TEXT | Free-form type descriptor (e.g. "crypto", "etf", "stock"). |
+| `id` | INTEGER | Primary key. Referenced as `asset_id` in `holdings`, `asset_prices`, and `equity_grant`. |
+| `name` | TEXT | Human-readable name (e.g. "ETH", "Vanguard FTSE All-World", "12 Acacia Avenue"). |
+| `asset_type` | TEXT | Free-form type descriptor (e.g. "crypto", "etf", "stock", "property"). |
 | `base_currency` | TEXT | The native currency of the asset (e.g. "ETH", "USD", "GBP"). |
+| `price_source` | TEXT | Strategy hint for where to fetch prices. Default `manual`. Future values: `coingecko`, `zoopla`, `web_search`. |
+
+---
+
+## Table: `pfa.holdings`
+
+**Pattern: Snapshot.** Records how many units of an asset are held at a point in time. Inventory only — no price information. Use LOCF to fill gaps.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `asset_id` | INTEGER | FK to `assets.id`. |
+| `quantity` | INTEGER | Units held. For whole shares use units directly. For fractional shares use units × 10000. For property use 1. |
+| `valid_from` | DATE | Date the holding became effective. |
+| `valid_to` | DATE | NULL = current row. Set when holding changes. |
+| `recorded_at` | TIMESTAMP | When written. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+
+**To value a holding:** join with `asset_prices` on `asset_id` for the latest price on or before the query date, then multiply `quantity × unit_price_pence`.
+
+---
+
+## Table: `pfa.asset_prices`
+
+**Pattern: Event (price tick).** Records a per-unit price observation for an asset. Prices are immutable once recorded — add a new row when the price changes. One row per price observation, not one row per asset.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `asset_id` | INTEGER | FK to `assets.id`. |
+| `unit_price_pence` | INTEGER | Price per unit in pence, in the currency of this row. Never a float. |
+| `currency` | TEXT | Currency of the unit price. Usually the asset's `base_currency` for crypto/stocks; GBP for properties. |
+| `as_of` | TIMESTAMP | When this price was observed. TIMESTAMP (not DATE) to support intraday crypto prices. |
+| `source` | TEXT | Where the price came from: `manual`, `coingecko`, `zoopla`, `web_search`, etc. |
+| `recorded_at` | TIMESTAMP | When this row was written. |
+| `source_id` | INTEGER | FK to `documents.id`. NULL for connector-fetched prices that have no uploaded document. |
+
+**To get the latest price for an asset:**
+
+```sql
+SELECT DISTINCT ON (asset_id)
+  asset_id,
+  unit_price_pence,
+  currency,
+  as_of,
+  source
+FROM pfa.asset_prices
+WHERE as_of <= TIMESTAMP '2026-05-01 23:59:59'
+ORDER BY asset_id, as_of DESC
+```
+
+**To value a holding:** `quantity × unit_price_pence` gives the value in `currency`. If `currency = 'GBP'` this is the GBP value directly. Non-GBP prices require FX conversion (not yet implemented — all seed data uses GBP-equivalent prices).
 
 ---
 
@@ -91,7 +143,7 @@ For the current balance (today), omit the date filter and just get the row with 
 |---|---|---|
 | `id` | INTEGER | Primary key. Referenced as `mortgage_id` in `mortgage_balance`. |
 | `lender` | TEXT | Lender name (e.g. "Nationwide"). |
-| `property` | TEXT | Property address or identifier. |
+| `property` | TEXT | Property address or identifier. Must match the `name` of the corresponding `assets` row (asset_type = 'property') for property valuation to work. |
 | `original_amount_pence` | INTEGER | Original loan amount in pence. Never updated — use `mortgage_balance` for current outstanding. |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
 
@@ -142,7 +194,7 @@ For the current balance (today), omit the date filter and just get the row with 
 
 ## Table: `pfa.mortgage_balance`
 
-**Pattern: Snapshot.** Observed mortgage state at a point in time.
+**Pattern: Snapshot.** Observed mortgage state at a point in time. Records the liability (outstanding balance) only. The property asset value is tracked separately via `holdings` + `asset_prices` against the matching `assets` row.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -150,32 +202,13 @@ For the current balance (today), omit the date filter and just get the row with 
 | `mortgage_id` | INTEGER | FK to `mortgages.id`. |
 | `outstanding_pence` | INTEGER | Outstanding balance in pence. |
 | `interest_rate_bps` | INTEGER | Current interest rate in basis points (e.g. 4.5% = 450). Integer to avoid floats. |
-| `property_value_pence` | INTEGER | Estimated property value in pence at observation date. |
 | `currency` | TEXT | Default `GBP`. |
 | `valid_from` | DATE | Observation date. |
 | `valid_to` | DATE | NULL = current row. |
 | `recorded_at` | TIMESTAMP | When written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 
-**LTV query:** `outstanding_pence * 100 / property_value_pence` gives LTV as a percentage (integer arithmetic).
-
----
-
-## Table: `pfa.asset_values`
-
-**Pattern: Snapshot.** Observed value of a non-account asset.
-
-| Column | Type | Meaning |
-|---|---|---|
-| `id` | INTEGER | Primary key. |
-| `asset_id` | INTEGER | FK to `assets.id`. |
-| `quantity` | INTEGER | Quantity in the asset's smallest unit (e.g. satoshis for BTC, shares × 10000 for fractional). |
-| `original_currency` | TEXT | Native currency of the asset. |
-| `gbp_equivalent_pence` | INTEGER | GBP equivalent at observation time. Never recomputed — stored at ingestion. |
-| `valid_from` | DATE | Observation date. |
-| `valid_to` | DATE | NULL = current row. |
-| `recorded_at` | TIMESTAMP | When written. |
-| `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+**Property equity:** To compute equity, join the mortgage's `outstanding_pence` with the latest `asset_prices.unit_price_pence` for the property asset (matched by `mortgages.property = assets.name` where `assets.asset_type = 'property'`). Equity = property value − outstanding.
 
 ---
 
@@ -206,13 +239,14 @@ For the current balance (today), omit the date filter and just get the row with 
 | `id` | INTEGER | Primary key. Referenced as `grant_id` in `equity_vesting_event`. |
 | `scheme_type` | TEXT | One of: `rsu`, `emi`, `unapproved`, `saye`. |
 | `units` | INTEGER | Total units granted. |
-| `strike_pence` | INTEGER | Exercise price per unit in pence. NULL for RSUs. |
+| `strike_pence` | INTEGER | Exercise price per unit in pence. NULL for RSUs. Event-locked tax fact — never updated. |
 | `grant_date` | DATE | Date the award was granted. |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
+| `asset_id` | INTEGER | FK to `assets.id`. The underlying share. Used to look up current price in `asset_prices` for unvested-unit valuation. NULL if not linked. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
-| `payload` | TEXT | JSON holding scheme-specific terms and `current_price_pence` (placeholder for contingent valuation). **Do not use for arithmetic** — payload is for display only. |
+| `payload` | TEXT | JSON for scheme-specific terms. **Do not use for arithmetic** — payload is for display only. |
 
-**Net worth note.** Contingent (unvested) equity is computed by a dedicated module, not by text-to-SQL. Unvested units = `units − SUM(equity_vesting_event.units_vested)` for vesting events up to the query date. Valuation method is an open decision — the placeholder uses `unvested_units × current_price_pence`.
+**Net worth note.** Contingent (unvested) equity valuation uses `equity_grant.asset_id` → `asset_prices` for the current share price. Unvested units = `units − SUM(equity_vesting_event.units_vested)` for vesting events up to the query date.
 
 ---
 
@@ -226,7 +260,7 @@ For the current balance (today), omit the date filter and just get the row with 
 | `grant_id` | INTEGER | FK to `equity_grant.id`. |
 | `vest_date` | DATE | Date units vested. |
 | `units_vested` | INTEGER | Number of units that vested on this date. |
-| `market_price_pence` | INTEGER | Market price per unit at vesting in pence. NULL if not recorded. |
+| `market_price_pence` | INTEGER | Market price per unit at vesting in pence. Event-locked tax fact — never refreshed. NULL if not recorded. |
 | `estimated_value_pence` | INTEGER | `units_vested × market_price_pence` at time of recording. NULL if price unknown. |
 | `occurred_at` | TIMESTAMP | Midnight UTC on `vest_date`. |
 | `recorded_at` | TIMESTAMP | When this row was written. |
@@ -317,43 +351,66 @@ WHERE valid_to IS NULL
 ORDER BY account_id, valid_from DESC
 ```
 
-### 3a. Total net worth across all accounts
+### 4. Current value of all asset holdings
 
-Always wrap the per-account deduplication in a subquery before summing. Never aggregate `account_balances` directly.
+Join the latest holding with the latest price. Only returns assets where both a holding and a price exist.
 
 ```sql
-SELECT SUM(latest.balance_pence) AS net_worth_pence
-FROM (
-  SELECT DISTINCT ON (account_id)
-    account_id,
-    balance_pence
-  FROM pfa.account_balances
+WITH latest_holdings AS (
+  SELECT DISTINCT ON (asset_id)
+    asset_id, quantity
+  FROM pfa.holdings
   WHERE valid_to IS NULL
-  ORDER BY account_id, valid_from DESC
-) AS latest
-```
-
-### 4. Total credits to account 1 this calendar month
-
-```sql
-SELECT SUM(amount_pence) AS total_credits_pence
-FROM pfa.transactions
-WHERE account_id = 1
-  AND amount_pence > 0
-  AND occurred_at >= DATE_TRUNC('month', CURRENT_DATE)
-```
-
-### 5. All balance observations for account 1 in chronological order
-
-```sql
+  ORDER BY asset_id, valid_from DESC
+),
+latest_prices AS (
+  SELECT DISTINCT ON (asset_id)
+    asset_id, unit_price_pence, currency, as_of, source
+  FROM pfa.asset_prices
+  ORDER BY asset_id, as_of DESC
+)
 SELECT
-  valid_from,
-  balance_pence,
-  currency,
-  recorded_at
-FROM pfa.account_balances
-WHERE account_id = 1
-ORDER BY valid_from ASC
+  a.name,
+  a.asset_type,
+  h.quantity,
+  p.unit_price_pence,
+  p.currency,
+  CAST(h.quantity AS BIGINT) * p.unit_price_pence AS total_value_pence,
+  p.as_of AS price_as_of,
+  p.source AS price_source
+FROM latest_holdings h
+JOIN pfa.assets a ON a.id = h.asset_id
+JOIN latest_prices p ON p.asset_id = h.asset_id
+```
+
+### 5. Current property value and mortgage equity
+
+```sql
+WITH prop_price AS (
+  SELECT DISTINCT ON (ap.asset_id)
+    a.name AS property_name,
+    ap.unit_price_pence AS property_value_pence
+  FROM pfa.asset_prices ap
+  JOIN pfa.assets a ON a.id = ap.asset_id
+  WHERE a.asset_type = 'property'
+  ORDER BY ap.asset_id, ap.as_of DESC
+),
+outstanding AS (
+  SELECT DISTINCT ON (mb.mortgage_id)
+    m.property,
+    mb.outstanding_pence
+  FROM pfa.mortgage_balance mb
+  JOIN pfa.mortgages m ON m.id = mb.mortgage_id
+  WHERE mb.valid_to IS NULL
+  ORDER BY mb.mortgage_id, mb.valid_from DESC
+)
+SELECT
+  o.property,
+  p.property_value_pence,
+  o.outstanding_pence,
+  p.property_value_pence - o.outstanding_pence AS equity_pence
+FROM outstanding o
+JOIN prop_price p ON p.property_name = o.property
 ```
 
 ### 6. Most recent payslip (gross, net, PAYE, pension)

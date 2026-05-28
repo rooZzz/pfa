@@ -10,6 +10,8 @@ type RealisedLine = {
   recorded_at: string;
   source_id: number;
   currency: string;
+  price_as_of?: string;
+  price_source?: string;
 };
 
 type ContingentLine = {
@@ -47,12 +49,27 @@ function formatGbp(pence: number): string {
 }
 
 function daysAgo(dateStr: string): string {
+  if (!dateStr) return "";
   const then = new Date(dateStr);
   const now = new Date();
   const days = Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
   if (days === 0) return "today";
   if (days === 1) return "1 day ago";
   return `${days} days ago`;
+}
+
+function priceAgeDays(dateStr: string | undefined): number | null {
+  if (!dateStr) return null;
+  const then = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function priceAgeLabel(days: number | null): string {
+  if (days === null) return "";
+  if (days === 0) return "price today";
+  if (days === 1) return "price 1d ago";
+  return `price ${days}d ago`;
 }
 
 function kindLabel(kind: RealisedLine["kind"]): string {
@@ -134,23 +151,38 @@ function NetWorthApp() {
         <h3 style={s.sectionHeading}>Realised</h3>
         <table style={s.table}>
           <tbody>
-            {data.realised.map((line, i) => (
-              <tr key={i}>
-                <td style={s.kindCell}>{kindLabel(line.kind)}</td>
-                <td style={s.nameCell}>{line.name}</td>
-                <td style={{ ...s.amountCell, color: line.value_pence < 0 ? "#c0392b" : "inherit" }}>
-                  {formatGbp(line.value_pence)}
-                </td>
-                <td style={s.staleCell} title={`recorded ${line.recorded_at}`}>
-                  {daysAgo(line.valid_from)}
-                </td>
-              </tr>
-            ))}
+            {data.realised.map((line, i) => {
+              const hasPriceMeta = line.kind === "asset" || line.kind === "property";
+              const ageDays = hasPriceMeta ? priceAgeDays(line.price_as_of) : null;
+              return (
+                <tr key={i}>
+                  <td style={s.kindCell}>{kindLabel(line.kind)}</td>
+                  <td style={s.nameCell}>{line.name}</td>
+                  <td style={{ ...s.amountCell, color: line.value_pence < 0 ? "#c0392b" : "inherit" }}>
+                    {formatGbp(line.value_pence)}
+                  </td>
+                  <td style={s.staleCell} title={`recorded ${line.recorded_at}`}>
+                    {daysAgo(line.valid_from)}
+                  </td>
+                  {hasPriceMeta ? (
+                    <td
+                      style={{ ...s.staleCell, color: ageDays != null && ageDays > 30 ? "#c0392b" : "#aaa" }}
+                      title={line.price_as_of ? `price as of ${line.price_as_of} via ${line.price_source ?? "unknown"}` : "no price recorded"}
+                    >
+                      {priceAgeLabel(ageDays)}
+                    </td>
+                  ) : (
+                    <td />
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr>
               <td colSpan={2} style={s.totalLabel}>Total realised</td>
               <td style={s.totalAmount}>{formatGbp(data.realised_total_pence)}</td>
+              <td />
               <td />
             </tr>
           </tfoot>
@@ -184,7 +216,9 @@ function NetWorthApp() {
                   <td style={s.amountCell}>
                     {line.est_value_pence != null ? formatGbp(line.est_value_pence) : "unknown"}
                   </td>
-                  <td style={s.staleCell}>{line.basis}</td>
+                  <td style={s.staleCell} title={line.price_per_unit_pence != null ? `${line.price_per_unit_pence}p per unit` : undefined}>
+                    {line.basis}
+                  </td>
                 </tr>
               ))}
             </tbody>
