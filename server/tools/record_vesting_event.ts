@@ -17,7 +17,11 @@ export const recordVestingEventSchema = {
     .number()
     .int()
     .optional()
-    .describe("Market price per unit in pence at vesting date. Used for tax and valuation."),
+    .describe(
+      "Market price per unit at vesting date. Must be an integer number of pence — e.g. 2565 for a 2,565p / £25.65 share price. " +
+      "UK prices are commonly quoted in pence (e.g. '2,565p', '2565p'): use that number directly, do NOT multiply by 100. " +
+      "Only convert if the price was given in pounds: £25.65 → 2565.",
+    ),
 };
 
 export async function recordVestingEvent(input: {

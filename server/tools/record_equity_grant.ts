@@ -11,7 +11,11 @@ export const recordEquityGrantSchema = {
     .number()
     .int()
     .optional()
-    .describe("Strike / exercise price per unit in pence. Omit for RSUs."),
+    .describe(
+      "Strike / exercise price per unit. Must be an integer number of pence — e.g. 50 for 50p, 1200 for £12.00. " +
+      "UK prices are often quoted in pence already (e.g. '1200p'): use that number directly, do NOT multiply by 100. " +
+      "Omit for RSUs.",
+    ),
   grant_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
@@ -22,7 +26,9 @@ export const recordEquityGrantSchema = {
     .int()
     .optional()
     .describe(
-      "Current market price per share in pence, used as placeholder for contingent valuation.",
+      "Current market price per share. Must be an integer number of pence — e.g. 2565 for a 2,565p / £25.65 share price. " +
+      "UK prices are commonly quoted in pence (e.g. '2,565p', '2565p'): use that number directly, do NOT multiply by 100. " +
+      "Only convert if the price was given in pounds: £25.65 → 2565.",
     ),
 };
 
