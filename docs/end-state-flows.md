@@ -215,6 +215,8 @@ Edit is not a separate surface. It folds into the manual-entry path: a correctio
 
 This does not contradict the "observations only" decision in the log — it is the state that decision was reserving the door for, once trust is established. The line is precise: a directive firing is an observation (Flow 6 and Flow 8, permitted today); ranking options — overpay versus invest — is advice, and stays behind this gate.
 
+The gate is enforced today via server `instructions` and tool descriptions (best-effort behavioural nudge — MAY-injected, model-variable). This is not a hard guarantee. True enforcement requires handler-side gating or removing model-facing raw-data tools; deferred. See the decision log in `docs/architecture.md`.
+
 ---
 
 ## Flow 8 — Goals and briefing

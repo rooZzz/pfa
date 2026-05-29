@@ -75,7 +75,7 @@ Working end-to-end on a thin slice. What exists today:
 - Net worth: `get_net_worth` tool plus `ui://pfa/net_worth.html` dashboard.
 - Goals (thin slice, Flow 8 + seed of Flow 6): `propose_goal` (Haiku classifies free text onto a goal type, returns the needs spec, no write), `confirm_goal` (deterministic write of the goal with its verbatim utterance and an audit document), `get_briefing` (pushes the full set of grounded directives across active goals — progress, deadlines, data gaps). Implemented goal types: `emergency_fund`, `isa_max`. Authored decomposition and the goal catalog live in `server/goals/`; metric computations in `server/metrics/`. The ISA annual allowance is a hardcoded stopgap pending the `tax_constants` reference.
 - Dev utilities: `reset_schema` and `seed_data` tools.
-- UI resources: `ui://pfa/mcp-app.html`, `ui://pfa/upload.html`, `ui://pfa/net_worth.html`.
+- UI resources: `ui://pfa/upload.html`, `ui://pfa/net_worth.html`, `ui://pfa/cashflow.html`.
 
 The end-state target lives in [docs/end-state-flows.md](docs/end-state-flows.md); the architecture in [docs/architecture.md](docs/architecture.md).
 
