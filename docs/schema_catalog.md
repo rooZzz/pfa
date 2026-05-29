@@ -320,6 +320,22 @@ Reference table for UK tax years. All ISA and PAYE queries must anchor to this t
 
 ---
 
+## Table: `pfa.goals`
+
+**Pattern: Reference.** One row per financial goal the user has set. The structured form of a classified goal type. Decomposition into sub-goals, metric bindings, and directives is authored in code and computed at briefing time — not stored here.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INTEGER | Primary key. |
+| `goal_type` | TEXT | The goal type from the catalog: `emergency_fund`, `isa_max`, `fire`, `house_deposit`, `debt_payoff`, `retirement`. |
+| `params` | TEXT | JSON object holding the confirmed slots for the goal type (e.g. `{"target_months": 6}` or `{"tax_year": "2025/26"}`). **Not a source for arithmetic or aggregation** — it holds goal configuration, read by the briefing engine, not the query layer. |
+| `raw_utterance` | TEXT | The user's original goal statement, stored verbatim as provenance and harness framing context. Never a data source for directives. |
+| `status` | TEXT | `active` or `archived`. Only `active` goals are evaluated in the briefing. |
+| `source_id` | INTEGER | NOT NULL. FK to `documents.id` — the audit document capturing the goal as entered. |
+| `recorded_at` | TIMESTAMP | UTC timestamp when the goal was recorded. |
+
+---
+
 ## Example queries
 
 ### 1. Current balance for account 1

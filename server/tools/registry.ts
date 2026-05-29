@@ -2,8 +2,11 @@ import { z } from "zod";
 import { resetDb } from "../db.js";
 import { getCashflow } from "../cashflow/index.js";
 import { getNetWorth } from "../net_worth/index.js";
+import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { confirmStagedRows } from "./confirm_staged_rows.js";
+import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
 import { ingestDocument } from "./ingest_document.js";
+import { proposeGoal, proposeGoalSchema } from "./propose_goal.js";
 import { queryNaturalLanguage } from "./query_natural_language.js";
 import {
   recordAccountBalance,
@@ -254,6 +257,27 @@ export const tools: ToolDescriptor[] = [
       question: z.string().describe("The financial question to answer in plain English."),
     },
     handler: async ({ question }) => text(await queryNaturalLanguage(question)),
+  }),
+  defineTool({
+    name: "propose_goal",
+    description:
+      "Classify a user's free-text financial goal onto a goal type and return what is needed to record it. Does not write anything. Pass the user's words verbatim. Follow up with confirm_goal once the needs_spec slots are filled.",
+    inputSchema: proposeGoalSchema,
+    handler: async (input) => text(await proposeGoal(input)),
+  }),
+  defineTool({
+    name: "confirm_goal",
+    description:
+      "Record a financial goal after its needs_spec slots are filled. Supported goal types: emergency_fund (target_months), isa_max (tax_year). Stores the goal with its verbatim utterance and an audit document. Deterministic — no advice.",
+    inputSchema: confirmGoalSchema,
+    handler: async (input) => text(await confirmGoal(input)),
+  }),
+  defineTool({
+    name: "get_briefing",
+    description:
+      "Push the complete set of grounded observations across all active goals: progress, deadlines, and data gaps. Facts only, never ranked options or advice. Defaults to today.",
+    inputSchema: getBriefingSchema,
+    handler: async (input) => text(await getBriefingTool(input)),
   }),
 ];
 

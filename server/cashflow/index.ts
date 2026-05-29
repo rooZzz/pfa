@@ -6,7 +6,7 @@ import type { CashflowResult, TrendPoint } from "./types.js";
 
 export type { CashflowResult } from "./types.js";
 
-async function resolvePeriod(
+export async function resolvePeriod(
   taxYear?: string,
   asOf?: string,
 ): Promise<{ tax_year: string; period_start: string; period_end: string }> {

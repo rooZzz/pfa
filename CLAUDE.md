@@ -66,13 +66,14 @@ Working end-to-end on a thin slice. What exists today:
 
 - Local stdio MCP server in `server/` registering tools and `ui://` resources for Claude Desktop.
 - SQLite write store via `better-sqlite3` and DuckDB read layer via the SQLite extension, sharing one `.sqlite` file on disk.
-- Schema in [server/db.ts](server/db.ts): `documents`, `accounts`, `assets` (with `price_source`), `mortgages`, `transactions`, `income_events` (with `payload`), `account_balances`, `pension_values`, `mortgage_balance`, `holdings`, `asset_prices`, `person_profile`, `tax_periods`, `equity_grant` (with `asset_id`), `equity_vesting_event`.
+- Schema in [server/db.ts](server/db.ts): `documents`, `accounts`, `assets` (with `price_source`), `mortgages`, `transactions`, `income_events` (with `payload`), `account_balances`, `pension_values`, `mortgage_balance`, `holdings`, `asset_prices`, `person_profile`, `tax_periods`, `equity_grant` (with `asset_id`), `equity_vesting_event`, `goals`.
 - Ingest tools:
   - `ingest_document` — base64 file in → Haiku 4.5 vision → staging buffer. Payslip only.
   - `confirm_staged_rows` — writes a staged payslip to `income_events` with `source_id` enforced.
   - `record_account_balance`, `record_pension_value`, `record_mortgage_balance`, `record_asset_holding`, `record_asset_price`, `refresh_asset_price`, `record_equity_grant`, `record_vesting_event` — manual-entry tools, one per series. Asset entry is a holding + price pair. `refresh_asset_price` dispatches on `assets.price_source` (skeleton for future connectors).
   - `query_natural_language` — Haiku text-to-SQL against [docs/schema_catalog.md](docs/schema_catalog.md), executed by DuckDB.
 - Net worth: `get_net_worth` tool plus `ui://pfa/net_worth.html` dashboard.
+- Goals (thin slice, Flow 8 + seed of Flow 6): `propose_goal` (Haiku classifies free text onto a goal type, returns the needs spec, no write), `confirm_goal` (deterministic write of the goal with its verbatim utterance and an audit document), `get_briefing` (pushes the full set of grounded directives across active goals — progress, deadlines, data gaps). Implemented goal types: `emergency_fund`, `isa_max`. Authored decomposition and the goal catalog live in `server/goals/`; metric computations in `server/metrics/`. The ISA annual allowance is a hardcoded stopgap pending the `tax_constants` reference.
 - Dev utilities: `reset_schema` and `seed_data` tools.
 - UI resources: `ui://pfa/mcp-app.html`, `ui://pfa/upload.html`, `ui://pfa/net_worth.html`.
 

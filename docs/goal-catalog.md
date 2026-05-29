@@ -106,6 +106,8 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 
 **UK edges / notes.** Cover is measured against essential monthly outgoings, not gross spend. Funds must be genuinely accessible — instant or near-instant access — so locked products do not count toward the metric.
 
+**Implemented formula.** `liquid_savings` = sum of the latest balance per account of type `current`, `savings`, or `isa` (LOCF as of the query date). Average monthly outgoings = mean of monthly transaction outflow over the trailing 12 months, across months that had any outflow. `emergency_fund_months` = `liquid_savings` / average monthly outgoings. The metric is unresolved (fires a data-gap directive) when there are no liquid balances or no spending transactions.
+
 ---
 
 ## `isa_max`
@@ -131,6 +133,10 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 | `allowance_progress` | `isa_allowance_remaining` — annual allowance minus contributions since the tax year `starts_on`, anchored to `tax_periods`. |
 
 **UK edges / notes.** Anchor to the UK tax year (April 6 to April 5) via `tax_periods`, never the calendar year. The annual allowance figure is itself a dated fact and must track the year in scope. The directive carries days remaining in the tax year, since the allowance does not carry forward.
+
+**Implemented formula.** Contributions = sum of inflow transactions (positive `amount_pence`) to accounts of type `isa` within the tax-year window resolved from `tax_periods`. `isa_allowance_remaining` = annual allowance minus contributions. The metric is unresolved (fires a data-gap directive) when no ISA account exists. The deadline directive reports days from the query date to the tax-year `ends_on`.
+
+**Stopgap.** The annual allowance is currently a hardcoded constant (`ISA_ANNUAL_ALLOWANCE_PENCE`, £20,000) in the goals catalog module, pending the dated, status-tagged `tax_constants` reference described in `docs/architecture.md`. Precise contribution modelling (distinguishing deposits from growth) is also deferred; inflow transactions to the ISA account are the current approximation.
 
 ---
 

@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import * as m0001 from "./0001_initial.js";
 import * as m0002 from "./0002_transaction_category.js";
 import * as m0003 from "./0003_seed_tax_periods.js";
+import * as m0004 from "./0004_goals.js";
 
 type Migration = {
   name: string;
@@ -13,6 +14,7 @@ const MIGRATIONS: Migration[] = [
   { name: "0001_initial", ...m0001 },
   { name: "0002_transaction_category", ...m0002 },
   { name: "0003_seed_tax_periods", ...m0003 },
+  { name: "0004_goals", ...m0004 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {
