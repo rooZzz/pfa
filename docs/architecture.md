@@ -233,6 +233,71 @@ These are invariants. They hold across all tables, all ingestion types, all stag
 
 ---
 
+## Goal framework
+
+A financial adviser starts from goals, not balances. Goal capture is therefore a first-class flow, elicited before or alongside data. This section defines how a fuzzy spoken goal becomes a set of deterministic, data-bound observations without a high-capability model inventing the financial logic.
+
+### The dividing line
+
+The separation that matters is grounded observation versus synthesised advice — not low-capability model versus high-capability model. Anything that must be correct and auditable is deterministic and owned by the app. Framing, prioritisation, and tradeoff reasoning are owned by the harness. The internal Haiku model stays at the I/O boundary.
+
+| Layer | Owns |
+|---|---|
+| App (deterministic) | Truth, coverage, the goal catalog, goal decomposition, metric definitions, and the directive engine. |
+| Harness (Sonnet and above) | Conversation, prioritisation, tradeoff reasoning, challenge. Turns fired directives into advice. |
+| Internal Haiku | The I/O boundary only — vision extraction, text-to-SQL, and classifying free text onto a goal type. |
+
+### Vocabulary
+
+These four terms are disjoint and must stay so.
+
+- **Goal type** — a member of a finite, authored catalog (`fire`, `house_deposit`, ...). What the user wants, normalised.
+- **Sub-goal** — a component a goal type deterministically decomposes into.
+- **Metric** — a deterministic computation that binds a sub-goal to stored data. Its value may be null when the data does not exist yet.
+- **Directive** — a rule that fires when a metric is evaluated against a sub-goal's target ("ISA 60 percent funded, 47 days left").
+
+A goal is intent; a directive is observation. They sit on opposite sides of the grounded-observation line. The catalog of goal types and their decompositions is the authored domain corpus — see `docs/goal-catalog.md`.
+
+Worked example: `fire` (financial independence, retire early) decomposes into `target_number` (target portfolio = annual spend / safe-withdrawal-rate), `bridge_fund` (spending across the years between retiring early and pension access age), and `contribution_gap` (required monthly contribution versus actual). The non-trivial edge is UK pension access age (57 from 2028): retiring before it silently requires an ISA or GIA bridge fund, which the decomposition encodes as a sub-goal.
+
+### The goal pipeline
+
+1. **Classify.** The harness elicits the goal; Haiku maps the user's words onto a goal type from the catalog. Text that maps to nothing is pushed back for clarification — an unmappable goal is inert, since it can attach to no directive.
+2. **Needs spec.** For a compound goal type the app returns a structured needs spec: the slots that must be filled before decomposition (for `fire`: target annual spend, safe-withdrawal-rate, current age, target retirement age), each with a default where one is sensible.
+3. **Interview.** The harness conducts the follow-up conversation to fill the slots. It is filling deterministic slots the app demanded, not deciding what the goal requires.
+4. **Confirm and decompose.** On confirmation the app deterministically decomposes the goal type into its sub-goals, each bound to a metric, and stores the goal with its verbatim utterance.
+
+### Design rules
+
+These are invariants, in the same spirit as the persistence-layer rules.
+
+1. **Decomposition is authored, never generated.** The financial logic that turns a goal type into sub-goals is frozen domain knowledge — identical every run and auditable. No model, Haiku or harness, generates it. A goal that cannot be decomposed deterministically is a signal to author a new goal type, not to invoke a model at runtime.
+
+2. **Metrics bind to definitions, not rows; absence is first-class.** A goal binds to a metric definition that always resolves, even when its current value is null because no data has been captured. An unresolved metric fires a data-gap directive ("house deposit goal set, no savings account linked") which becomes the next capture prompt. Missing data is an observation, not an error.
+
+3. **The briefing is push, not pull.** The app proactively evaluates every directive against current data and goals and hands the harness the complete observation set. The harness never chooses what to query — coverage is the app's responsibility, framing is the harness's. This is what prevents a missed pension gap because the model did not think to look.
+
+4. **The verbatim utterance is provenance.** The user's original words are stored on the goal alongside the structured form, mirroring the source-document rule (persistence design rule 1). It serves audit — "why does this goal exist?" — and gives the harness framing context the catalog discards. It is context, never a data source; directives never fire off prose.
+
+5. **The advice gate holds.** A directive firing is an observation and is permitted today. Ranking options ("overpay versus invest") is advice and stays gated under the observations-only decision. The goal framework sharpens where that line sits; it does not move it.
+
+6. **Domain rule data is app-owned, dated, status-tagged, injected, and never recalled.** UK tax and legal rules that drive directives and advice live in the app as reference data, not in the model's memory. They are injected into the advice and briefing payload for the tax year in scope, the same way `schema_catalog.md` is injected into every text-to-SQL call. The harness applies and frames the rules; it never sources a tax figure from its own training, which is stale and unprovenanced. Market and macro context — "markets are down, buy now" — is the opposite category: a judgment about live external state and a form of market timing. It is out of scope, not reference data.
+
+### Domain rule data (tax constants)
+
+Tax and legal constants — allowances, rates, bands, the pension access age — are the sibling of `tax_periods` (persistence design rule 3): app-owned reference data, dated and provenanced. Conceptually a `tax_constants` row carries the constant key, its value (in pence with explicit currency where monetary), a `valid_from`/`valid_to` effective window (the snapshot pattern), a `status` of `enacted` or `announced`, and a source. No DDL yet.
+
+Two properties make it carry forward-looking rule changes without new machinery:
+
+- **Temporal versioning.** Each constant has an effective window. This year's ISA allowance is not next year's; both are rows. An announced-but-future change is simply a row whose `valid_from` is in the future — there is no separate notion of an "announcement".
+- **Status.** A constant is `enacted` (in force, royal assent) or `announced` (Budget speech, draft legislation, consultation — subject to change). The status rides through to any directive built on it.
+
+This lets the briefing fire **deadline directives** from pending constants: "ISA allowance drops to X on [date], 73 days away; current headroom Y." That is the same shape as the existing "ISA 60 percent funded, 47 days left" directive — a grounded observation, not a new mechanism. A directive resting on an `announced` (not yet `enacted`) constant must say so — "proposed, subject to legislation" — never stated as settled fact. The "act now" conclusion remains advice, behind the gate.
+
+Updates are **human-curated**. Legislation is never auto-parsed into the canonical table — these are the most safety-critical rows in the system, and one wrong constant poisons every downstream directive. Drafting may be assisted, but a human confirms before the write, the same mandatory-review spine as document ingestion. The table therefore carries a standing maintenance obligation: curated updates on the fiscal cadence, including announced-but-pending changes.
+
+---
+
 ## Ingestion pipeline
 
 Three source types. The table taxonomy is identical for all three. The pipeline differs.
@@ -385,3 +450,6 @@ This table records **design fit** — whether the schema and architecture accomm
 | 2026-05-28 | Asset pricing: split inventory from valuation; event-locked prices stay on event rows | `holdings` (quantity, changes on transactions) + `asset_prices` (per-unit price ticks, source-tagged) replace the old `asset_values` table which bundled both. Property value moves to `asset_prices` against a `property` asset, removing it from `mortgage_balance`. Equity grant current price moves from `payload` to `asset_prices` via `equity_grant.asset_id`. Strike and market-at-vest remain on their respective event rows as immutable tax facts. `assets.price_source` is a strategy hint for future connectors. |
 | 2026-05-28 | Data access: Kysely typed query builder + migrator | Write path (`record_*` tools, `references.ts`) uses Kysely over `better-sqlite3` for typed inserts/selects and transactions. Schema lives once as the Kysely `DatabaseSchema` interface (`server/schema.ts`); a coverage test asserts every table/column appears in `docs/schema_catalog.md`. Versioned migrations (`server/migrations/`) replace the destructive `DDL` + `DROP_ALL` strings; `initDb()` runs `migrateToLatest()` on startup, `resetDb()` is test-only. The DuckDB read path keeps parameterised `sql` (no string interpolation); `runQuery(sql, params)` passes bind parameters. |
 | 2026-05-28 | As-of lookup: one centralised LOCF helper | The "latest snapshot covering a date" logic, previously hand-rolled per query, lives once in `server/snapshots.ts` and is composed by every net-worth line query and the trend points. See design rule 5. |
+| 2026-05-29 | Goals: goals-first, deterministic decomposition, push briefing | Goal capture is a first-class flow. The dividing line is grounded observation versus synthesised advice, not model capability — the app owns truth, the goal catalog, decomposition, metrics, and the directive engine; the harness owns framing and tradeoffs; Haiku only classifies free text onto a goal type. Goal-type decomposition into sub-goals is authored and frozen, never model-generated. Metrics bind to definitions (absence fires a data-gap directive). The briefing pushes the complete observation set rather than the harness pulling. The verbatim utterance is stored as provenance and framing context, never a data source. The advice gate is unchanged. See the Goal framework section and `docs/goal-catalog.md`. |
+| 2026-05-29 | Tax rules: app-owned `tax_constants`, injected, never recalled | UK tax and legal constants are app-owned reference data, the sibling of `tax_periods` — dated (`valid_from`/`valid_to`), status-tagged (`enacted` vs `announced`), provenanced. Injected into the advice and briefing payload for the tax year in scope; the harness applies and frames the rules but never sources a tax figure from its own training. A future-effective row is an announced change; deadline directives fire from pending constants and carry their certainty ("proposed, subject to legislation"), while "act now" stays advice. Updates are human-curated on the fiscal cadence — legislation is never auto-parsed into the canonical table. See the Domain rule data section. No schema or code yet. |
+| 2026-05-29 | Market and macro context: out of scope | Market direction and timing — "markets are down, buy now" — is a judgment about live external state, not reference data. The app never asserts it. Any factual market data is a far-future grounded-connector concern with provenance, never a recommendation; the directional call is market timing and stays out. |

@@ -6,19 +6,20 @@
 
 ---
 
-## The seven flows
+## The flows
 
-Three operational flows move and maintain data. Four capability flows turn that data into value. The fourth capability flow — advice — is new, dangerous, and gated.
+Three operational flows move and maintain data. Five capability flows turn that data into value. Goals and the briefing (Flow 8) capture intent and push a complete grounded observation set; they underpin insight and advice. Advice (Flow 7) is new, dangerous, and gated.
 
 | # | Flow | Kind | One line |
 |---|---|---|---|
-| 1 | Ingest | Operational | Any document, value, or connector becomes auditable, structured data |
+| 1 | Ingest | Operational | Any document, value, connector, or goal becomes auditable, structured data or intent |
 | 2 | Edit | Operational | Any committed source can be corrected or removed without losing history |
 | 3 | Query | Operational | Any question becomes a grounded answer with provenance |
 | 4 | Net worth | Capability | What I own, realised vs contingent, point-in-time and trended |
 | 5 | Cashflow | Capability | What comes in and goes out, tax-aware, historic and projected |
 | 6 | Insight | Capability | Facts surfaced from my own data, no judgement attached |
 | 7 | Advice | Capability | Sound planning guidance grounded in my data and UK rules |
+| 8 | Goals and briefing | Capability | What I am aiming for, and a complete grounded observation set pushed from it |
 
 Each flow below is specified across six dimensions: trigger, surface, what the model does, what is read or written, what the user sees, and how failure and review are handled.
 
@@ -86,6 +87,20 @@ The fan-out (rather than a single dispatching tool) keeps each tool's argument s
 **What the user sees.** Setup confirmation in `ui://connectors`; thereafter data simply appears. The user does not touch the connector again unless reconfiguring.
 
 **Failure / review.** No review step — structured, high trust, deduplicated. Setup validation (bad API key, malformed wallet address) fails loudly at the `ui://connectors` boundary.
+
+### Goal capture (intent, not data)
+
+**Trigger.** The user states what they are aiming for ("I want to retire early", "save for a house deposit"). A financial adviser asks this first, so onboarding elicits goals before or alongside the first data.
+
+**Surface.** Conversation.
+
+**What the model does.** Haiku classifies the user's words onto a goal type from the catalog (`docs/goal-catalog.md`). For a compound type the app returns a needs spec — the slots that must be filled — and the harness conducts the interview to fill them. On confirmation the app deterministically decomposes the goal type into sub-goals bound to metrics. Decomposition is authored, never model-generated.
+
+**Read / written.** A goal record: goal type, confirmed slots, derived sub-goals and metric bindings, and the verbatim utterance as provenance. No financial data row — a goal is intent, captured separately from the data it will be measured against.
+
+**What the user sees.** Confirmation of the goal as understood, the slots captured, and what data will be needed to track it.
+
+**Failure / review.** Text that maps to no goal type is pushed back for clarification, never guessed — an unmappable goal is inert. The planning and briefing mechanics that act on a captured goal are Flow 8.
 
 ---
 
@@ -185,7 +200,7 @@ Edit is not a separate surface. It folds into the manual-entry path: a correctio
 
 **Surface.** Conversation, with the working shown.
 
-**What the model does.** Grounds guidance in the user's actual data plus UK tax and financial domain logic, and produces sound, conservative planning advice: pension annual-allowance headroom, ISA optimisation, overpay-versus-invest, tax-efficient timing of equity disposals against CGT.
+**What the model does.** Grounds guidance in the user's actual data plus UK tax and financial domain logic, and produces sound, conservative planning advice: pension annual-allowance headroom, ISA optimisation, overpay-versus-invest, tax-efficient timing of equity disposals against CGT. The UK tax constants it applies — allowances, rates, bands — are supplied by the app for the tax year in scope, never sourced from the model's own training. The harness applies and frames the rules; the figures are injected.
 
 **Read / written.** Reads across all stores plus the projection engine. No writes, and critically no autonomous action — advice is surfaced; the user decides and acts.
 
@@ -198,7 +213,25 @@ Edit is not a separate surface. It folds into the manual-entry path: a correctio
 - Conservative and reversible bias. Prefer guidance that is hard to regret.
 - Hard boundary. Planning guidance grounded in the user's own numbers and UK rules — not regulated financial advice, not market timing, not product selection. Framed explicitly as such.
 
-This does not contradict the "observations only" decision in the log — it is the state that decision was reserving the door for, once trust is established.
+This does not contradict the "observations only" decision in the log — it is the state that decision was reserving the door for, once trust is established. The line is precise: a directive firing is an observation (Flow 6 and Flow 8, permitted today); ranking options — overpay versus invest — is advice, and stays behind this gate.
+
+---
+
+## Flow 8 — Goals and briefing
+
+Goal capture (Flow 1) records what the user is aiming for. This flow turns goals plus data into a complete, grounded observation set that underpins insight (Flow 6) and advice (Flow 7).
+
+**Trigger.** The user asks how they are tracking ("am I on track?"), or the system surfaces a briefing unprompted when the data warrants it.
+
+**Surface.** Conversation, and inline on dashboards.
+
+**What the model does.** The app — not the harness — evaluates every directive across all active goals against current data and pushes the complete observation set to the harness. The harness prioritises and frames; it never decides what to query. Coverage is the app's responsibility, framing is the harness's. A directive whose metric cannot resolve (no data captured yet) fires as a data-gap directive, which becomes the next capture prompt.
+
+**Read / written.** Reads goals, metric definitions, and all data stores. No writes. Whether briefings are persisted is an open decision.
+
+**What the user sees.** A prioritised set of grounded observations ("ISA 60 percent funded, 47 days left"; "house deposit goal set, no savings account linked"; "ISA allowance drops on [date], 73 days away — proposed, subject to legislation"), each traceable to its data or named as a gap. Deadline directives fire from pending tax constants the same way as from the tax-year boundary, and a directive on an announced-not-enacted change carries its certainty. No ranking of options — that is advice, Flow 7.
+
+**Failure / review.** An observation that cannot be fully grounded is not surfaced. The briefing pushes the full set rather than a model-chosen subset, so a relevant gap is never silently omitted because the model did not think to look.
 
 ---
 
@@ -224,12 +257,21 @@ These are consequences of the flows above, not independent features. Each one ex
 | Projection engine | Net worth, cashflow, advice | Forward modelling shared by three flows. |
 | Provenance + staleness surfacing | Query, net worth, cashflow, advice | A cross-cutting invariant, not a feature. |
 | Trust / accuracy tracking | Insight, advice | Measures whether the system has earned the right to advise. |
+| Goal catalog (authored) | Goals, briefing | Finite goal types and their frozen, deterministic decompositions. The domain corpus in `docs/goal-catalog.md`. |
+| Goal classification (Haiku) | Goals | Maps free text onto a goal type; unmappable text is pushed back, not guessed. |
+| Needs spec + interview | Goals | App returns the slots a compound goal needs; the harness fills them. |
+| Deterministic decomposition | Goals | Goal type to sub-goals to metric bindings. Authored code, never model-generated. |
+| Metric definitions | Goals, briefing | Computations that bind sub-goals to data; resolve to a value or null. |
+| Directive engine | Briefing, insight, advice | Evaluates metrics against targets; fires observations, including data-gap directives. |
+| Briefing push contract | Briefing, insight, advice | App pushes the complete observation set; the harness never chooses what to query. |
+| Verbatim utterance provenance | Goals | Original words stored on the goal for audit and harness framing; never a data source. |
+| Tax-constants reference (dated, status-tagged) | Advice, briefing | App-owned `tax_constants`, sibling of `tax_periods`; `enacted` vs `announced`, temporally versioned. Injected per call, never recalled. Human-curated on the fiscal cadence. |
 
 ---
 
 ## Decided vs open
 
-**Decided (locked in `docs/architecture.md` and the decision log, plus this round).** Local stdio MCP server as the app; Claude Desktop as harness; SQLite write store + DuckDB read; event/snapshot table patterns; `documents` as universal source anchor; integer amounts, explicit currency, UTC; `tax_periods` for UK tax year; mandatory human review for uploads; connector dedup via `external_id`; connector setup through specialised `ui://connectors` components; uploads are one-source, one-document at a time (no multi-file, no multi-type, bulk backfill deferred); uploads enter through the `ui://upload` widget only, sent to the server as base64 via `app.callServerTool` (no file path, no chat attachment, never model-visible); `ingest_document` is content-based, not path-based; edits fold into the manual-entry path (no `ui://sources` surface) — the LLM extracts correction intent, a deterministic primitive performs close-and-reinsert (snapshots), superseding entries (events), or a tombstone (removal); never an in-place UPDATE or DELETE, never LLM-generated mutation SQL; the read pipeline stays read-only.
+**Decided (locked in `docs/architecture.md` and the decision log, plus this round).** Local stdio MCP server as the app; Claude Desktop as harness; SQLite write store + DuckDB read; event/snapshot table patterns; `documents` as universal source anchor; integer amounts, explicit currency, UTC; `tax_periods` for UK tax year; mandatory human review for uploads; connector dedup via `external_id`; connector setup through specialised `ui://connectors` components; uploads are one-source, one-document at a time (no multi-file, no multi-type, bulk backfill deferred); uploads enter through the `ui://upload` widget only, sent to the server as base64 via `app.callServerTool` (no file path, no chat attachment, never model-visible); `ingest_document` is content-based, not path-based; edits fold into the manual-entry path (no `ui://sources` surface) — the LLM extracts correction intent, a deterministic primitive performs close-and-reinsert (snapshots), superseding entries (events), or a tombstone (removal); never an in-place UPDATE or DELETE, never LLM-generated mutation SQL; the read pipeline stays read-only; goals are elicited first (goals-first onboarding) and captured as intent separate from data; the goal pipeline is classify (Haiku) then needs spec then interview (harness) then deterministic decomposition (app); goal-type decomposition into sub-goals is authored and frozen, never model-generated; metrics bind to definitions that resolve to a value or null, and a null fires a data-gap directive; the briefing pushes the complete observation set rather than the harness pulling a subset; the verbatim utterance is stored as provenance and harness framing context, never a data source; the advice gate is unchanged — a directive firing is an observation, ranking options is advice; UK tax and legal constants are app-owned reference data (`tax_constants`, sibling of `tax_periods`), dated and status-tagged (`enacted` vs `announced`), injected into the advice and briefing payload and never recalled by the model; deadline directives fire from pending constants carrying their certainty; tax-constant updates are human-curated on the fiscal cadence (legislation is never auto-parsed into the canonical table); market direction and timing are out of scope.
 
 **To spike before committing.** Base64 file payload round-trip across postMessage and stdio with a real multi-megabyte PDF — the one place the widget-upload design is unverified.
 
@@ -242,6 +284,10 @@ These are consequences of the flows above, not independent features. Each one ex
 - The trust gate metric and threshold that flips insight into advice.
 - The precise advice boundary against regulated financial advice.
 - Projection engine assumptions (growth rates, contribution continuation).
+- The metric definitions themselves — the exact formula each metric (`invested_assets`, `liquid_savings`, `emergency_fund_months`, `isa_allowance_remaining`, `outstanding_debt`, `projected_pension_pot`, `contribution_rate`) computes from the stores.
+- The concrete `tax_constants` table and migration, the curation process that maintains it on the fiscal cadence, and the exact set of constants it holds (safe-withdrawal-rate default, pension access age, annual ISA and pension allowances, rates and bands). The pattern is decided; the table and its upkeep are not yet built.
+- The briefing output shape (the observation-set contract) and whether briefings are persisted.
+- The goal catalog is extensible — each new goal type is authored, not inferred; the initial set lives in `docs/goal-catalog.md`.
 
 ---
 
