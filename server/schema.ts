@@ -164,6 +164,16 @@ export interface PersonProfileTable {
   source_id: number;
 }
 
+export interface GoalsTable {
+  id: Generated<number>;
+  goal_type: string;
+  params: string;
+  raw_utterance: string;
+  status: Generated<string>;
+  source_id: number;
+  recorded_at: Generated<string>;
+}
+
 export interface DatabaseSchema {
   documents: DocumentsTable;
   tax_periods: TaxPeriodsTable;
@@ -180,4 +190,5 @@ export interface DatabaseSchema {
   holdings: HoldingsTable;
   asset_prices: AssetPricesTable;
   person_profile: PersonProfileTable;
+  goals: GoalsTable;
 }

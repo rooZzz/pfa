@@ -28,6 +28,7 @@ describe("migration runner", () => {
       "0001_initial",
       "0002_transaction_category",
       "0003_seed_tax_periods",
+      "0004_goals",
     ]);
   });
 
@@ -45,6 +46,7 @@ describe("migration runner", () => {
       "0001_initial",
       "0002_transaction_category",
       "0003_seed_tax_periods",
+      "0004_goals",
     ]);
   });
 
@@ -79,6 +81,7 @@ describe("migration runner", () => {
       "0001_initial",
       "0002_transaction_category",
       "0003_seed_tax_periods",
+      "0004_goals",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

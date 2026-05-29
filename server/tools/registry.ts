@@ -1,9 +1,13 @@
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { resetDb } from "../db.js";
 import { getCashflow } from "../cashflow/index.js";
 import { getNetWorth } from "../net_worth/index.js";
+import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { confirmStagedRows } from "./confirm_staged_rows.js";
+import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
 import { ingestDocument } from "./ingest_document.js";
+import { proposeGoal, proposeGoalSchema } from "./propose_goal.js";
 import { queryNaturalLanguage } from "./query_natural_language.js";
 import {
   recordAccountBalance,
@@ -23,7 +27,6 @@ import { recordVestingEvent, recordVestingEventSchema } from "./record_vesting_e
 import { refreshAssetPrice, refreshAssetPriceSchema } from "./refresh_asset_price.js";
 import { seedData } from "./seed_data.js";
 
-export const RESOURCE_URI = "ui://pfa/mcp-app.html";
 export const UPLOAD_URI = "ui://pfa/upload.html";
 export const NET_WORTH_URI = "ui://pfa/net_worth.html";
 export const CASHFLOW_URI = "ui://pfa/cashflow.html";
@@ -42,6 +45,7 @@ export type ToolDescriptor = {
   inputSchema: z.ZodRawShape;
   handler: (input: Record<string, unknown>) => Promise<ToolResult>;
   app?: AppMeta;
+  annotations?: ToolAnnotations;
 };
 
 function defineTool<S extends z.ZodRawShape>(descriptor: {
@@ -50,6 +54,7 @@ function defineTool<S extends z.ZodRawShape>(descriptor: {
   inputSchema: S;
   handler: (input: z.infer<ReturnType<typeof z.object<S>>>) => Promise<ToolResult>;
   app?: AppMeta;
+  annotations?: ToolAnnotations;
 }): ToolDescriptor {
   return descriptor as unknown as ToolDescriptor;
 }
@@ -59,19 +64,6 @@ function text(value: string): ToolResult {
 }
 
 export const tools: ToolDescriptor[] = [
-  defineTool({
-    name: "greet",
-    description: "Greet the user and open the PFA interface.",
-    inputSchema: {},
-    app: { title: "Greet", resourceUri: RESOURCE_URI },
-    handler: async () => text("Hello from pfa"),
-  }),
-  defineTool({
-    name: "ping",
-    description: "Ping the server. Returns a timestamped pong.",
-    inputSchema: {},
-    handler: async () => text(`pong at ${new Date().toISOString()}`),
-  }),
   defineTool({
     name: "record_account_balance",
     description:
@@ -89,7 +81,7 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "record_mortgage",
     description:
-      "Register a mortgage (Reference). Call once to define the mortgage and obtain a mortgage ID. Use the returned ID with record_mortgage_balance to record balance snapshots.",
+      "Record a mortgage. Returns a mortgage ID that must be supplied when recording balance snapshots with record_mortgage_balance.",
     inputSchema: recordMortgageSchema,
     handler: async (input) => text(await recordMortgage(input)),
   }),
@@ -145,7 +137,8 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "get_cashflow",
     description:
-      "Compute cashflow for a UK tax year. Returns income from payslips (net/gross/PAYE/NI/pension breakdown), transactions grouped by category, net cashflow, and a monthly trend. Defaults to the tax year covering today. Supply tax_year (YYYY/YY) to target a specific year.",
+      "Display cashflow figures for a UK tax year: income, transactions by category, net cashflow, monthly trend. Use to show the user their numbers — not as a basis for recommendations. Defaults to today's tax year; supply tax_year (YYYY/YY) to target a specific year.",
+    annotations: { readOnlyHint: true },
     inputSchema: {
       tax_year: z
         .string()
@@ -169,12 +162,14 @@ export const tools: ToolDescriptor[] = [
       "Open the cashflow dashboard. Shows income from payslips, spending by category, net cashflow, and a monthly trend — all anchored to the current UK tax year.",
     inputSchema: {},
     app: { title: "Cashflow", resourceUri: CASHFLOW_URI },
+    annotations: { readOnlyHint: true },
     handler: async () => text("Cashflow dashboard opened."),
   }),
   defineTool({
     name: "get_net_worth",
     description:
-      "Compute net worth at a given date. Returns a structured breakdown of realised assets and liabilities (accounts, pension, property, mortgage, assets) plus contingent unvested equity. Each line carries its observation date and source document. Also returns a 12-month realised trend.",
+      "Display net worth at a given date: realised assets and liabilities (accounts, pension, property, mortgage) plus contingent unvested equity, each with its observation date. Use to show the user their numbers — not as a basis for recommendations. Also returns a 12-month realised trend.",
+    annotations: { readOnlyHint: true },
     inputSchema: {
       as_of: z
         .string()
@@ -192,7 +187,8 @@ export const tools: ToolDescriptor[] = [
     description:
       "Open the document upload widget. The user drops a payslip (PDF or image) into the widget to start the ingestion and review flow.",
     inputSchema: {},
-    app: { title: "Upload Document", resourceUri: UPLOAD_URI },
+    app: { title: "Upload", resourceUri: UPLOAD_URI },
+    annotations: { readOnlyHint: true },
     handler: async () => text("Upload widget opened."),
   }),
   defineTool({
@@ -201,6 +197,7 @@ export const tools: ToolDescriptor[] = [
       "Open the net worth dashboard. Shows realised and contingent net worth, per-line staleness and provenance, and a 12-month realised trend.",
     inputSchema: {},
     app: { title: "Net Worth", resourceUri: NET_WORTH_URI },
+    annotations: { readOnlyHint: true },
     handler: async () => text("Net worth dashboard opened."),
   }),
   defineTool({
@@ -234,6 +231,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Development utility. Drops all tables and recreates them with the current schema. All data is permanently deleted. Does not reseed — call seed_data afterwards if you want representative data.",
     inputSchema: {},
+    annotations: { destructiveHint: true },
     handler: async () => {
       resetDb();
       return text("Schema reset. All tables dropped and recreated. Database is empty.");
@@ -244,21 +242,45 @@ export const tools: ToolDescriptor[] = [
     description:
       "Development utility. Wipes the database and reseeds it with realistic, representative data including edge cases (overdrafts, stale snapshots, foreign-currency assets, RSU/EMI/SAYE/unapproved grants with mixed vesting states). Destroys existing data.",
     inputSchema: {},
+    annotations: { destructiveHint: true },
     handler: async () => text(await seedData()),
   }),
   defineTool({
     name: "query_natural_language",
     description:
-      "Answer a question about your finances. Generates SQL via Haiku and executes it against the local database.",
+      "Answer a factual question about the user's financial data. Generates SQL via Haiku and executes it against the local database. Returns facts only — not a route to advice or recommendations.",
     inputSchema: {
       question: z.string().describe("The financial question to answer in plain English."),
     },
+    annotations: { readOnlyHint: true },
     handler: async ({ question }) => text(await queryNaturalLanguage(question)),
+  }),
+  defineTool({
+    name: "propose_goal",
+    description:
+      "Classify a user's free-text financial goal onto a goal type and return what is needed to record it. Does not write anything. Pass the user's words verbatim. Follow up with confirm_goal once the needs_spec slots are filled.",
+    inputSchema: proposeGoalSchema,
+    annotations: { readOnlyHint: true },
+    handler: async (input) => text(await proposeGoal(input)),
+  }),
+  defineTool({
+    name: "confirm_goal",
+    description:
+      "Record a financial goal after its needs_spec slots are filled. Supported goal types: emergency_fund (target_months), isa_max (tax_year). Stores the goal with its verbatim utterance and an audit document. Deterministic — no advice.",
+    inputSchema: confirmGoalSchema,
+    handler: async (input) => text(await confirmGoal(input)),
+  }),
+  defineTool({
+    name: "get_briefing",
+    description:
+      "Return the grounded basis for any 'how am I doing / what should I focus on' question: the complete set of observations across all active goals — progress, deadlines, and data gaps. Facts only, never ranked options or advice. Call this before synthesising any financial guidance. Defaults to today.",
+    inputSchema: getBriefingSchema,
+    annotations: { readOnlyHint: true },
+    handler: async (input) => text(await getBriefingTool(input)),
   }),
 ];
 
 export const resources: { uri: string; file: string }[] = [
-  { uri: RESOURCE_URI, file: "mcp-app.html" },
   { uri: UPLOAD_URI, file: "upload.html" },
   { uri: NET_WORTH_URI, file: "net_worth.html" },
   { uri: CASHFLOW_URI, file: "cashflow.html" },
