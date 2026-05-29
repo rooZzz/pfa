@@ -65,8 +65,10 @@ For the current balance (today), omit the date filter and just get the row with 
 |---|---|---|
 | `id` | INTEGER | Primary key. Referenced as `account_id` in `account_balances`, `pension_values`. |
 | `name` | TEXT | Human-readable account name (e.g. "Barclays Current", "Nest Pension"). |
-| `type` | TEXT | One of: `current`, `savings`, `isa`, `pension`, `mortgage`. |
+| `type` | TEXT | One of: `current`, `savings`, `isa`, `pension`, `mortgage`. A connector models each Monzo pot as its own account row (`savings`, or `isa` for a cash ISA pot). |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
+| `provider` | TEXT | Connector that owns this account (e.g. `monzo`). NULL for manually entered accounts. |
+| `external_id` | TEXT | The provider's own identifier for this account or pot. NULL for manual accounts. Unique per `(provider, external_id)`; lets a sync match an existing account instead of duplicating it. |
 
 ---
 
@@ -284,10 +286,12 @@ ORDER BY asset_id, as_of DESC
 | `amount_pence` | INTEGER | Amount in pence. Positive = inflow (credit). Negative = outflow (debit). |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
 | `description` | TEXT | Free-text description from the source (e.g. merchant name). |
-| `category` | TEXT | Spending category. Free-text, expected to follow Monzo vocabulary: `general`, `eating_out`, `expenses`, `transport`, `cash`, `bills`, `entertainment`, `shopping`, `holidays`, `groceries`. Use `income` for non-salary inflows. Default `general`. |
+| `category` | TEXT | Spending category. Free-text, expected to follow Monzo vocabulary: `general`, `eating_out`, `expenses`, `transport`, `cash`, `bills`, `entertainment`, `shopping`, `holidays`, `groceries`, plus other Monzo built-in slugs (`family`, `gifts`, `savings`, `transfers`). Use `income` for non-salary inflows. Default `general`. Monzo user-defined custom categories arrive as opaque `category_<id>` values and are kept as-is so each stays a distinct bucket; the display layer numbers them ("Custom 1", "Custom 2") since Monzo's API does not expose their names. |
+| `external_id` | TEXT | The provider's own transaction identifier (e.g. a Monzo transaction id). NULL for manual rows. Unique; connector syncs use it to avoid inserting the same transaction twice. |
+| `is_internal` | INTEGER | `1` if this is a movement between the user's own accounts or pots (e.g. funding a savings pot), `0` otherwise. Default `0`. Internal movements are excluded from spending totals (cashflow outflow, average monthly outgoings) since they are not consumption. They are NOT excluded from ISA contribution totals, where a current-to-ISA transfer is a genuine contribution. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 
-**Cashflow note.** Salary/payslip income is in `income_events`, not `transactions`. Do not look for salary in `transactions`. For full cashflow, combine `income_events` (for payslip net pay) and `transactions` (for discretionary inflows/outflows). To anchor to a UK tax year, join `transactions.occurred_at` to `tax_periods` using `CAST(occurred_at AS DATE) BETWEEN starts_on AND ends_on`.
+**Cashflow note.** `transactions` (the bank feed) is the source of truth for actual money in and out, including the salary credit, rent, and any other income — these are all positive `amount_pence` rows. `income_events` (payslips) is the tax decomposition of salary (gross, PAYE, NI, pension) and is NOT an income amount to add: summing `income_events.net_pence` together with transaction inflows double-counts the salary, which already lands as a credit in `transactions`. Use `income_events` for the gross/tax/pension split and tax-year allowance logic, never as a cashflow total. Exclude internal movements (`transactions.is_internal = 1`) from spending and inflow aggregations. Treat the `savings` category as a distinct third stream (savings and investing), separate from spending: money moved to or from savings/investments held outside the connected accounts (e.g. Monzo Investments) is a cash movement but neither consumption nor a net-worth change, so it is reported as its own net figure and excluded from the spending and income totals. Transfers into Monzo savings/ISA pots are internal (`is_internal = 1`, their `description` is the destination pot's `external_id`); they stay in liquid savings and are reported separately as "into pots", never in spending and never in the net. To anchor to a UK tax year, join `transactions.occurred_at` to `tax_periods` using `CAST(occurred_at AS DATE) BETWEEN starts_on AND ends_on`.
 
 **Cashflow by category:**
 

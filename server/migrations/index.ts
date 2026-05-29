@@ -3,6 +3,7 @@ import * as m0001 from "./0001_initial.js";
 import * as m0002 from "./0002_transaction_category.js";
 import * as m0003 from "./0003_seed_tax_periods.js";
 import * as m0004 from "./0004_goals.js";
+import * as m0005 from "./0005_connector.js";
 
 type Migration = {
   name: string;
@@ -15,6 +16,7 @@ const MIGRATIONS: Migration[] = [
   { name: "0002_transaction_category", ...m0002 },
   { name: "0003_seed_tax_periods", ...m0003 },
   { name: "0004_goals", ...m0004 },
+  { name: "0005_connector", ...m0005 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {
@@ -51,12 +53,17 @@ export function rollbackAll(db: Database.Database): void {
   ensureMigrationTable(db);
   const applied = appliedNames(db);
   const remove = db.prepare("DELETE FROM schema_migrations WHERE name = ?");
-  for (const migration of [...MIGRATIONS].reverse()) {
-    if (!applied.has(migration.name)) continue;
-    const revert = db.transaction(() => {
-      migration.down(db);
-      remove.run(migration.name);
-    });
-    revert();
+  db.pragma("foreign_keys = OFF");
+  try {
+    for (const migration of [...MIGRATIONS].reverse()) {
+      if (!applied.has(migration.name)) continue;
+      const revert = db.transaction(() => {
+        migration.down(db);
+        remove.run(migration.name);
+      });
+      revert();
+    }
+  } finally {
+    db.pragma("foreign_keys = ON");
   }
 }

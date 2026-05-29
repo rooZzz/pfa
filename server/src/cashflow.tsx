@@ -13,20 +13,11 @@ function formatGbp(pence: number): string {
 
 function categoryLabel(cat: string): string {
   const labels: Record<string, string> = {
-    eating_out: "Eating out",
-    transport: "Transport",
-    groceries: "Groceries",
-    bills: "Bills",
-    shopping: "Shopping",
-    entertainment: "Entertainment",
-    holidays: "Holidays",
-    expenses: "Expenses",
-    cash: "Cash",
     income: "Income (other)",
-    general: "General",
     mondo: "Monzo top-up",
   };
-  return labels[cat] ?? cat;
+  if (labels[cat]) return labels[cat];
+  return cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function CashflowApp() {
@@ -90,12 +81,27 @@ function CashflowApp() {
   const hasTransactions = data.transactions_by_category.length > 0;
   const hasIncome = data.income.payslip_count > 0;
 
+  const isSavings = (cat: string) => cat === "savings";
   const outflowCategories = data.transactions_by_category.filter(
-    (l) => l.outflow_pence > 0,
+    (l) => l.outflow_pence > 0 && !isSavings(l.category),
   );
   const inflowCategories = data.transactions_by_category.filter(
-    (l) => l.inflow_pence > 0 && l.outflow_pence === 0,
+    (l) => l.inflow_pence > 0 && l.outflow_pence === 0 && !isSavings(l.category),
   );
+  const savingsLines = data.transactions_by_category.filter((l) => isSavings(l.category));
+  const savingsOut = savingsLines.reduce((sum, l) => sum + l.outflow_pence, 0);
+  const savingsIn = savingsLines.reduce((sum, l) => sum + l.inflow_pence, 0);
+
+  const customNumber = new Map<string, number>();
+  for (const line of data.transactions_by_category) {
+    if (line.category.startsWith("category_")) {
+      customNumber.set(line.category, customNumber.size + 1);
+    }
+  }
+  const labelFor = (cat: string): string => {
+    const n = customNumber.get(cat);
+    return n ? `Custom ${n}` : categoryLabel(cat);
+  };
 
   return (
     <div style={s.container}>
@@ -109,7 +115,7 @@ function CashflowApp() {
       </div>
 
       <section>
-        <h3 style={s.sectionHeading}>Net cashflow</h3>
+        <h3 style={s.sectionHeading}>Net cashflow — tax year to date</h3>
         <div
           style={{
             ...s.netTotal,
@@ -123,9 +129,13 @@ function CashflowApp() {
       {hasIncome && (
         <section>
           <h3 style={s.sectionHeading}>
-            Income — {data.income.payslip_count} payslip
+            Salary tax breakdown — {data.income.payslip_count} payslip
             {data.income.payslip_count !== 1 ? "s" : ""}
           </h3>
+          <p style={s.emptyNote}>
+            From payslips. Take-home is already counted in inflows below — shown here only
+            for the gross/tax/pension split.
+          </p>
           <table style={s.table}>
             <tbody>
               <tr>
@@ -179,13 +189,18 @@ function CashflowApp() {
       {hasTransactions && outflowCategories.length > 0 && (
         <section>
           <h3 style={s.sectionHeading}>
-            Spending — {formatGbp(data.transaction_outflow_total_pence)}
+            Spending — {formatGbp(data.spending_total_pence)}
           </h3>
           <table style={s.table}>
             <tbody>
               {outflowCategories.map((line, i) => (
                 <tr key={i}>
-                  <td style={s.nameCell}>{categoryLabel(line.category)}</td>
+                  <td style={s.nameCell}>
+                    {labelFor(line.category)}
+                    {customNumber.has(line.category) && line.samples.length > 0 && (
+                      <div style={s.samples}>{line.samples.join(" · ")}</div>
+                    )}
+                  </td>
                   <td style={{ ...s.amountCell, color: "#c0392b" }}>
                     -{formatGbp(line.outflow_pence)}
                   </td>
@@ -200,19 +215,60 @@ function CashflowApp() {
       {inflowCategories.length > 0 && (
         <section>
           <h3 style={s.sectionHeading}>
-            Other inflows — {formatGbp(data.transaction_inflow_total_pence)}
+            Other inflows — {formatGbp(data.income_total_pence)}
           </h3>
           <table style={s.table}>
             <tbody>
               {inflowCategories.map((line, i) => (
                 <tr key={i}>
-                  <td style={s.nameCell}>{categoryLabel(line.category)}</td>
+                  <td style={s.nameCell}>
+                    {labelFor(line.category)}
+                    {customNumber.has(line.category) && line.samples.length > 0 && (
+                      <div style={s.samples}>{line.samples.join(" · ")}</div>
+                    )}
+                  </td>
                   <td style={{ ...s.amountCell, color: "#27ae60" }}>
                     {formatGbp(line.inflow_pence)}
                   </td>
                   <td style={s.countCell}>{line.count}×</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {(savingsLines.length > 0 || data.pot_savings_net_pence !== 0) && (
+        <section>
+          <h3 style={s.sectionHeading}>Savings & investing</h3>
+          <p style={s.emptyNote}>
+            Money set aside this period. Pot transfers stay in your liquid savings; only
+            money leaving Monzo affects net cashflow.
+          </p>
+          <table style={s.table}>
+            <tbody>
+              {data.pot_savings_net_pence !== 0 && (
+                <tr>
+                  <td style={s.nameCell}>Into Monzo pots (stays liquid)</td>
+                  <td style={s.amountCell}>{formatGbp(data.pot_savings_net_pence)}</td>
+                </tr>
+              )}
+              {savingsOut > 0 && (
+                <tr>
+                  <td style={s.nameCell}>To external savings / investments</td>
+                  <td style={{ ...s.amountCell, color: "#c0392b" }}>
+                    -{formatGbp(savingsOut)}
+                  </td>
+                </tr>
+              )}
+              {savingsIn > 0 && (
+                <tr>
+                  <td style={s.nameCell}>Back from external savings</td>
+                  <td style={{ ...s.amountCell, color: "#27ae60" }}>
+                    {formatGbp(savingsIn)}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </section>
@@ -235,8 +291,8 @@ function CashflowApp() {
             <thead>
               <tr>
                 <th style={s.th}>Month</th>
-                <th style={{ ...s.th, textAlign: "right" }}>Income (net)</th>
-                <th style={{ ...s.th, textAlign: "right" }}>Spending</th>
+                <th style={{ ...s.th, textAlign: "right" }}>In</th>
+                <th style={{ ...s.th, textAlign: "right" }}>Out</th>
                 <th style={{ ...s.th, textAlign: "right" }}>Net</th>
               </tr>
             </thead>
@@ -244,7 +300,9 @@ function CashflowApp() {
               {data.trend.map((pt, i) => (
                 <tr key={i}>
                   <td style={s.nameCell}>{pt.month}</td>
-                  <td style={s.amountCell}>{formatGbp(pt.income_net_pence)}</td>
+                  <td style={{ ...s.amountCell, color: "#27ae60" }}>
+                    {formatGbp(pt.transaction_inflow_pence)}
+                  </td>
                   <td style={{ ...s.amountCell, color: "#c0392b" }}>
                     -{formatGbp(pt.transaction_outflow_pence)}
                   </td>
@@ -316,6 +374,7 @@ const s: Record<string, React.CSSProperties> = {
     color: "#666",
     fontSize: "0.75rem",
   },
+  samples: { fontSize: "0.7rem", color: "#aaa", marginTop: "0.1rem" },
   deductionRow: { color: "#777" },
   indent: { paddingLeft: "1rem" },
   trendSection: { marginTop: "1rem" },

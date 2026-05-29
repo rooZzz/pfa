@@ -170,6 +170,8 @@ Edit is not a separate surface. It folds into the manual-entry path: a correctio
 
 **What the model does.** Combines income events and transactions, anchored to the UK tax year via `tax_periods`. Aware of PAYE, NI, employee and employer pension contributions, salary sacrifice, and ISA allowance consumption. Models equity vesting events as projected income spikes with an estimated tax liability alongside. Compares budget to actual.
 
+**Income is sourced once, from the bank feed.** Money in and out comes from `transactions` — the salary credit, rent, and any other income all land there as credits, each counted exactly once. Payslips (`income_events`) are not an additive income line; they are the tax decomposition of the salary credit (gross, PAYE, NI, employee/employer pension) and feed the tax-year and allowance logic. Summing payslip net pay together with transaction inflows would double-count salary, since the same money already appears as a bank credit. This assumes the salary-receiving account is connected; if a payslip has no matching credit in any connected account, that is a data-gap directive (Flow 8), not a silent fallback.
+
 **Read / written.** Reads income events, transactions, person profile, equity vesting events, tax periods. No writes.
 
 **What the user sees.** Historic cashflow by category, projected cashflow including vesting spikes, tax-year-anchored allowance consumption (ISA, pension annual allowance).

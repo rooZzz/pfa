@@ -11,9 +11,11 @@ export async function queryTransactionsByCategory(
       category,
       COALESCE(SUM(amount_pence) FILTER (WHERE amount_pence > 0), 0) AS inflow_pence,
       COALESCE(ABS(SUM(amount_pence) FILTER (WHERE amount_pence < 0)), 0) AS outflow_pence,
-      COUNT(*) AS count
+      COUNT(*) AS count,
+      list_slice(list(DISTINCT description) FILTER (WHERE description IS NOT NULL), 1, 6) AS samples
     FROM pfa.transactions
     WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+      AND is_internal = 0
     GROUP BY category
     ORDER BY outflow_pence DESC`,
     [start, end],
@@ -24,5 +26,24 @@ export async function queryTransactionsByCategory(
     inflow_pence: toNum(r.inflow_pence),
     outflow_pence: toNum(r.outflow_pence),
     count: toNum(r.count),
+    samples: Array.isArray(r.samples) ? r.samples.map((s) => String(s)) : [],
   }));
+}
+
+export async function queryPotSavingNetPence(
+  start: string,
+  end: string,
+): Promise<number> {
+  const rows = await runQuery(
+    `SELECT COALESCE(-SUM(t.amount_pence), 0) AS net_into_pots
+     FROM pfa.transactions t
+     JOIN pfa.accounts p
+       ON p.external_id = t.description
+      AND p.provider = 'monzo'
+      AND p.type IN ('savings', 'isa')
+     WHERE CAST(t.occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+       AND t.is_internal = 1`,
+    [start, end],
+  );
+  return toNum(rows[0]?.net_into_pots ?? 0);
 }

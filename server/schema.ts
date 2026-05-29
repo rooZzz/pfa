@@ -24,6 +24,8 @@ export interface AccountsTable {
   name: string;
   type: AccountType;
   currency: Generated<string>;
+  provider: string | null;
+  external_id: string | null;
 }
 
 export interface AssetsTable {
@@ -63,6 +65,8 @@ export interface TransactionsTable {
   currency: Generated<string>;
   description: string | null;
   category: Generated<string>;
+  external_id: string | null;
+  is_internal: Generated<number>;
   source_id: number;
 }
 
@@ -174,6 +178,19 @@ export interface GoalsTable {
   recorded_at: Generated<string>;
 }
 
+export interface ConnectorStateTable {
+  id: Generated<number>;
+  provider: string;
+  client_id: string;
+  client_secret: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string | null;
+  cursors_json: Generated<string>;
+  last_synced_at: string | null;
+  updated_at: Generated<string>;
+}
+
 export interface DatabaseSchema {
   documents: DocumentsTable;
   tax_periods: TaxPeriodsTable;
@@ -191,4 +208,5 @@ export interface DatabaseSchema {
   asset_prices: AssetPricesTable;
   person_profile: PersonProfileTable;
   goals: GoalsTable;
+  connector_state: ConnectorStateTable;
 }

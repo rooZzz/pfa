@@ -106,7 +106,7 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 
 **UK edges / notes.** Cover is measured against essential monthly outgoings, not gross spend. Funds must be genuinely accessible — instant or near-instant access — so locked products do not count toward the metric.
 
-**Implemented formula.** `liquid_savings` = sum of the latest balance per account of type `current`, `savings`, or `isa` (LOCF as of the query date). Average monthly outgoings = mean of monthly transaction outflow over the trailing 12 months, across months that had any outflow. `emergency_fund_months` = `liquid_savings` / average monthly outgoings. The metric is unresolved (fires a data-gap directive) when there are no liquid balances or no spending transactions.
+**Implemented formula.** `liquid_savings` = sum of the latest balance per account of type `current`, `savings`, or `isa` (LOCF as of the query date). Average monthly outgoings = mean of monthly transaction outflow over the trailing 12 months, across months that had any outflow, excluding internal transfers (`is_internal = 1`) and savings/investing contributions (`category = 'savings'`) since neither is a living expense. `emergency_fund_months` = `liquid_savings` / average monthly outgoings. The metric is unresolved (fires a data-gap directive) when there are no liquid balances or no spending transactions.
 
 ---
 

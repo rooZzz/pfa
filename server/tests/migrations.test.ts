@@ -29,6 +29,7 @@ describe("migration runner", () => {
       "0002_transaction_category",
       "0003_seed_tax_periods",
       "0004_goals",
+      "0005_connector",
     ]);
   });
 
@@ -47,6 +48,7 @@ describe("migration runner", () => {
       "0002_transaction_category",
       "0003_seed_tax_periods",
       "0004_goals",
+      "0005_connector",
     ]);
   });
 
@@ -63,6 +65,29 @@ describe("migration runner", () => {
       .prepare("SELECT tax_year FROM tax_periods WHERE starts_on = '2025-04-06'")
       .get() as { tax_year: string } | undefined;
     expect(current?.tax_year).toBe("2025/26");
+  });
+
+  it("resets cleanly when foreign-key-linked data is present", () => {
+    const db = getDb();
+    db.prepare(
+      "INSERT INTO documents (source_type, file_path, content_hash) VALUES ('connector', '/tmp/run.json', 'h')",
+    ).run();
+    db.prepare(
+      "INSERT INTO accounts (name, type, currency, provider, external_id) VALUES ('Monzo Current', 'current', 'GBP', 'monzo', 'acc_1')",
+    ).run();
+    db.prepare(
+      "INSERT INTO transactions (account_id, occurred_at, amount_pence, currency, category, external_id, is_internal, source_id) VALUES (1, '2026-05-01', -100, 'GBP', 'general', 'tx_1', 0, 1)",
+    ).run();
+
+    expect(() => resetDb()).not.toThrow();
+
+    expect(
+      (getDb().prepare("SELECT COUNT(*) AS n FROM transactions").get() as { n: number })
+        .n,
+    ).toBe(0);
+    expect(
+      (getDb().prepare("SELECT COUNT(*) AS n FROM accounts").get() as { n: number }).n,
+    ).toBe(0);
   });
 
   it("resetDb rolls all migrations down and back up", () => {
@@ -82,6 +107,7 @@ describe("migration runner", () => {
       "0002_transaction_category",
       "0003_seed_tax_periods",
       "0004_goals",
+      "0005_connector",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

@@ -3,6 +3,7 @@ export type CategoryLine = {
   inflow_pence: number;
   outflow_pence: number;
   count: number;
+  samples: string[];
 };
 
 export type IncomeTotal = {
@@ -17,7 +18,6 @@ export type IncomeTotal = {
 
 export type TrendPoint = {
   month: string;
-  income_net_pence: number;
   transaction_inflow_pence: number;
   transaction_outflow_pence: number;
   net_pence: number;
@@ -31,6 +31,10 @@ export type CashflowResult = {
   transactions_by_category: CategoryLine[];
   transaction_inflow_total_pence: number;
   transaction_outflow_total_pence: number;
+  income_total_pence: number;
+  spending_total_pence: number;
+  savings_total_pence: number;
+  pot_savings_net_pence: number;
   net_cashflow_pence: number;
   trend: TrendPoint[];
 };

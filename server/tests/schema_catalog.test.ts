@@ -19,6 +19,7 @@ function userTables(): string[] {
          WHERE type = 'table'
            AND name NOT LIKE 'sqlite_%'
            AND name != 'schema_migrations'
+           AND name != 'connector_state'
          ORDER BY name`,
       )
       .all() as { name: string }[]
