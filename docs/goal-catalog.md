@@ -18,6 +18,8 @@ Each goal type follows one template:
 
 Metric names are shared with `docs/architecture.md` and `docs/end-state-flows.md`. Keep them identical across all three.
 
+The dated values the UK-edges sections reference — the safe-withdrawal-rate default, the pension access age, the ISA and pension allowances — are not hardcoded here. They resolve from the app-owned `tax_constants` reference, dated and status-tagged, and are injected at advice and briefing time. See the Domain rule data section in `docs/architecture.md`.
+
 ---
 
 ## `fire` — financial independence, retire early
