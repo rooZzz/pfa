@@ -174,7 +174,7 @@ describe("getCashflow", () => {
     expect(result.transaction_inflow_total_pence).toBe(15000);
   });
 
-  it("computes net_cashflow_pence = income.net + tx_inflows - tx_outflows", async () => {
+  it("computes net_cashflow_pence from transactions only, not payslip net", async () => {
     await insertIncome("2025-06-25", 600000, 450000, 120000, 20000, 10000);
     await recordTransaction({
       account_name: "Barclays",
@@ -194,7 +194,135 @@ describe("getCashflow", () => {
     });
 
     const result = await getCashflow({ tax_year: "2025/26" });
-    expect(result.net_cashflow_pence).toBe(450000 + 10000 - 30000);
+    expect(result.net_cashflow_pence).toBe(10000 - 30000);
+  });
+
+  it("does not double-count salary: the payslip stays for tax, the credit is the cash", async () => {
+    await insertIncome("2025-06-25", 600000, 450000, 120000, 20000, 10000);
+    await recordTransaction({
+      account_name: "Monzo Current",
+      account_type: "current",
+      amount_pence: 450000,
+      category: "income",
+      occurred_at: "2025-06-25",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo Current",
+      account_type: "current",
+      amount_pence: -30000,
+      category: "bills",
+      occurred_at: "2025-06-26",
+      currency: "GBP",
+    });
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    expect(result.income.net_pence).toBe(450000);
+    expect(result.transaction_inflow_total_pence).toBe(450000);
+    expect(result.net_cashflow_pence).toBe(450000 - 30000);
+  });
+
+  it("keeps custom category ids distinct and returns sample descriptions", async () => {
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: -1000,
+      category: "category_AAA",
+      description: "Vinted",
+      occurred_at: "2025-06-01",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: -2000,
+      category: "category_AAA",
+      description: "eBay",
+      occurred_at: "2025-06-02",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: -3000,
+      category: "category_BBB",
+      description: "Apple",
+      occurred_at: "2025-06-03",
+      currency: "GBP",
+    });
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    const a = result.transactions_by_category.find((l) => l.category === "category_AAA");
+    const b = result.transactions_by_category.find((l) => l.category === "category_BBB");
+
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    expect(a?.count).toBe(2);
+    expect([...(a?.samples ?? [])].sort()).toEqual(["Vinted", "eBay"].sort());
+  });
+
+  it("splits savings-category transactions into their own stream, out of spending", async () => {
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: -10000,
+      category: "groceries",
+      occurred_at: "2025-06-10",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: -5000,
+      category: "savings",
+      description: "to investments",
+      occurred_at: "2025-06-15",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: 2000,
+      category: "savings",
+      description: "from investments",
+      occurred_at: "2025-06-20",
+      currency: "GBP",
+    });
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    expect(result.spending_total_pence).toBe(10000);
+    expect(result.savings_total_pence).toBe(3000);
+    expect(result.income_total_pence).toBe(0);
+    expect(result.net_cashflow_pence).toBe(-13000);
+  });
+
+  it("reports net into Monzo pots separately, outside spending and net", async () => {
+    const db = getDb();
+    const doc = Number(
+      db
+        .prepare(
+          "INSERT INTO documents (source_type, file_path, content_hash) VALUES ('connector', '/r.json', 'h')",
+        )
+        .run().lastInsertRowid,
+    );
+    const current = Number(
+      db
+        .prepare(
+          "INSERT INTO accounts (name, type, currency, provider, external_id) VALUES ('Monzo Current', 'current', 'GBP', 'monzo', 'acc_x')",
+        )
+        .run().lastInsertRowid,
+    );
+    db.prepare(
+      "INSERT INTO accounts (name, type, currency, provider, external_id) VALUES ('Rainy Day', 'savings', 'GBP', 'monzo', 'pot_x')",
+    ).run();
+    db.prepare(
+      "INSERT INTO transactions (account_id, occurred_at, amount_pence, currency, description, category, is_internal, external_id, source_id) VALUES (?, '2025-06-10', -5000, 'GBP', 'pot_x', 'savings', 1, 'tx_pot', ?)",
+    ).run(current, doc);
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    expect(result.pot_savings_net_pence).toBe(5000);
+    expect(result.spending_total_pence).toBe(0);
+    expect(result.net_cashflow_pence).toBe(0);
   });
 
   it("excludes transactions outside the period (tax year boundary)", async () => {
@@ -244,8 +372,8 @@ describe("getCashflow", () => {
     expect(result.trend.length).toBeGreaterThan(0);
     const june = result.trend.find((pt) => pt.month === "2025-06");
     expect(june).toBeDefined();
-    expect(june?.income_net_pence).toBe(450000);
+    expect(june?.transaction_inflow_pence).toBe(0);
     expect(june?.transaction_outflow_pence).toBe(5000);
-    expect(june?.net_pence).toBe(445000);
+    expect(june?.net_pence).toBe(-5000);
   });
 });

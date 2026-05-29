@@ -51,6 +51,7 @@ export function getSchemaSql(): string {
        WHERE type = 'table'
          AND name NOT LIKE 'sqlite_%'
          AND name != 'schema_migrations'
+         AND name != 'connector_state'
        ORDER BY name`,
     )
     .all() as { sql: string | null }[];

@@ -19,7 +19,8 @@ export async function queryAccountLines(asOf: string): Promise<RealisedLine[]> {
        b.source_id,
        b.currency
      FROM (${snap.sql}) b
-     LEFT JOIN pfa.accounts a ON a.id = b.account_id`,
+     LEFT JOIN pfa.accounts a ON a.id = b.account_id
+     WHERE b.balance_pence != 0`,
     snap.params,
   );
   return rows.map((r) => ({

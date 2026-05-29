@@ -67,6 +67,8 @@ export async function averageMonthlyOutgoings(
          ABS(SUM(amount_pence) FILTER (WHERE amount_pence < 0)) AS outflow_pence
        FROM pfa.transactions
        WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+         AND is_internal = 0
+         AND category != 'savings'
        GROUP BY 1
        HAVING ABS(SUM(amount_pence) FILTER (WHERE amount_pence < 0)) > 0
      )

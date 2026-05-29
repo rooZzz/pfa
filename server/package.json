@@ -5,10 +5,11 @@
   "description": "Personal finance assistant MCP server",
   "private": true,
   "scripts": {
-    "build": "tsc --noEmit && cross-env INPUT=upload.html vite build && cross-env INPUT=net_worth.html vite build && cross-env INPUT=cashflow.html vite build && tsc -p tsconfig.server.json",
+    "build": "tsc --noEmit && cross-env INPUT=upload.html vite build && cross-env INPUT=net_worth.html vite build && cross-env INPUT=cashflow.html vite build && cross-env INPUT=connectors.html vite build && tsc -p tsconfig.server.json",
     "dev:ui": "cross-env INPUT=net_worth.html vite build --watch",
     "start:stdio": "npm run build 1>&2 && tsx main.ts --stdio",
     "inspect": "npm run build && mcp-inspector tsx main.ts --stdio",
+    "monzo:auth": "tsx monzo-auth.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:live": "vitest run --config vitest.live.config.ts",

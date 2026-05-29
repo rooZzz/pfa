@@ -5,6 +5,8 @@ import { getCashflow } from "../cashflow/index.js";
 import { getNetWorth } from "../net_worth/index.js";
 import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { confirmStagedRows } from "./confirm_staged_rows.js";
+import { connectMonzo, connectMonzoSchema } from "./connect_monzo.js";
+import { syncMonzo } from "./sync_monzo.js";
 import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
 import { ingestDocument } from "./ingest_document.js";
 import { proposeGoal, proposeGoalSchema } from "./propose_goal.js";
@@ -30,6 +32,7 @@ import { seedData } from "./seed_data.js";
 export const UPLOAD_URI = "ui://pfa/upload.html";
 export const NET_WORTH_URI = "ui://pfa/net_worth.html";
 export const CASHFLOW_URI = "ui://pfa/cashflow.html";
+export const CONNECTORS_URI = "ui://pfa/connectors.html";
 
 export type ToolResult = { content: { type: "text"; text: string }[] };
 
@@ -201,6 +204,30 @@ export const tools: ToolDescriptor[] = [
     handler: async () => text("Net worth dashboard opened."),
   }),
   defineTool({
+    name: "open_connectors",
+    description:
+      "Open the connectors widget to set up a data connector. Use this when the user wants to connect Monzo so they can enter their credentials securely in the widget rather than in chat.",
+    inputSchema: {},
+    app: { title: "Connectors", resourceUri: CONNECTORS_URI },
+    annotations: { readOnlyHint: true },
+    handler: async () => text("Connector setup opened."),
+  }),
+  defineTool({
+    name: "connect_monzo",
+    description:
+      "Save Monzo credentials and run an initial full-history backfill. Called from the connectors widget — not model-visible. Credentials are never passed through chat.",
+    inputSchema: connectMonzoSchema,
+    app: { title: "Connect Monzo", resourceUri: CONNECTORS_URI, visibility: ["app"] },
+    handler: async (input) => text(await connectMonzo(input)),
+  }),
+  defineTool({
+    name: "sync_monzo",
+    description:
+      "Sync the latest Monzo transactions, balances, and pots into the canonical store. Idempotent — re-running does not duplicate transactions. Requires Monzo to be connected first.",
+    inputSchema: {},
+    handler: async () => text(await syncMonzo()),
+  }),
+  defineTool({
     name: "ingest_document",
     description:
       "Parse a document from base64-encoded content via Haiku 4.5 vision. Called from the upload widget — not model-visible.",
@@ -284,4 +311,5 @@ export const resources: { uri: string; file: string }[] = [
   { uri: UPLOAD_URI, file: "upload.html" },
   { uri: NET_WORTH_URI, file: "net_worth.html" },
   { uri: CASHFLOW_URI, file: "cashflow.html" },
+  { uri: CONNECTORS_URI, file: "connectors.html" },
 ];
