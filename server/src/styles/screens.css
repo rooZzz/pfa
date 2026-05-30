@@ -1,0 +1,146 @@
+.mt-1 {
+  margin-top: var(--space-1);
+}
+.mt-2 {
+  margin-top: var(--space-2);
+}
+.mt-3 {
+  margin-top: var(--space-3);
+}
+.mt-4 {
+  margin-top: var(--space-4);
+}
+.mt-5 {
+  margin-top: var(--space-5);
+}
+.mb-2 {
+  margin-bottom: var(--space-2);
+}
+.mb-3 {
+  margin-bottom: var(--space-3);
+}
+.mb-4 {
+  margin-bottom: var(--space-4);
+}
+
+.card--chart {
+  padding: var(--space-3) var(--space-4);
+}
+.card--flush {
+  padding: 0;
+  overflow: hidden;
+}
+.card-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+}
+
+.figure-hero {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-3xl);
+  color: var(--ink-strong);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.figure-net {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+}
+
+.t--inset td:first-child {
+  padding-left: var(--space-4);
+}
+.t--inset td:last-child {
+  padding-right: var(--space-4);
+}
+
+.legend {
+  display: inline-flex;
+  gap: var(--space-3);
+}
+.legend .key {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+.kv .k {
+  color: var(--ink-muted);
+}
+.kv .v {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.kv .v.pos {
+  color: var(--positive);
+}
+.kv .v.neg {
+  color: var(--negative);
+}
+
+.segbar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  gap: 2px;
+}
+.segbar .seg-net {
+  background: var(--positive);
+}
+.segbar .seg-paye {
+  background: var(--negative);
+}
+.segbar .seg-ni {
+  background: color-mix(in oklch, var(--negative) 65%, var(--ink-faint));
+}
+.segbar .seg-pension {
+  background: var(--ink-faint);
+}
+
+.chip-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+}
+.chip-ico--accent {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.chip-ico--muted {
+  background: var(--surface-2);
+  color: var(--ink-muted);
+}
+
+.center-min {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+}
+
+.result-ok .ok-title {
+  font-family: var(--font-serif);
+  font-size: var(--text-lg);
+  color: var(--ink-strong);
+}
+
+.samples {
+  font-size: var(--text-2xs);
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
