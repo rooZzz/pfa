@@ -144,6 +144,7 @@ function NetWorthApp() {
   return (
     <div className="screen rise stack">
       <Masthead
+        tight
         title="Net worth"
         sub={`As of ${data.as_of}`}
         action={
