@@ -139,6 +139,7 @@ describe("isaAllowanceRemaining", () => {
     const result = await isaAllowanceRemaining(AS_OF);
     expect(result.resolved).toBe(true);
     expect(result.value).toBe(1500000);
+    expect(result.detail.allowance_pence).toBe(2000000);
     expect(result.detail.contributions_pence).toBe(500000);
     expect(result.detail.tax_year).toBe("2025/26");
   });

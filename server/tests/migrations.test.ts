@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, initDb, resetDb } from "../db.js";
+import { rollbackAll, runMigrations } from "../migrations/index.js";
 
 function tableNames(): string[] {
   return (
@@ -30,6 +31,7 @@ describe("migration runner", () => {
       "0003_seed_tax_periods",
       "0004_goals",
       "0005_connector",
+      "0006_tax_constants",
     ]);
   });
 
@@ -49,6 +51,7 @@ describe("migration runner", () => {
       "0003_seed_tax_periods",
       "0004_goals",
       "0005_connector",
+      "0006_tax_constants",
     ]);
   });
 
@@ -65,6 +68,27 @@ describe("migration runner", () => {
       .prepare("SELECT tax_year FROM tax_periods WHERE starts_on = '2025-04-06'")
       .get() as { tax_year: string } | undefined;
     expect(current?.tax_year).toBe("2025/26");
+  });
+
+  it("seeds tax_constants on fresh init", () => {
+    const count = (
+      getDb().prepare("SELECT COUNT(*) AS n FROM tax_constants").get() as { n: number }
+    ).n;
+    expect(count).toBeGreaterThanOrEqual(40);
+    const isa = getDb()
+      .prepare(
+        "SELECT value FROM tax_constants WHERE key = 'isa_allowance' AND valid_to IS NULL",
+      )
+      .get() as { value: number } | undefined;
+    expect(isa?.value).toBe(2000000);
+  });
+
+  it("drops tax_constants when 0006 rolls back", () => {
+    expect(tableNames()).toContain("tax_constants");
+    rollbackAll(getDb());
+    expect(tableNames()).not.toContain("tax_constants");
+    runMigrations(getDb());
+    expect(tableNames()).toContain("tax_constants");
   });
 
   it("resets cleanly when foreign-key-linked data is present", () => {
@@ -108,6 +132,7 @@ describe("migration runner", () => {
       "0003_seed_tax_periods",
       "0004_goals",
       "0005_connector",
+      "0006_tax_constants",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

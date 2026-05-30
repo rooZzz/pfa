@@ -2,8 +2,7 @@ import { resolvePeriod } from "../cashflow/index.js";
 import { runQuery } from "../query.js";
 import { latestRangeSnapshot } from "../snapshots.js";
 import { toNum } from "../sql_util.js";
-
-export const ISA_ANNUAL_ALLOWANCE_PENCE = 2_000_000;
+import { resolveConstant } from "../tax_constants.js";
 
 export type MetricValue = {
   metric: string;
@@ -134,6 +133,18 @@ export async function isaAllowanceRemaining(
   taxYear?: string,
 ): Promise<MetricValue> {
   const period = await resolvePeriod(taxYear, asOf);
+  const allowanceConstant = await resolveConstant("isa_allowance", period.period_start);
+  if (!allowanceConstant) {
+    return {
+      metric: "isa_allowance_remaining",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: { tax_year: period.tax_year, period_end: period.period_end },
+      gap_reason: `ISA allowance constant not found for tax year ${period.tax_year}.`,
+    };
+  }
+  const allowancePence = allowanceConstant.value;
   const rows = await runQuery(
     `SELECT
        COALESCE(SUM(t.amount_pence) FILTER (WHERE t.amount_pence > 0), 0) AS contributions,
@@ -161,10 +172,10 @@ export async function isaAllowanceRemaining(
   return {
     metric: "isa_allowance_remaining",
     resolved: true,
-    value: ISA_ANNUAL_ALLOWANCE_PENCE - contributions,
+    value: allowancePence - contributions,
     unit: "pence",
     detail: {
-      allowance_pence: ISA_ANNUAL_ALLOWANCE_PENCE,
+      allowance_pence: allowancePence,
       contributions_pence: contributions,
       tax_year: period.tax_year,
       period_end: period.period_end,

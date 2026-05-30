@@ -165,6 +165,12 @@ describe("getBriefing", () => {
 
     const deadline = briefing.directives.find((d) => d.kind === "deadline");
     expect(deadline?.data.days_left).toBe(35);
+
+    const cashIsa = briefing.directives.find(
+      (d) => d.data.effective_from === "2027-04-06",
+    );
+    expect(cashIsa?.kind).toBe("deadline");
+    expect(cashIsa?.data.cash_isa_allowance_pence).toBe(1200000);
   });
 
   it("returns no directives when there are no active goals", async () => {

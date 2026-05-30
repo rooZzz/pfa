@@ -178,6 +178,20 @@ export interface GoalsTable {
   recorded_at: Generated<string>;
 }
 
+export interface TaxConstantsTable {
+  id: Generated<number>;
+  key: string;
+  value: number;
+  unit: "pence" | "years" | "bps";
+  currency: string | null;
+  valid_from: string;
+  valid_to: string | null;
+  status: "enacted" | "announced";
+  source: string;
+  note: string | null;
+  recorded_at: Generated<string>;
+}
+
 export interface ConnectorStateTable {
   id: Generated<number>;
   provider: string;
@@ -209,4 +223,5 @@ export interface DatabaseSchema {
   person_profile: PersonProfileTable;
   goals: GoalsTable;
   connector_state: ConnectorStateTable;
+  tax_constants: TaxConstantsTable;
 }
