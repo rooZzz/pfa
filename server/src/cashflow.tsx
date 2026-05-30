@@ -199,15 +199,16 @@ function CashflowApp() {
         </Btn>
       </div>
 
-      <div className="grid cols-3">
-        <div className="card card-sunken">
-          <Stat
-            label="Net YTD"
-            value={(netPos ? "+" : "") + formatGbpk(data.net_cashflow_pence)}
-            delta={netPos ? "surplus" : "deficit"}
-            deltaTone={netPos ? "pos" : "neg"}
-          />
+      <div>
+        <div className="figure-hero">
+          {(netPos ? "+" : "") + formatGbp(data.net_cashflow_pence, { whole: true })}
         </div>
+        <div className={"stat-delta mt-2 " + (netPos ? "pos" : "neg")}>
+          {netPos ? "surplus" : "deficit"} · tax year to date
+        </div>
+      </div>
+
+      <div className="grid cols-2">
         <div className="card card-sunken">
           <Stat
             label="Spending"

@@ -71,6 +71,12 @@ quiet progress meter.
     The entrance reveal animates transform only, never opacity, so content is never hidden if the
     animation is paused in a backgrounded iframe.
 
+11. Consistent across screens. The same kind of thing looks the same everywhere. Every dashboard
+    opens the same way — a serif title, a mono context line, then the screen's defining figure as a
+    hero — so the eye learns one pattern and reuses it. Equivalent elements share a component and a
+    rank; a heading, a total, or a tile should not be styled one way on net worth and another on
+    cashflow. When two screens diverge, that difference must mean something.
+
 ## Type
 
 - Newsreader (serif) for titles and section headings — literary warmth, a scholarly note.

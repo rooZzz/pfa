@@ -146,18 +146,8 @@ function NetWorthApp() {
     <div className="screen rise stack">
       <div className="screen-head" style={{ marginBottom: 0 }}>
         <div>
-          <div className="screen-sub" style={{ marginTop: 0 }}>
-            NET WORTH · {data.as_of}
-          </div>
-          <div className="figure-hero">
-            {formatGbp(data.realised_total_pence, { whole: true })}
-          </div>
-          {change != null && (
-            <div className={"stat-delta mt-2 " + (change >= 0 ? "pos" : "neg")}>
-              {(change >= 0 ? "+" : "") + formatGbp(change, { whole: true })}
-              {changePct != null ? ` (${changePct}%)` : ""} over {trendVals.length} months
-            </div>
-          )}
+          <div className="screen-title">Net worth</div>
+          <div className="screen-sub">As of {data.as_of}</div>
         </div>
         <Btn
           variant="secondary"
@@ -168,6 +158,18 @@ function NetWorthApp() {
         >
           {busy ? "Syncing" : "Refresh"}
         </Btn>
+      </div>
+
+      <div>
+        <div className="figure-hero">
+          {formatGbp(data.realised_total_pence, { whole: true })}
+        </div>
+        {change != null && (
+          <div className={"stat-delta mt-2 " + (change >= 0 ? "pos" : "neg")}>
+            {(change >= 0 ? "+" : "") + formatGbp(change, { whole: true })}
+            {changePct != null ? ` (${changePct}%)` : ""} over {trendVals.length} months
+          </div>
+        )}
       </div>
 
       {trendVals.length > 1 && (
