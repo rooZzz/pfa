@@ -103,12 +103,22 @@ export async function upcomingChange(
 export async function taxConstantsForDate(
   asOf: string,
 ): Promise<Record<string, ResolvedConstant>> {
-  const resolved = await Promise.all(
-    TAX_CONSTANT_KEYS.map((key) => resolveConstant(key, asOf)),
+  const rows = await runQuery(
+    `SELECT key, value, unit, currency, status, source, valid_from
+       FROM (
+         SELECT key, value, unit, currency, status, source, valid_from,
+                ROW_NUMBER() OVER (PARTITION BY key ORDER BY valid_from DESC) AS rn
+           FROM pfa.tax_constants
+          WHERE valid_from <= CAST(? AS DATE)
+            AND (valid_to IS NULL OR valid_to >= CAST(? AS DATE))
+       ) ranked
+      WHERE rn = 1`,
+    [asOf, asOf],
   );
   const bundle: Record<string, ResolvedConstant> = {};
-  for (const constant of resolved) {
-    if (constant) bundle[constant.key] = constant;
+  for (const row of rows) {
+    const constant = toResolved(row);
+    bundle[constant.key] = constant;
   }
   return bundle;
 }

@@ -3,7 +3,7 @@ import { DB_PATH } from "./db.js";
 
 type Row = Record<string, unknown>;
 
-let duck: duckdb.Database | null = null;
+let duckInit: Promise<duckdb.Database> | null = null;
 
 function runRawOnDb(db: duckdb.Database, sql: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -14,21 +14,23 @@ function runRawOnDb(db: duckdb.Database, sql: string): Promise<void> {
   });
 }
 
-async function getDuck(): Promise<duckdb.Database> {
-  if (duck) return duck;
-
+async function initDuck(): Promise<duckdb.Database> {
   const instance = new duckdb.Database(":memory:");
 
   await runRawOnDb(instance, "INSTALL sqlite");
   await runRawOnDb(instance, "LOAD sqlite");
   await runRawOnDb(instance, `ATTACH '${DB_PATH}' AS pfa (TYPE sqlite, READ_ONLY)`);
 
-  duck = instance;
-  return duck;
+  return instance;
+}
+
+function getDuck(): Promise<duckdb.Database> {
+  if (!duckInit) duckInit = initDuck();
+  return duckInit;
 }
 
 export function resetDuck(): void {
-  duck = null;
+  duckInit = null;
 }
 
 export async function runQuery(sql: string, params: unknown[] = []): Promise<Row[]> {
