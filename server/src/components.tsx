@@ -183,16 +183,21 @@ export function Meter({
   value,
   pct,
   tone,
+  sub,
 }: {
   name: string;
   value: string;
   pct: number;
   tone?: "neg" | "pos" | "muted";
+  sub?: string;
 }) {
   return (
     <div className="meter">
       <div className="meter-top">
-        <span className="meter-name">{name}</span>
+        <span className="meter-name">
+          {name}
+          {sub && <span className="meter-sub">{sub}</span>}
+        </span>
         <span className="meter-val">{value}</span>
       </div>
       <div className="meter-track">

@@ -323,6 +323,13 @@
   min-width: 0;
   line-height: 1.25;
 }
+.meter-sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
 .meter-val {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;

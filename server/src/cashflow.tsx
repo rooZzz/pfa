@@ -14,6 +14,10 @@ function categoryLabel(cat: string): string {
   return cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function isCustomCategory(cat: string): boolean {
+  return cat.startsWith("category_");
+}
+
 function monthLabel(ym: string): string {
   const parts = ym.split("-").map(Number);
   const year = parts[0];
@@ -152,6 +156,21 @@ function CashflowApp() {
   const savingsIn = savingsLines.reduce((sum, l) => sum + l.inflow_pence, 0);
   const hasSavings = data.pot_savings_net_pence !== 0 || savingsOut > 0 || savingsIn > 0;
 
+  const customNumber = new Map<string, number>();
+  for (const line of data.transactions_by_category) {
+    if (isCustomCategory(line.category)) {
+      customNumber.set(line.category, customNumber.size + 1);
+    }
+  }
+  const labelFor = (cat: string): string => {
+    const n = customNumber.get(cat);
+    return n ? `Custom ${n}` : categoryLabel(cat);
+  };
+  const subFor = (line: { category: string; samples: string[] }): string | undefined =>
+    isCustomCategory(line.category) && line.samples.length > 0
+      ? line.samples.join(" · ")
+      : undefined;
+
   const netPos = data.net_cashflow_pence >= 0;
 
   const trendRows = data.trend.map((t) => ({
@@ -254,7 +273,8 @@ function CashflowApp() {
             {outflowCategories.map((line, i) => (
               <Meter
                 key={i}
-                name={categoryLabel(line.category)}
+                name={labelFor(line.category)}
+                sub={subFor(line)}
                 value={formatGbp(line.outflow_pence)}
                 pct={(line.outflow_pence / spendMax) * 100}
                 tone="neg"
@@ -273,7 +293,8 @@ function CashflowApp() {
             {inflowCategories.map((line, i) => (
               <Meter
                 key={i}
-                name={categoryLabel(line.category)}
+                name={labelFor(line.category)}
+                sub={subFor(line)}
                 value={formatGbp(line.inflow_pence)}
                 pct={(line.inflow_pence / inflowMax) * 100}
                 tone="pos"
