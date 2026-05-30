@@ -215,6 +215,11 @@
   color: var(--ink-faint);
   margin-top: 2px;
 }
+.t .sub.sub-inline {
+  display: inline;
+  margin-top: 0;
+  margin-left: var(--space-2);
+}
 .t tfoot td {
   border-top: 1px solid var(--line-strong);
   border-bottom: 0;
@@ -224,6 +229,25 @@
 }
 .t.compact td {
   padding: 0.4rem var(--space-3) 0.4rem 0;
+}
+
+.t .group-row td {
+  padding-top: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.t tbody:first-child .group-row td {
+  padding-top: var(--space-3);
+}
+.t .group-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-faint);
+}
+.t .group-sub {
+  color: var(--ink-muted);
+  font-weight: 500;
 }
 
 .lhead {

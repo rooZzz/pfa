@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 72" width="300" height="72">
+  
+  <g transform="translate(4,4)">
+    <path fill="#b8673e" fill-rule="evenodd" d="M12 12 L52 12 A40 40 0 0 1 12 52 Z M20.3 25.5 a5.2 5.2 0 1 0 10.4 0 a5.2 5.2 0 1 0 -10.4 0 Z"></path>
+  </g>
+  <text x="80" y="38" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="40" fill="#221a15" letter-spacing="0.4">PFA</text>
+  <text x="81" y="58" font-family="&#39;IBM Plex Mono&#39;, monospace" font-weight="500" font-size="9.4" letter-spacing="1.7" fill="#7a6a5d">PERSONAL FINANCE ASSISTANT</text>
+</svg>

@@ -4,6 +4,7 @@ import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
+import { Masthead } from "./branding.js";
 import { Btn, Meter, MiniBars, Stat } from "./components.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
@@ -181,23 +182,22 @@ function CashflowApp() {
 
   return (
     <div className="screen rise stack">
-      <div className="screen-head" style={{ marginBottom: 0 }}>
-        <div>
-          <div className="screen-title">Cashflow</div>
-          <div className="screen-sub">
-            {data.tax_year} · {data.period_start} – {data.period_end}
-          </div>
-        </div>
-        <Btn
-          variant="secondary"
-          size="sm"
-          icon="refresh"
-          onClick={() => void load(true)}
-          disabled={busy}
-        >
-          {busy ? "Syncing" : "Refresh"}
-        </Btn>
-      </div>
+      <Masthead
+        tight
+        title="Cashflow"
+        sub={`${data.tax_year} · ${data.period_start} – ${data.period_end}`}
+        action={
+          <Btn
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            onClick={() => void load(true)}
+            disabled={busy}
+          >
+            {busy ? "Syncing" : "Refresh"}
+          </Btn>
+        }
+      />
 
       <div>
         <div className="figure-hero">
