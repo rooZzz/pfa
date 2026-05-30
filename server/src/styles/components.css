@@ -236,7 +236,7 @@
   border-bottom: 1px solid var(--line);
 }
 .t tbody:first-child .group-row td {
-  padding-top: 0;
+  padding-top: var(--space-3);
 }
 .t .group-name {
   font-family: var(--font-mono);
