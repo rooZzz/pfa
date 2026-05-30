@@ -13,6 +13,9 @@
 .mt-5 {
   margin-top: var(--space-5);
 }
+.ml-2 {
+  margin-left: var(--space-2);
+}
 .mb-2 {
   margin-bottom: var(--space-2);
 }
