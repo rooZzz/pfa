@@ -16,37 +16,7 @@ import { MonzoReauthError } from "./errors.js";
 
 const PROVIDER = "monzo";
 const DAY_MS = 86_400_000;
-const INCREMENTAL_WINDOW_DAYS = 89;
-const BACKFILL_WINDOW_DAYS = 365 * 3;
-const MAX_RANGE_DAYS = 89;
-const RANGE_OVERLAP_MS = 60_000;
-
-async function listTransactionsRange(
-  client: MonzoClient,
-  accountId: string,
-  sinceIso: string,
-  beforeIso: string,
-): Promise<MonzoTransaction[]> {
-  const windowMs = MAX_RANGE_DAYS * DAY_MS;
-  const floorMs = Date.parse(sinceIso);
-  const beforeMs = Date.parse(beforeIso);
-  const byId = new Map<string, MonzoTransaction>();
-  let startMs = floorMs;
-  while (startMs < beforeMs) {
-    const endMs = Math.min(startMs + windowMs, beforeMs);
-    const windowSince = new Date(
-      Math.max(floorMs, startMs - RANGE_OVERLAP_MS),
-    ).toISOString();
-    const page = await client.listTransactions({
-      accountId,
-      since: windowSince,
-      before: new Date(endMs).toISOString(),
-    });
-    for (const transaction of page) byId.set(transaction.id, transaction);
-    startMs = endMs;
-  }
-  return [...byId.values()];
-}
+const HISTORY_WINDOW_DAYS = 89;
 
 export type MonzoSyncResult = {
   backfill: boolean;
@@ -114,11 +84,8 @@ export async function runMonzoSync(opts: {
 
   const now = new Date();
   const before = now.toISOString();
-  const incrementalSince = new Date(
-    now.getTime() - INCREMENTAL_WINDOW_DAYS * DAY_MS,
-  ).toISOString();
-  const backfillSince = new Date(
-    now.getTime() - BACKFILL_WINDOW_DAYS * DAY_MS,
+  const windowSince = new Date(
+    now.getTime() - HISTORY_WINDOW_DAYS * DAY_MS,
   ).toISOString();
   const syncDate = before.slice(0, 10);
 
@@ -138,13 +105,11 @@ export async function runMonzoSync(opts: {
     const balance = await client.getBalance(account.id);
     const pots = await client.listPots(account.id);
     const cursor = state.cursors[account.id];
-    const transactions = opts.backfill
-      ? await listTransactionsRange(client, account.id, backfillSince, before)
-      : await client.listTransactions({
-          accountId: account.id,
-          since: cursor ?? incrementalSince,
-          before,
-        });
+    const since = opts.backfill ? windowSince : (cursor ?? windowSince);
+    const transactions = await client.listTransactions({
+      accountId: account.id,
+      since,
+    });
     perAccount.push({ account, balance, pots, transactions });
   }
 
