@@ -94,6 +94,6 @@ describe("is_internal exclusion", () => {
     const result = await isaAllowanceRemaining(AS_OF, "2025/26");
     expect(result.resolved).toBe(true);
     expect(result.detail.contributions_pence).toBe(80000);
-    expect(result.value).toBe(2_000_000 - 80000);
+    expect(result.value).toBe((result.detail.allowance_pence as number) - 80000);
   });
 });

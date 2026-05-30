@@ -12,5 +12,5 @@ export const getBriefingSchema = {
 export async function getBriefingTool(input: { as_of?: string }): Promise<string> {
   const asOf = input.as_of ?? new Date().toISOString().split("T")[0]!;
   const briefing = await getBriefing(asOf);
-  return briefing.text;
+  return JSON.stringify(briefing);
 }

@@ -322,6 +322,8 @@ Reference table for UK tax years. All ISA and PAYE queries must anchor to this t
 
 **UK tax year rule:** The tax year starts on April 6 and ends on April 5 of the following year. A date like `2026-01-15` falls in the `2025/26` tax year. Never use `YEAR()` or calendar year boundaries for tax calculations — always join to `tax_periods`.
 
+**Sibling table `pfa.tax_constants`** (UK tax/legal constants: allowances, rates, bands, access ages) exists on disk but is deliberately not a text-to-SQL target. It is injected into the advice and briefing payload via the deterministic accessor in `server/tax_constants.ts` (`resolveConstant`, `taxConstantsForDate`), never queried by generated SQL — its dated, status-tagged temporal logic is too easy to get wrong in generated queries.
+
 ---
 
 ## Table: `pfa.goals`

@@ -4,6 +4,11 @@ import {
   isaAllowanceRemaining,
   type MetricValue,
 } from "../metrics/index.js";
+import {
+  type ResolvedConstant,
+  taxConstantsForDate,
+  upcomingChange,
+} from "../tax_constants.js";
 import { decompose, isImplemented, type SubGoalBinding } from "./catalog.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap";
@@ -20,6 +25,7 @@ export type Directive = {
 export type Briefing = {
   as_of: string;
   directives: Directive[];
+  tax_constants: Record<string, ResolvedConstant>;
   text: string;
 };
 
@@ -48,12 +54,12 @@ async function evaluateMetric(
   return isaAllowanceRemaining(asOf, taxYear);
 }
 
-function directivesFor(
+async function directivesFor(
   goal: { id: number; goal_type: string },
   binding: SubGoalBinding,
   metric: MetricValue,
   asOf: string,
-): Directive[] {
+): Promise<Directive[]> {
   const base = { goal_id: goal.id, goal_type: goal.goal_type, sub_goal: binding.key };
 
   if (!metric.resolved) {
@@ -95,7 +101,7 @@ function directivesFor(
   const usedPercent = Math.round((contributions / allowance) * 100);
   const daysLeft = daysBetween(asOf, periodEnd);
 
-  return [
+  const directives: Directive[] = [
     {
       ...base,
       kind: "progress",
@@ -115,6 +121,25 @@ function directivesFor(
       data: { days_left: daysLeft, period_end: periodEnd, tax_year: taxYear },
     },
   ];
+
+  const cashIsaChange = await upcomingChange("cash_isa_allowance", asOf);
+  if (cashIsaChange) {
+    const daysAway = daysBetween(asOf, cashIsaChange.valid_from);
+    const caveat =
+      cashIsaChange.status === "announced" ? " (proposed, subject to legislation)" : "";
+    directives.push({
+      ...base,
+      kind: "deadline",
+      message: `Cash-ISA sub-limit of ${formatPence(cashIsaChange.value)} takes effect ${cashIsaChange.valid_from}, ${daysAway} days away${caveat}.`,
+      data: {
+        effective_from: cashIsaChange.valid_from,
+        days_away: daysAway,
+        cash_isa_allowance_pence: cashIsaChange.value,
+      },
+    });
+  }
+
+  return directives;
 }
 
 export async function getBriefing(asOf: string): Promise<Briefing> {
@@ -132,15 +157,17 @@ export async function getBriefing(asOf: string): Promise<Briefing> {
     for (const binding of decompose(goal.goal_type, params)) {
       const metric = await evaluateMetric(binding, asOf, params);
       directives.push(
-        ...directivesFor(
+        ...(await directivesFor(
           { id: Number(goal.id), goal_type: goal.goal_type },
           binding,
           metric,
           asOf,
-        ),
+        )),
       );
     }
   }
+
+  const tax_constants = await taxConstantsForDate(asOf);
 
   const text =
     directives.length === 0
@@ -149,5 +176,5 @@ export async function getBriefing(asOf: string): Promise<Briefing> {
           "\n",
         );
 
-  return { as_of: asOf, directives, text };
+  return { as_of: asOf, directives, tax_constants, text };
 }

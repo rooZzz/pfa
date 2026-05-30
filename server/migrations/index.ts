@@ -4,6 +4,7 @@ import * as m0002 from "./0002_transaction_category.js";
 import * as m0003 from "./0003_seed_tax_periods.js";
 import * as m0004 from "./0004_goals.js";
 import * as m0005 from "./0005_connector.js";
+import * as m0006 from "./0006_tax_constants.js";
 
 type Migration = {
   name: string;
@@ -17,6 +18,7 @@ const MIGRATIONS: Migration[] = [
   { name: "0003_seed_tax_periods", ...m0003 },
   { name: "0004_goals", ...m0004 },
   { name: "0005_connector", ...m0005 },
+  { name: "0006_tax_constants", ...m0006 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {
