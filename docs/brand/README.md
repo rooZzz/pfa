@@ -6,7 +6,7 @@ index point knocked out as a transparent hole. One geometry, every treatment.
 ## What’s inside
 
 ```
-pfa-logo/
+docs/brand/
 ├─ svg/
 │  ├─ mark-clay.svg          ← primary mark (clay #b8673e)
 │  ├─ mark-ink.svg           ← monochrome (ink #221a15)
@@ -27,20 +27,20 @@ pfa-logo/
 
 ## Quick start
 
-**HTML `<head>`** (point paths at wherever you place the folder, e.g. `/pfa-logo/`):
+**HTML `<head>`** (point paths at wherever you place the folder, e.g. `/brand/`):
 
 ```html
-<link rel="icon" href="/pfa-logo/svg/favicon.svg" type="image/svg+xml" />
-<link rel="icon" href="/pfa-logo/png/favicon-32.png" sizes="32x32" />
-<link rel="apple-touch-icon" href="/pfa-logo/png/apple-touch-icon.png" />
-<link rel="manifest" href="/pfa-logo/site.webmanifest" />
+<link rel="icon" href="/brand/svg/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/brand/png/favicon-32.png" sizes="32x32" />
+<link rel="apple-touch-icon" href="/brand/png/apple-touch-icon.png" />
+<link rel="manifest" href="/brand/site.webmanifest" />
 <meta name="theme-color" content="#b8673e" />
 ```
 
 **React** — preferred for in-app use (crisp at any size, inherits theme):
 
 ```jsx
-import { QuadrantMark, PfaLockup } from "./pfa-logo/QuadrantMark";
+import { QuadrantMark, PfaLockup } from "./brand/QuadrantMark";
 
 <QuadrantMark size={28} />                  // clay, default
 <QuadrantMark size={28} fill="var(--accent)" />  // follows light/dark theme
@@ -50,7 +50,7 @@ import { QuadrantMark, PfaLockup } from "./pfa-logo/QuadrantMark";
 **Plain CSS** — when you can’t inline SVG:
 
 ```html
-<link rel="stylesheet" href="/pfa-logo/pfa-mark.css" />
+<link rel="stylesheet" href="/brand/pfa-mark.css" />
 <span class="pfa-mark"></span>
 <span class="pfa-mark pfa-mark--paper"></span>   <!-- on dark / clay -->
 ```
