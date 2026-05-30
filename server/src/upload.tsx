@@ -246,6 +246,8 @@ function UploadApp() {
       </div>
       <div
         className={"dropzone" + (isDragging ? " dragging" : "")}
+        role="button"
+        tabIndex={0}
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragging(true);
@@ -258,6 +260,12 @@ function UploadApp() {
           if (file) processFile(file);
         }}
         onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
       >
         <div className="dz-ico">
           <Icon name="upload" size={28} />
