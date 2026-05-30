@@ -217,13 +217,13 @@ function NetWorthApp() {
                     <tr key={i}>
                       <td>
                         {line.name}
+                        <span className="sub sub-inline">{age}</span>
                         {isStale && (
                           <span className="badge warn" style={{ marginLeft: 6 }}>
                             <span className="led" />
                             stale
                           </span>
                         )}
-                        <span className="sub">{age}</span>
                       </td>
                       <td
                         className="col-num"
