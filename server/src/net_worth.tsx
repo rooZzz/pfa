@@ -4,6 +4,7 @@ import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { NetWorthResult, RealisedLine } from "../net_worth/types.js";
+import { Masthead } from "./branding.js";
 import { Btn, CompositionBar, Sparkline, Stat } from "./components.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
@@ -23,24 +24,17 @@ function ageLabel(days: number | null): string {
   return `${days} days ago`;
 }
 
-function kindLabel(kind: RealisedLine["kind"]): string {
-  switch (kind) {
-    case "account":
-      return "Account";
-    case "pension":
-      return "Pension";
-    case "asset":
-      return "Asset";
-    case "property":
-      return "Property";
-    case "mortgage":
-      return "Mortgage";
-  }
-}
-
 function sumKind(lines: RealisedLine[], kind: RealisedLine["kind"]): number {
   return lines.filter((l) => l.kind === kind).reduce((sum, l) => sum + l.value_pence, 0);
 }
+
+const GROUP_ORDER: { kind: RealisedLine["kind"]; label: string }[] = [
+  { kind: "account", label: "Cash" },
+  { kind: "asset", label: "Investments" },
+  { kind: "pension", label: "Pension" },
+  { kind: "property", label: "Property" },
+  { kind: "mortgage", label: "Liabilities" },
+];
 
 function NetWorthApp() {
   const [data, setData] = useState<NetWorthData | null>(null);
@@ -140,25 +134,30 @@ function NetWorthApp() {
     { label: "Cash", value: cash, tone: "pos" as const },
   ];
 
+  const groups = GROUP_ORDER.map((g) => ({
+    ...g,
+    lines: data.realised.filter((l) => l.kind === g.kind),
+  })).filter((g) => g.lines.length > 0);
+
   const hasContingent = data.contingent.length > 0;
 
   return (
     <div className="screen rise stack">
-      <div className="screen-head" style={{ marginBottom: 0 }}>
-        <div>
-          <div className="screen-title">Net worth</div>
-          <div className="screen-sub">As of {data.as_of}</div>
-        </div>
-        <Btn
-          variant="secondary"
-          size="sm"
-          icon="refresh"
-          onClick={() => void load(true)}
-          disabled={busy}
-        >
-          {busy ? "Syncing" : "Refresh"}
-        </Btn>
-      </div>
+      <Masthead
+        title="Net worth"
+        sub={`As of ${data.as_of}`}
+        action={
+          <Btn
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            onClick={() => void load(true)}
+            disabled={busy}
+          >
+            {busy ? "Syncing" : "Refresh"}
+          </Btn>
+        }
+      />
 
       <div>
         <div className="figure-hero">
@@ -198,40 +197,47 @@ function NetWorthApp() {
 
       <div className="card card--flush">
         <table className="t compact t--inset">
-          <tbody>
-            {data.realised.map((line, i) => {
-              const hasPriceMeta = line.kind === "asset" || line.kind === "property";
-              const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
-              const isStale = priceAge != null && priceAge > 30;
-              const age = hasPriceMeta
-                ? ageLabel(priceAge)
-                : ageLabel(daysSince(line.valid_from));
-              return (
-                <tr key={i}>
-                  <td>
-                    {line.name}
-                    {isStale && (
-                      <span className="badge warn" style={{ marginLeft: 6 }}>
-                        <span className="led" />
-                        stale
-                      </span>
-                    )}
-                    <span className="sub">
-                      {kindLabel(line.kind)} · {age}
-                    </span>
-                  </td>
-                  <td
-                    className="col-num"
-                    style={{
-                      color: line.value_pence < 0 ? "var(--negative)" : "var(--ink)",
-                    }}
-                  >
-                    {formatGbp(line.value_pence)}
-                  </td>
+          {groups.map((group) => {
+            const subtotal = group.lines.reduce((sum, l) => sum + l.value_pence, 0);
+            return (
+              <tbody key={group.kind}>
+                <tr className="group-row">
+                  <td className="group-name">{group.label}</td>
+                  <td className="col-num group-sub">{formatGbp(subtotal)}</td>
                 </tr>
-              );
-            })}
-          </tbody>
+                {group.lines.map((line, i) => {
+                  const hasPriceMeta = line.kind === "asset" || line.kind === "property";
+                  const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
+                  const isStale = priceAge != null && priceAge > 30;
+                  const age = hasPriceMeta
+                    ? ageLabel(priceAge)
+                    : ageLabel(daysSince(line.valid_from));
+                  return (
+                    <tr key={i}>
+                      <td>
+                        {line.name}
+                        {isStale && (
+                          <span className="badge warn" style={{ marginLeft: 6 }}>
+                            <span className="led" />
+                            stale
+                          </span>
+                        )}
+                        <span className="sub">{age}</span>
+                      </td>
+                      <td
+                        className="col-num"
+                        style={{
+                          color: line.value_pence < 0 ? "var(--negative)" : "var(--ink)",
+                        }}
+                      >
+                        {formatGbp(line.value_pence)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            );
+          })}
           <tfoot>
             <tr>
               <td>Total realised</td>

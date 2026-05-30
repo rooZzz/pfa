@@ -3,6 +3,7 @@ import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Masthead } from "./branding.js";
 import { Badge, Btn, Icon } from "./components.js";
 
 type Status = "form" | "connecting" | "connected" | "syncing" | "error";
@@ -122,24 +123,21 @@ function ConnectorsApp() {
   if (status === "connected") {
     return (
       <div className="screen rise">
-        <div className="screen-head">
-          <div className="row">
+        <Masthead
+          lead={
             <span className="chip-ico chip-ico--accent">
               <Icon name="bank" size={18} />
             </span>
-            <div>
-              <div className="screen-title" style={{ fontSize: "var(--text-md)" }}>
-                Monzo
-              </div>
-              <div className="screen-sub" style={{ marginTop: 2 }}>
-                high-trust ingestion · manual sync
-              </div>
-            </div>
-          </div>
-          <Badge tone="ok" led>
-            connected
-          </Badge>
-        </div>
+          }
+          title="Monzo"
+          sub="high-trust ingestion · manual sync"
+          titleSize="var(--text-md)"
+          action={
+            <Badge tone="ok" led>
+              connected
+            </Badge>
+          }
+        />
 
         <p className="note accent" style={{ margin: "var(--space-4) 0" }}>
           {message}
@@ -167,16 +165,15 @@ function ConnectorsApp() {
 
   return (
     <div className="screen rise">
-      <div className="screen-head">
-        <div className="row">
+      <Masthead
+        lead={
           <span className="chip-ico chip-ico--muted">
             <Icon name="plug" size={18} />
           </span>
-          <div className="screen-title" style={{ fontSize: "var(--text-md)" }}>
-            Connect Monzo
-          </div>
-        </div>
-      </div>
+        }
+        title="Connect Monzo"
+        titleSize="var(--text-md)"
+      />
 
       <p className="note accent" style={{ margin: "var(--space-3) 0 var(--space-4)" }}>
         Run <span className="mono">npm run monzo:auth</span> and paste the result below.

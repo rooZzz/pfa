@@ -6,6 +6,7 @@ import {
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { PFA_ICONS } from "./branding.js";
 import { initDb } from "./db.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { resources, tools } from "./tools/registry.js";
@@ -16,7 +17,7 @@ export function createServer(): McpServer {
   initDb();
 
   const server = new McpServer(
-    { name: "pfa", version: "0.1.0" },
+    { name: "pfa", version: "0.1.0", icons: PFA_ICONS },
     { instructions: SERVER_INSTRUCTIONS },
   );
 

@@ -4,6 +4,7 @@ import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { IngestReviewResult } from "../tools/ingest_document.js";
+import { Masthead } from "./branding.js";
 import { Badge, Btn, Icon } from "./components.js";
 import { formatGbp } from "./format.js";
 
@@ -172,22 +173,24 @@ function UploadApp() {
     ];
     return (
       <div className="screen rise">
-        <div className="screen-head">
-          <div>
-            <div className="screen-title">Review payslip</div>
-            <div className="screen-sub">
+        <Masthead
+          title="Review payslip"
+          sub={
+            <>
               <Icon
                 name="file"
                 size={11}
                 style={{ verticalAlign: "-1px", marginRight: 4 }}
               />
               {filename}
-            </div>
-          </div>
-          <Badge tone="accent" led>
-            staged
-          </Badge>
-        </div>
+            </>
+          }
+          action={
+            <Badge tone="accent" led>
+              staged
+            </Badge>
+          }
+        />
 
         <p className="note accent mb-4">
           Parsed by Haiku vision. Nothing is written until you confirm — human review is
@@ -241,9 +244,7 @@ function UploadApp() {
 
   return (
     <div className="screen rise">
-      <div className="screen-head">
-        <div className="screen-title">Upload payslip</div>
-      </div>
+      <Masthead title="Upload payslip" />
       <div
         className={"dropzone" + (isDragging ? " dragging" : "")}
         role="button"

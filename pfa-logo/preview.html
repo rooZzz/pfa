@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PFA logo kit — preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="icon" href="svg/favicon.svg" type="image/svg+xml" />
+<style>
+  :root { --clay:#b8673e; --ink:#221a15; --paper:#fffefb; --espresso:#181412; --muted:#7a6a5d; --line:#e7ddd2; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#f6efe6; color:var(--ink); font-family:"Hanken Grotesk",system-ui,sans-serif; }
+  .wrap { max-width:880px; margin:0 auto; padding:56px 28px 80px; }
+  h1 { font-family:"Newsreader",serif; font-weight:500; font-size:40px; letter-spacing:-.01em; margin:0 0 6px; }
+  .sub { color:var(--muted); font-size:15px; margin:0 0 40px; }
+  h2 { font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--clay); margin:40px 0 14px; font-weight:600; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; }
+  .cell { border:1px solid var(--line); border-radius:10px; background:var(--paper); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:22px; min-width:128px; flex:1; }
+  .cell.dark { background:var(--espresso); border-color:#2a2420; }
+  .cell.clay { background:var(--clay); border-color:transparent; }
+  .tag { font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .cell.dark .tag, .cell.clay .tag { color:rgba(255,255,255,.65); }
+  img { display:block; }
+  .ico { border-radius:22%; box-shadow:0 2px 10px rgba(0,0,0,.12); }
+  .lockup { display:flex; align-items:center; gap:16px; }
+  .lockup .wm { display:flex; flex-direction:column; gap:3px; line-height:1; }
+  .lockup .wm b { font-family:"Newsreader",serif; font-weight:500; font-size:38px; }
+  .lockup .wm span { font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PFA — The Quadrant</h1>
+  <p class="sub">Logo kit preview. Every file in this folder, rendered from the actual exported assets.</p>
+
+  <h2>Primary lockup</h2>
+  <div class="row">
+    <div class="cell" style="flex-basis:100%">
+      <div class="lockup">
+        <img src="svg/mark-clay.svg" width="60" height="60" alt="PFA mark" />
+        <span class="wm"><b>PFA</b><span>Personal Finance Assistant</span></span>
+      </div>
+    </div>
+  </div>
+
+  <h2>Mark — treatments</h2>
+  <div class="row">
+    <div class="cell"><img src="svg/mark-clay.svg" width="64" height="64" alt="clay" /><span class="tag">clay · primary</span></div>
+    <div class="cell dark"><img src="svg/mark-clay.svg" width="64" height="64" alt="reverse" /><span class="tag">reverse</span></div>
+    <div class="cell"><img src="svg/mark-ink.svg" width="64" height="64" alt="ink" /><span class="tag">monochrome</span></div>
+    <div class="cell clay"><img src="svg/mark-paper.svg" width="64" height="64" alt="knockout" /><span class="tag">knockout</span></div>
+  </div>
+
+  <h2>App icons</h2>
+  <div class="row">
+    <div class="cell"><img class="ico" src="png/apple-touch-icon.png" width="88" height="88" alt="apple touch" /><span class="tag">apple-touch 180</span></div>
+    <div class="cell"><img class="ico" src="png/icon-512.png" width="88" height="88" alt="icon 512" /><span class="tag">icon 512 (paper)</span></div>
+    <div class="cell"><img class="ico" src="png/icon-512-clay.png" width="88" height="88" alt="icon clay" /><span class="tag">icon 512 (clay)</span></div>
+    <div class="cell"><img class="ico" src="png/icon-512-maskable.png" width="88" height="88" alt="maskable" /><span class="tag">maskable</span></div>
+  </div>
+
+  <h2>Favicon</h2>
+  <div class="row">
+    <div class="cell" style="flex-direction:row; gap:24px; justify-content:flex-start">
+      <img src="png/favicon-48.png" width="48" height="48" alt="48" />
+      <img src="png/favicon-32.png" width="32" height="32" alt="32" />
+      <img src="png/favicon-16.png" width="16" height="16" alt="16" />
+      <span class="tag">48 · 32 · 16</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -11,7 +11,7 @@ export function latestRangeSnapshot(
       FROM ${table}
       WHERE valid_from <= CAST(? AS DATE)
         AND (valid_to IS NULL OR valid_to > CAST(? AS DATE))
-      ORDER BY ${partitionBy}, valid_from DESC`,
+      ORDER BY ${partitionBy}, valid_from DESC, recorded_at DESC, id DESC`,
     params: [asOf, asOf],
   };
 }
@@ -27,7 +27,7 @@ export function latestPriceTick(
       FROM pfa.asset_prices ap
       JOIN pfa.assets a ON a.id = ap.asset_id
       WHERE ap.as_of <= CAST(? AS TIMESTAMP)${extra}
-      ORDER BY ap.asset_id, ap.as_of DESC`,
+      ORDER BY ap.asset_id, ap.as_of DESC, ap.recorded_at DESC, ap.id DESC`,
     params: [`${asOf} 23:59:59`, ...(extraWhere?.params ?? [])],
   };
 }
