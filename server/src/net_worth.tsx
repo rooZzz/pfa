@@ -1,38 +1,26 @@
+import "./styles/index.css";
+import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { NetWorthResult, RealisedLine } from "../net_worth/types.js";
+import { Btn, CompositionBar, Sparkline, Stat } from "./components.js";
+import { formatGbp, formatGbpk } from "./format.js";
 
 type NetWorthData = NetWorthResult;
 
-function formatGbp(pence: number): string {
-  const abs = Math.abs(pence);
-  const sign = pence < 0 ? "-" : "";
-  return `${sign}£${(abs / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function daysSince(dateStr: string | undefined): number | null {
+  if (!dateStr) return null;
+  const then = new Date(dateStr).getTime();
+  if (Number.isNaN(then)) return null;
+  return Math.floor((Date.now() - then) / (1000 * 60 * 60 * 24));
 }
 
-function daysAgo(dateStr: string): string {
-  if (!dateStr) return "";
-  const then = new Date(dateStr);
-  const now = new Date();
-  const days = Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
-  if (days === 0) return "today";
+function ageLabel(days: number | null): string {
+  if (days === null) return "no date";
+  if (days <= 0) return "today";
   if (days === 1) return "1 day ago";
   return `${days} days ago`;
-}
-
-function priceAgeDays(dateStr: string | undefined): number | null {
-  if (!dateStr) return null;
-  const then = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function priceAgeLabel(days: number | null): string {
-  if (days === null) return "";
-  if (days === 0) return "price today";
-  if (days === 1) return "price 1d ago";
-  return `price ${days}d ago`;
 }
 
 function kindLabel(kind: RealisedLine["kind"]): string {
@@ -50,9 +38,14 @@ function kindLabel(kind: RealisedLine["kind"]): string {
   }
 }
 
+function sumKind(lines: RealisedLine[], kind: RealisedLine["kind"]): number {
+  return lines.filter((l) => l.kind === kind).reduce((sum, l) => sum + l.value_pence, 0);
+}
+
 function NetWorthApp() {
   const [data, setData] = useState<NetWorthData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { app, error } = useApp({
@@ -60,287 +53,243 @@ function NetWorthApp() {
     capabilities: {},
   });
 
-  const load = useCallback(async () => {
-    if (!app) return;
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const today = new Date().toISOString().split("T")[0]!;
-      const result = await app.callServerTool({
-        name: "get_net_worth",
-        arguments: { as_of: today },
-      });
-      const text = result.content?.find((c: { type: string }) => c.type === "text") as
-        | { type: "text"; text: string }
-        | undefined;
-      if (!text) throw new Error("No response from get_net_worth.");
-      setData(JSON.parse(text.text) as NetWorthData);
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
-    } finally {
-      setLoading(false);
-    }
-  }, [app]);
+  const load = useCallback(
+    async (isRefresh: boolean) => {
+      if (!app) return;
+      if (isRefresh) setBusy(true);
+      else setLoading(true);
+      setErrorMessage(null);
+      try {
+        const today = new Date().toISOString().split("T")[0]!;
+        const result = await app.callServerTool({
+          name: "get_net_worth",
+          arguments: { as_of: today },
+        });
+        const text = result.content?.find((c: { type: string }) => c.type === "text") as
+          | { type: "text"; text: string }
+          | undefined;
+        if (!text) throw new Error("No response from get_net_worth.");
+        setData(JSON.parse(text.text) as NetWorthData);
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
+      } finally {
+        setLoading(false);
+        setBusy(false);
+      }
+    },
+    [app],
+  );
 
   useEffect(() => {
-    if (app) void load();
+    if (app) void load(false);
   }, [app, load]);
 
-  if (error) return <p style={s.error}>Connection error: {error.message}</p>;
-  if (!app) return <p style={s.muted}>Connecting…</p>;
-  if (loading) return <p style={s.muted}>Loading net worth…</p>;
-
-  if (errorMessage) {
+  if (error) {
     return (
-      <div style={s.container}>
-        <p style={s.error}>{errorMessage}</p>
-        <button style={{ ...s.btn, ...s.btnPrimary }} onClick={() => void load()}>
-          Retry
-        </button>
+      <div className="screen rise">
+        <p className="note">Connection error: {error.message}</p>
       </div>
     );
   }
-
+  if (!app || loading) {
+    return (
+      <div className="screen center-min">
+        <div className="loading-row">
+          <span className="spinner" />
+          {app ? "Loading net worth" : "Connecting"}
+        </div>
+      </div>
+    );
+  }
+  if (errorMessage) {
+    return (
+      <div className="screen rise stack">
+        <p className="note">{errorMessage}</p>
+        <div>
+          <Btn
+            variant="secondary"
+            size="sm"
+            icon="refresh"
+            onClick={() => void load(false)}
+          >
+            Retry
+          </Btn>
+        </div>
+      </div>
+    );
+  }
   if (!data) return null;
 
+  const trendVals = data.trend.map((t) => t.realised_total_pence);
+  const first = trendVals[0];
+  const last = trendVals[trendVals.length - 1];
+  const change = first != null && last != null ? last - first : null;
+  const changePct =
+    change != null && first ? ((change / Math.abs(first)) * 100).toFixed(1) : null;
+
+  const cash = sumKind(data.realised, "account");
+  const investments = sumKind(data.realised, "asset");
+  const pension = sumKind(data.realised, "pension");
+  const property = sumKind(data.realised, "property");
+  const accountCount = data.realised.filter((l) => l.kind === "account").length;
+
+  const composition = [
+    { label: "Property", value: property, tone: "accent" as const },
+    { label: "Pension", value: pension, tone: "muted" as const },
+    { label: "Investments", value: investments, tone: "pos" as const },
+    { label: "Cash", value: cash, tone: "pos" as const },
+  ];
+
   const hasContingent = data.contingent.length > 0;
-  const hasUnknown = data.unknown.length > 0;
 
   return (
-    <div style={s.container}>
-      <div style={s.header}>
-        <h2 style={s.title}>Net worth — {data.as_of}</h2>
-        <button style={{ ...s.btn, ...s.btnSecondary }} onClick={() => void load()}>
-          Refresh
-        </button>
+    <div className="screen rise stack">
+      <div className="screen-head" style={{ marginBottom: 0 }}>
+        <div>
+          <div className="screen-title">Net worth</div>
+          <div className="screen-sub">As of {data.as_of}</div>
+        </div>
+        <Btn
+          variant="secondary"
+          size="sm"
+          icon="refresh"
+          onClick={() => void load(true)}
+          disabled={busy}
+        >
+          {busy ? "Syncing" : "Refresh"}
+        </Btn>
       </div>
 
-      <section>
-        <h3 style={s.sectionHeading}>Realised</h3>
-        <table style={s.table}>
+      <div>
+        <div className="figure-hero">
+          {formatGbp(data.realised_total_pence, { whole: true })}
+        </div>
+        {change != null && (
+          <div className={"stat-delta mt-2 " + (change >= 0 ? "pos" : "neg")}>
+            {(change >= 0 ? "+" : "") + formatGbp(change, { whole: true })}
+            {changePct != null ? ` (${changePct}%)` : ""} over {trendVals.length} months
+          </div>
+        )}
+      </div>
+
+      {trendVals.length > 1 && (
+        <div className="card card--chart">
+          <Sparkline data={trendVals} height={56} />
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-label mb-3">Composition</div>
+        <CompositionBar rows={composition} />
+      </div>
+
+      <div className="grid cols-2">
+        <div className="card card-sunken">
+          <Stat
+            label="Liquid cash"
+            value={formatGbpk(cash)}
+            delta={`${accountCount} account${accountCount === 1 ? "" : "s"}`}
+          />
+        </div>
+        <div className="card card-sunken">
+          <Stat label="Investments" value={formatGbpk(investments)} delta="holdings" />
+        </div>
+      </div>
+
+      <div className="card card--flush">
+        <table className="t compact t--inset">
           <tbody>
             {data.realised.map((line, i) => {
               const hasPriceMeta = line.kind === "asset" || line.kind === "property";
-              const ageDays = hasPriceMeta ? priceAgeDays(line.price_as_of) : null;
+              const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
+              const isStale = priceAge != null && priceAge > 30;
+              const age = hasPriceMeta
+                ? ageLabel(priceAge)
+                : ageLabel(daysSince(line.valid_from));
               return (
                 <tr key={i}>
-                  <td style={s.kindCell}>{kindLabel(line.kind)}</td>
-                  <td style={s.nameCell}>{line.name}</td>
+                  <td>
+                    {line.name}
+                    {isStale && (
+                      <span className="badge warn" style={{ marginLeft: 6 }}>
+                        <span className="led" />
+                        stale
+                      </span>
+                    )}
+                    <span className="sub">
+                      {kindLabel(line.kind)} · {age}
+                    </span>
+                  </td>
                   <td
+                    className="col-num"
                     style={{
-                      ...s.amountCell,
-                      color: line.value_pence < 0 ? "#c0392b" : "inherit",
+                      color: line.value_pence < 0 ? "var(--negative)" : "var(--ink)",
                     }}
                   >
                     {formatGbp(line.value_pence)}
                   </td>
-                  <td style={s.staleCell} title={`recorded ${line.recorded_at}`}>
-                    {daysAgo(line.valid_from)}
-                  </td>
-                  {hasPriceMeta ? (
-                    <td
-                      style={{
-                        ...s.staleCell,
-                        color: ageDays != null && ageDays > 30 ? "#c0392b" : "#aaa",
-                      }}
-                      title={
-                        line.price_as_of
-                          ? `price as of ${line.price_as_of} via ${line.price_source ?? "unknown"}`
-                          : "no price recorded"
-                      }
-                    >
-                      {priceAgeLabel(ageDays)}
-                    </td>
-                  ) : (
-                    <td />
-                  )}
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={2} style={s.totalLabel}>
-                Total realised
-              </td>
-              <td style={s.totalAmount}>{formatGbp(data.realised_total_pence)}</td>
-              <td />
-              <td />
+              <td>Total realised</td>
+              <td className="col-num">{formatGbp(data.realised_total_pence)}</td>
             </tr>
           </tfoot>
         </table>
-      </section>
+      </div>
 
       {hasContingent && (
-        <section style={s.contingentSection}>
-          <h3 style={s.sectionHeading}>Contingent — not yet owned</h3>
-          <p style={s.contingentNote}>Unvested equity. Not included in realised total.</p>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.th}>Scheme</th>
-                <th style={s.th}>Grant date</th>
-                <th style={s.th}>Unvested units</th>
-                <th style={s.th}>Est. value</th>
-                <th style={s.th}>Basis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.contingent.map((line, i) => (
-                <tr key={i}>
-                  <td style={s.nameCell}>{line.scheme_type.toUpperCase()}</td>
-                  <td style={s.nameCell}>{line.grant_date}</td>
-                  <td style={s.amountCell}>{line.unvested_units.toLocaleString()}</td>
-                  <td style={s.amountCell}>
-                    {line.est_value_pence != null
-                      ? formatGbp(line.est_value_pence)
-                      : "unknown"}
-                  </td>
-                  <td
-                    style={s.staleCell}
-                    title={
-                      line.price_per_unit_pence != null
-                        ? `${line.price_per_unit_pence}p per unit`
-                        : undefined
-                    }
-                  >
-                    {line.basis}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {data.contingent_total_pence > 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan={3} style={s.totalLabel}>
-                    Total contingent (est.)
-                  </td>
-                  <td style={s.totalAmount}>{formatGbp(data.contingent_total_pence)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </section>
+        <div className="stack-2">
+          <div className="lhead">
+            <h4>Contingent</h4>
+            <span className="hint">not owned · excluded from total</span>
+          </div>
+          <div className="card card-sunken card--flush">
+            <table className="t compact t--inset">
+              <tbody>
+                {data.contingent.map((grant, i) => (
+                  <tr key={i}>
+                    <td>
+                      {grant.unvested_units.toLocaleString()}{" "}
+                      {grant.scheme_type.toUpperCase()} units
+                      <span className="sub">
+                        granted {grant.grant_date} · {grant.basis.replace(/_/g, " ")}
+                        {grant.price_per_unit_pence != null
+                          ? ` · ${grant.price_per_unit_pence}p / unit`
+                          : ""}
+                      </span>
+                    </td>
+                    <td className="col-num">
+                      {grant.est_value_pence != null
+                        ? formatGbp(grant.est_value_pence)
+                        : "unknown"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {data.contingent_total_pence > 0 && (
+                <tfoot>
+                  <tr>
+                    <td>Total contingent (est.)</td>
+                    <td className="col-num">{formatGbp(data.contingent_total_pence)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
       )}
 
-      {hasUnknown && (
-        <section style={s.unknownSection}>
-          <h3 style={s.sectionHeading}>No observations at this date</h3>
-          <ul style={s.unknownList}>
-            {data.unknown.map((u, i) => (
-              <li key={i} style={s.unknownItem}>
-                {u}
-              </li>
-            ))}
-          </ul>
-        </section>
+      {data.unknown.length > 0 && (
+        <div className="note">
+          No observations at {data.as_of} for: {data.unknown.join(", ")}.
+        </div>
       )}
-
-      <section style={s.trendSection}>
-        <h3 style={s.sectionHeading}>Monthly trend — realised</h3>
-        <table style={s.table}>
-          <tbody>
-            {data.trend.map((pt, i) => (
-              <tr key={i}>
-                <td style={s.nameCell}>{pt.date}</td>
-                <td style={s.amountCell}>{formatGbp(pt.realised_total_pence)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
     </div>
   );
 }
-
-const s: Record<string, React.CSSProperties> = {
-  container: {
-    fontFamily: "system-ui",
-    padding: "1rem",
-    maxWidth: "40rem",
-    fontSize: "0.875rem",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "1rem",
-  },
-  title: { margin: 0, fontSize: "1rem" },
-  sectionHeading: {
-    fontSize: "0.75rem",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    color: "#666",
-    margin: "1.25rem 0 0.5rem",
-  },
-  table: { borderCollapse: "collapse", width: "100%" },
-  kindCell: {
-    padding: "0.25rem 0.5rem 0.25rem 0",
-    color: "#888",
-    fontSize: "0.75rem",
-    whiteSpace: "nowrap",
-    width: "5rem",
-  },
-  nameCell: { padding: "0.25rem 0.75rem 0.25rem 0", color: "#333" },
-  amountCell: {
-    padding: "0.25rem 0",
-    fontVariantNumeric: "tabular-nums",
-    textAlign: "right",
-    whiteSpace: "nowrap",
-  },
-  staleCell: {
-    padding: "0.25rem 0 0.25rem 0.75rem",
-    color: "#aaa",
-    fontSize: "0.75rem",
-    whiteSpace: "nowrap",
-  },
-  totalLabel: { padding: "0.5rem 0 0.25rem", fontWeight: 600, color: "#333" },
-  totalAmount: {
-    padding: "0.5rem 0 0.25rem",
-    fontWeight: 600,
-    fontVariantNumeric: "tabular-nums",
-    textAlign: "right",
-  },
-  th: {
-    padding: "0.25rem 0.5rem 0.25rem 0",
-    textAlign: "left",
-    fontWeight: 500,
-    color: "#666",
-    fontSize: "0.75rem",
-  },
-  contingentSection: {
-    borderLeft: "3px solid #e67e22",
-    paddingLeft: "0.75rem",
-    marginTop: "1rem",
-  },
-  contingentNote: { color: "#888", fontSize: "0.75rem", margin: "0 0 0.5rem" },
-  unknownSection: { marginTop: "1rem", color: "#888" },
-  unknownList: { margin: "0.25rem 0", paddingLeft: "1.25rem" },
-  unknownItem: { marginBottom: "0.2rem", fontSize: "0.8rem" },
-  trendSection: { marginTop: "1rem" },
-  btn: {
-    padding: "0.3rem 0.75rem",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "0.8rem",
-  },
-  btnPrimary: { background: "#0070f3", color: "#fff" },
-  btnSecondary: { background: "#f0f0f0", color: "#333" },
-  muted: {
-    color: "#888",
-    fontFamily: "system-ui",
-    padding: "1rem",
-    fontSize: "0.875rem",
-  },
-  error: {
-    color: "#c0392b",
-    fontFamily: "system-ui",
-    padding: "1rem",
-    fontSize: "0.875rem",
-  },
-};
 
 createRoot(document.getElementById("root")!).render(<NetWorthApp />);

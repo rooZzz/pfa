@@ -1,6 +1,9 @@
+import "./styles/index.css";
+import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Badge, Btn, Icon } from "./components.js";
 
 type Status = "form" | "connecting" | "connected" | "syncing" | "error";
 
@@ -87,95 +90,128 @@ function ConnectorsApp() {
   }
 
   if (error) {
-    return <p style={styles.error}>Connection error: {error.message}</p>;
+    return (
+      <div className="screen rise">
+        <p className="note">Connection error: {error.message}</p>
+      </div>
+    );
   }
   if (!app) {
-    return <p style={styles.muted}>Connecting…</p>;
+    return (
+      <div className="screen center-min">
+        <div className="loading-row">
+          <span className="spinner" />
+          Connecting
+        </div>
+      </div>
+    );
   }
-  if (status === "connecting") {
-    return <p style={styles.muted}>Connecting Monzo and backfilling history…</p>;
-  }
-  if (status === "syncing") {
-    return <p style={styles.muted}>Syncing Monzo…</p>;
+  if (status === "connecting" || status === "syncing") {
+    return (
+      <div className="screen rise center-min">
+        <div className="loading-row">
+          <span className="spinner" />
+          {status === "connecting"
+            ? "Connecting Monzo · backfilling history"
+            : "Syncing transactions"}
+        </div>
+      </div>
+    );
   }
 
   if (status === "connected") {
     return (
-      <div style={styles.container}>
-        <h2 style={styles.heading}>Monzo</h2>
-        <p style={styles.success}>{message}</p>
-        <div style={styles.actions}>
-          <button style={{ ...styles.button, ...styles.confirm }} onClick={handleSync}>
+      <div className="screen rise">
+        <div className="screen-head">
+          <div className="row">
+            <span className="chip-ico chip-ico--accent">
+              <Icon name="bank" size={18} />
+            </span>
+            <div>
+              <div className="screen-title" style={{ fontSize: "var(--text-md)" }}>
+                Monzo
+              </div>
+              <div className="screen-sub" style={{ marginTop: 2 }}>
+                high-trust ingestion · manual sync
+              </div>
+            </div>
+          </div>
+          <Badge tone="ok" led>
+            connected
+          </Badge>
+        </div>
+
+        <p className="note accent" style={{ margin: "var(--space-4) 0" }}>
+          {message}
+        </p>
+
+        <div className="row row-2">
+          <Btn variant="primary" icon="sync" onClick={() => void handleSync()}>
             Sync now
-          </button>
-          <button
-            style={{ ...styles.button, ...styles.cancel }}
-            onClick={() => setStatus("form")}
+          </Btn>
+          <Btn
+            variant="ghost"
+            icon="plug"
+            onClick={() => {
+              setStatus("form");
+              setInput("");
+              setMessage(null);
+            }}
           >
             Reconnect
-          </button>
+          </Btn>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.heading}>Connect Monzo</h2>
-      <p style={styles.muted}>
-        Run <code>npm run monzo:auth</code> and paste the result below — it carries the
-        tokens needed to backfill full history and auto-renew. For a quick test you can
-        instead paste a bare access token from the Monzo developer playground. Input is
-        sent straight to the local app and never appears in chat.
+    <div className="screen rise">
+      <div className="screen-head">
+        <div className="row">
+          <span className="chip-ico chip-ico--muted">
+            <Icon name="plug" size={18} />
+          </span>
+          <div className="screen-title" style={{ fontSize: "var(--text-md)" }}>
+            Connect Monzo
+          </div>
+        </div>
+      </div>
+
+      <p className="note accent" style={{ margin: "var(--space-3) 0 var(--space-4)" }}>
+        Run <span className="mono">npm run monzo:auth</span> and paste the result below.
+        For a quick test you can paste a bare access token instead. Input goes straight to
+        the local app — it never appears in chat.
       </p>
-      {status === "error" && errorMessage && <p style={styles.error}>{errorMessage}</p>}
+
+      {status === "error" && errorMessage && <p className="note mb-4">{errorMessage}</p>}
+
+      <label className="field-label">OAuth tokens or bare access token</label>
       <textarea
-        style={styles.textarea}
+        className="textarea"
         rows={5}
-        placeholder='{"client_id":"…","client_secret":"…","access_token":"…","refresh_token":"…"}  — or a bare access token'
+        spellCheck={false}
+        placeholder={
+          '{"client_id":"…","client_secret":"…","access_token":"…","refresh_token":"…"}\n— or a bare access token'
+        }
         value={input}
         onChange={(e) => setInput(e.target.value)}
       />
-      <div style={styles.actions}>
-        <button
-          style={{ ...styles.button, ...(canConnect ? styles.confirm : styles.disabled) }}
-          onClick={handleConnect}
+      <div className="row-between mt-3">
+        <span className="eyebrow row-2" style={{ gap: 5 }}>
+          <Icon name="info" size={12} /> credentials stay local
+        </span>
+        <Btn
+          variant="primary"
+          icon="check"
+          onClick={() => void handleConnect()}
           disabled={!canConnect}
         >
           Connect
-        </button>
+        </Btn>
       </div>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: { fontFamily: "system-ui", padding: "1rem", maxWidth: "30rem" },
-  heading: { marginTop: 0, marginBottom: "0.5rem", fontSize: "1rem" },
-  textarea: {
-    width: "100%",
-    padding: "0.5rem",
-    border: "1px solid #ccc",
-    borderRadius: "4px",
-    fontSize: "0.8125rem",
-    fontFamily: "ui-monospace, monospace",
-    boxSizing: "border-box",
-    resize: "vertical",
-  },
-  actions: { display: "flex", gap: "0.5rem", marginTop: "0.75rem" },
-  button: {
-    padding: "0.4rem 1rem",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-  },
-  confirm: { background: "#0070f3", color: "#fff" },
-  disabled: { background: "#ccc", color: "#fff", cursor: "not-allowed" },
-  cancel: { background: "#eee", color: "#333" },
-  success: { color: "#0a7a0a" },
-  error: { color: "#c0392b" },
-  muted: { color: "#888", fontSize: "0.8125rem" },
-};
 
 createRoot(document.getElementById("root")!).render(<ConnectorsApp />);

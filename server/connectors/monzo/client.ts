@@ -112,6 +112,11 @@ export function createMonzoClient(opts: {
       }
       if (!res.ok) {
         const text = await res.text().catch(() => "");
+        if (res.status === 403 && text.includes("verification_required")) {
+          throw new MonzoReauthError(
+            "Monzo needs fresh verification to read transactions (its tokens only access the last 90 days once a few minutes old). Open the Connectors widget and run Connect again with credentials minted immediately beforehand.",
+          );
+        }
         throw new MonzoApiError(res.status, text.slice(0, 200));
       }
       return (await res.json()) as T;

@@ -34,6 +34,8 @@ Three modes:
 | `ui://net_worth` | Net worth dashboard — trended, point-in-time. |
 | `ui://cashflow` | Cashflow and budget dashboard. |
 
+Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/src/styles/` and `server/src/components.tsx`.
+
 **Background processes** — Connector runners (Monzo, Ethereum wallet) run as launchd daemons independent of Claude Desktop. Their *setup* — credentials, schedule, enable/disable — happens through `ui://connectors`. Once configured they run autonomously, writing to SQLite directly. The user never touches them again unless reconfiguring.
 
 ---

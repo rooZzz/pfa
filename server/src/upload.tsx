@@ -1,24 +1,19 @@
+import "./styles/index.css";
+import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { IngestReviewResult } from "../tools/ingest_document.js";
+import { Badge, Btn, Icon } from "./components.js";
+import { formatGbp } from "./format.js";
 
 type IngestResult = IngestReviewResult;
 
 type Status = "drop" | "parsing" | "review" | "confirming" | "confirmed" | "error";
 
-function formatGbp(pence: number | null | undefined): string {
+function gbpOrDash(pence: number | null | undefined): string {
   if (pence == null) return "not shown";
-  return `£${(pence / 100).toFixed(2)}`;
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <tr>
-      <td style={styles.label}>{label}</td>
-      <td style={styles.value}>{value}</td>
-    </tr>
-  );
+  return formatGbp(pence);
 }
 
 function UploadApp() {
@@ -60,8 +55,7 @@ function UploadApp() {
           ) as { type: "text"; text: string } | undefined;
           if (!text) throw new Error("No response from ingest_document.");
 
-          const data = JSON.parse(text.text) as IngestResult;
-          setIngestResult(data);
+          setIngestResult(JSON.parse(text.text) as IngestResult);
           setStatus("review");
         } catch (err) {
           setStatus("error");
@@ -96,191 +90,205 @@ function UploadApp() {
     }
   }
 
-  function handleCancel() {
+  function reset() {
     setStatus("drop");
     setIngestResult(null);
     setErrorMessage(null);
   }
 
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(true);
-  }
-
-  function handleDragLeave() {
-    setIsDragging(false);
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-  }
-
   if (error) {
-    return <p style={styles.error}>Connection error: {error.message}</p>;
+    return (
+      <div className="screen rise">
+        <p className="note">Connection error: {error.message}</p>
+      </div>
+    );
+  }
+  if (!app) {
+    return (
+      <div className="screen center-min">
+        <div className="loading-row">
+          <span className="spinner" />
+          Connecting
+        </div>
+      </div>
+    );
   }
 
-  if (!app) {
-    return <p style={styles.muted}>Connecting…</p>;
+  if (status === "parsing" || status === "confirming") {
+    return (
+      <div className="screen rise center-min">
+        <div className="loading-row">
+          <span className="spinner" />
+          {status === "parsing" ? "Parsing payslip — Haiku vision" : "Writing to store"}
+        </div>
+      </div>
+    );
   }
 
   if (status === "confirmed") {
     return (
-      <div style={styles.container}>
-        <p style={styles.success}>{confirmMessage}</p>
+      <div className="screen rise result-ok">
+        <span className="seal">
+          <Icon name="check" size={22} />
+        </span>
+        <div>
+          <div className="ok-title">Saved to ledger</div>
+          <p className="muted mt-2" style={{ fontSize: "var(--text-sm)" }}>
+            {confirmMessage}
+          </p>
+        </div>
+        <Btn variant="secondary" size="sm" icon="upload" onClick={reset}>
+          Upload another
+        </Btn>
       </div>
     );
   }
 
   if (status === "error") {
     return (
-      <div style={styles.container}>
-        <p style={styles.error}>{errorMessage}</p>
-        <button
-          style={{ ...styles.button, ...styles.cancel }}
-          onClick={() => {
-            setStatus("drop");
-            setErrorMessage(null);
-          }}
-        >
-          Try again
-        </button>
+      <div className="screen rise stack">
+        <p className="note">{errorMessage}</p>
+        <div>
+          <Btn variant="secondary" size="sm" onClick={reset}>
+            Try again
+          </Btn>
+        </div>
       </div>
     );
   }
 
-  if (status === "parsing") {
-    return <p style={styles.muted}>Parsing payslip…</p>;
-  }
-
-  if (status === "confirming") {
-    return <p style={styles.muted}>Saving…</p>;
-  }
-
   if (status === "review" && ingestResult) {
     const { parsed, payload, filename } = ingestResult;
+    const rows: [string, string][] = [
+      ["Pay date", parsed.pay_date],
+      ["Tax year", parsed.tax_year ?? "not shown"],
+      ["Gross pay", gbpOrDash(parsed.gross_pence)],
+      ["Taxable pay", gbpOrDash(parsed.taxable_pence)],
+      ["Net pay", gbpOrDash(parsed.net_pence)],
+      ["PAYE", gbpOrDash(parsed.paye_pence)],
+      ["NI (employee)", gbpOrDash(parsed.ni_employee_pence)],
+      ["Pension (employee)", gbpOrDash(parsed.pension_employee_pence)],
+      ["Pension (employer)", gbpOrDash(parsed.pension_employer_pence)],
+    ];
     return (
-      <div style={styles.container}>
-        <h2 style={styles.heading}>Review payslip</h2>
-        <p style={styles.source}>Source: {filename}</p>
+      <div className="screen rise">
+        <div className="screen-head">
+          <div>
+            <div className="screen-title">Review payslip</div>
+            <div className="screen-sub">
+              <Icon
+                name="file"
+                size={11}
+                style={{ verticalAlign: "-1px", marginRight: 4 }}
+              />
+              {filename}
+            </div>
+          </div>
+          <Badge tone="accent" led>
+            staged
+          </Badge>
+        </div>
 
-        <table style={styles.table}>
-          <tbody>
-            <Row label="Pay date" value={parsed.pay_date} />
-            <Row label="Tax year" value={parsed.tax_year ?? "not shown"} />
-            <Row label="Gross pay" value={formatGbp(parsed.gross_pence)} />
-            {parsed.taxable_pence != null && (
-              <Row label="Taxable pay" value={formatGbp(parsed.taxable_pence)} />
-            )}
-            <Row label="Net pay" value={formatGbp(parsed.net_pence)} />
-            <Row label="PAYE" value={formatGbp(parsed.paye_pence)} />
-            <Row label="NI (employee)" value={formatGbp(parsed.ni_employee_pence)} />
-            <Row
-              label="Pension (employee)"
-              value={formatGbp(parsed.pension_employee_pence)}
-            />
-            <Row
-              label="Pension (employer)"
-              value={formatGbp(parsed.pension_employer_pence)}
-            />
-          </tbody>
-        </table>
+        <p className="note accent mb-4">
+          Parsed by Haiku vision. Nothing is written until you confirm — human review is
+          non-negotiable.
+        </p>
+
+        <div className="card card--flush">
+          <table className="t compact t--inset">
+            <tbody>
+              {rows.map(([k, v], i) => (
+                <tr key={i}>
+                  <td className="muted">{k}</td>
+                  <td className="col-num">{v}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {payload.line_items.length > 0 && (
           <>
-            <h3 style={styles.subheading}>Line items</h3>
-            <table style={styles.table}>
+            <div className="lhead">
+              <h4>Line items</h4>
+            </div>
+            <table className="t compact">
               <tbody>
                 {payload.line_items.map((item, i) => (
-                  <Row
-                    key={i}
-                    label={item.description}
-                    value={formatGbp(item.amount_pence)}
-                  />
+                  <tr key={i}>
+                    <td>{item.description}</td>
+                    <td className={"col-num" + (item.amount_pence < 0 ? " neg" : "")}>
+                      {formatGbp(item.amount_pence)}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </>
         )}
 
-        <div style={styles.actions}>
-          <button style={{ ...styles.button, ...styles.confirm }} onClick={handleConfirm}>
-            Confirm
-          </button>
-          <button style={{ ...styles.button, ...styles.cancel }} onClick={handleCancel}>
+        <div className="row row-2 mt-5">
+          <Btn variant="primary" icon="check" onClick={() => void handleConfirm()}>
+            Confirm &amp; save
+          </Btn>
+          <Btn variant="ghost" onClick={reset}>
             Cancel
-          </button>
+          </Btn>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.heading}>Upload payslip</h2>
+    <div className="screen rise">
+      <div className="screen-head">
+        <div className="screen-title">Upload payslip</div>
+      </div>
       <div
-        style={{ ...styles.dropzone, ...(isDragging ? styles.dropzoneDragging : {}) }}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        className={"dropzone" + (isDragging ? " dragging" : "")}
+        role="button"
+        tabIndex={0}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          const file = e.dataTransfer.files[0];
+          if (file) processFile(file);
+        }}
         onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
       >
-        <p style={styles.dropzoneText}>Drop a PDF or image here, or click to browse</p>
+        <div className="dz-ico">
+          <Icon name="upload" size={28} />
+        </div>
+        <div className="dz-title">Drop a PDF or image, or click to browse</div>
+        <div className="dz-hint">payslip · pdf, jpg, png</div>
         <input
           ref={fileInputRef}
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           style={{ display: "none" }}
-          onChange={handleFileChange}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) processFile(file);
+          }}
         />
       </div>
+      <p className="note mt-4">
+        Files are parsed locally then staged for your review. Every saved row stays
+        auditable back to its source document.
+      </p>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: { fontFamily: "system-ui", padding: "1rem", maxWidth: "28rem" },
-  heading: { marginTop: 0, marginBottom: "0.5rem", fontSize: "1rem" },
-  subheading: {
-    marginTop: "1rem",
-    marginBottom: "0.5rem",
-    fontSize: "0.875rem",
-    color: "#555",
-  },
-  source: { fontSize: "0.75rem", color: "#888", marginBottom: "1rem" },
-  table: { borderCollapse: "collapse", width: "100%", marginBottom: "1.25rem" },
-  label: { padding: "0.3rem 0.75rem 0.3rem 0", color: "#666", whiteSpace: "nowrap" },
-  value: { padding: "0.3rem 0", fontVariantNumeric: "tabular-nums" },
-  actions: { display: "flex", gap: "0.5rem" },
-  button: {
-    padding: "0.4rem 1rem",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-  },
-  confirm: { background: "#0070f3", color: "#fff" },
-  cancel: { background: "#eee", color: "#333" },
-  success: { color: "#0a7a0a" },
-  error: { color: "#c0392b" },
-  muted: { color: "#888", fontFamily: "system-ui", padding: "1rem" },
-  dropzone: {
-    border: "2px dashed #ccc",
-    borderRadius: "8px",
-    padding: "2rem",
-    textAlign: "center",
-    cursor: "pointer",
-    transition: "border-color 0.2s",
-  },
-  dropzoneDragging: { borderColor: "#0070f3", background: "#f0f7ff" },
-  dropzoneText: { margin: 0, color: "#666", fontSize: "0.875rem" },
-};
 
 createRoot(document.getElementById("root")!).render(<UploadApp />);
