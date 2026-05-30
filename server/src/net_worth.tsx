@@ -240,23 +240,44 @@ function NetWorthApp() {
       </div>
 
       {hasContingent && (
-        <div className="note accent stack-2">
-          <strong style={{ color: "var(--ink)" }}>
-            Contingent · {formatGbp(data.contingent_total_pence, { whole: true })}
-          </strong>
-          {data.contingent.map((grant, i) => (
-            <div key={i}>
-              {grant.unvested_units.toLocaleString()} unvested{" "}
-              {grant.scheme_type.toUpperCase()} units
-              {grant.price_per_unit_pence != null
-                ? ` (${grant.price_per_unit_pence}p / unit)`
-                : ""}
-              {grant.est_value_pence != null
-                ? ` · ${formatGbp(grant.est_value_pence, { whole: true })}`
-                : ""}
-            </div>
-          ))}
-          <span className="faint">Not in realised total.</span>
+        <div className="stack-2">
+          <div className="lhead">
+            <h4>Contingent</h4>
+            <span className="hint">not owned · excluded from total</span>
+          </div>
+          <div className="card card-sunken card--flush">
+            <table className="t compact t--inset">
+              <tbody>
+                {data.contingent.map((grant, i) => (
+                  <tr key={i}>
+                    <td>
+                      {grant.unvested_units.toLocaleString()}{" "}
+                      {grant.scheme_type.toUpperCase()} units
+                      <span className="sub">
+                        granted {grant.grant_date} · {grant.basis.replace(/_/g, " ")}
+                        {grant.price_per_unit_pence != null
+                          ? ` · ${grant.price_per_unit_pence}p / unit`
+                          : ""}
+                      </span>
+                    </td>
+                    <td className="col-num">
+                      {grant.est_value_pence != null
+                        ? formatGbp(grant.est_value_pence)
+                        : "unknown"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {data.contingent_total_pence > 0 && (
+                <tfoot>
+                  <tr>
+                    <td>Total contingent (est.)</td>
+                    <td className="col-num">{formatGbp(data.contingent_total_pence)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
         </div>
       )}
 
