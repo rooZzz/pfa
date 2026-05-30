@@ -17,7 +17,7 @@ import { MonzoReauthError } from "./errors.js";
 const PROVIDER = "monzo";
 const DAY_MS = 86_400_000;
 const INCREMENTAL_WINDOW_DAYS = 89;
-const HISTORY_FLOOR = "2010-01-01T00:00:00Z";
+const BACKFILL_WINDOW_DAYS = 365 * 3;
 
 export type MonzoSyncResult = {
   backfill: boolean;
@@ -88,6 +88,9 @@ export async function runMonzoSync(opts: {
   const incrementalSince = new Date(
     now.getTime() - INCREMENTAL_WINDOW_DAYS * DAY_MS,
   ).toISOString();
+  const backfillSince = new Date(
+    now.getTime() - BACKFILL_WINDOW_DAYS * DAY_MS,
+  ).toISOString();
   const syncDate = before.slice(0, 10);
 
   const accounts = (await client.listAccounts()).filter(
@@ -107,7 +110,7 @@ export async function runMonzoSync(opts: {
     const pots = await client.listPots(account.id);
     const cursor = state.cursors[account.id];
     const since = opts.backfill
-      ? (account.created ?? HISTORY_FLOOR)
+      ? backfillSince
       : (cursor ?? incrementalSince);
     const transactions = await client.listTransactions({
       accountId: account.id,
