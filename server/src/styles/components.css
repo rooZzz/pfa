@@ -215,6 +215,11 @@
   color: var(--ink-faint);
   margin-top: 2px;
 }
+.t .sub.sub-inline {
+  display: inline;
+  margin-top: 0;
+  margin-left: var(--space-2);
+}
 .t tfoot td {
   border-top: 1px solid var(--line-strong);
   border-bottom: 0;
