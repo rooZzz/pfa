@@ -62,7 +62,9 @@ a {
 
 .screen {
   padding: var(--space-5);
-  max-width: 560px;
+  width: 100%;
+  max-width: 780px;
+  margin-inline: auto;
 }
 
 .eyebrow {

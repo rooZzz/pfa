@@ -405,6 +405,7 @@
   line-height: var(--leading-snug);
   border-left: 2px solid var(--line-strong);
   padding-left: var(--space-3);
+  max-width: 66ch;
 }
 .note.accent {
   border-color: var(--accent);

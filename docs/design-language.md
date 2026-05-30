@@ -61,7 +61,10 @@ quiet progress meter.
 
 8. Respect the frame. These screens render as sandboxed iframes embedded in a chat, at side-panel
    widths. Designs are vertical, compact, and wrap gracefully; they assume the host's theme and never
-   pretend to be a full-page app.
+   pretend to be a full-page app. Fill the frame rather than assume a fixed width: the screen is fluid
+   to a sane maximum and centered, so leftover space is balanced, never dumped as right-hand padding.
+   Figures, tables, and tiles stretch to use the room; prose stays capped near a readable measure
+   (~66ch) so a wider panel never produces over-long lines.
 
 9. Money is never a float. Values are integer pence end-to-end and formatted at the edge. The UI
    reflects the data model's precision; it never introduces rounding of its own.
