@@ -140,7 +140,7 @@ function NetWorthApp() {
     { label: "Cash", value: cash, tone: "pos" as const },
   ];
 
-  const contingent = data.contingent[0];
+  const hasContingent = data.contingent.length > 0;
 
   return (
     <div className="screen rise stack">
@@ -239,17 +239,24 @@ function NetWorthApp() {
         </table>
       </div>
 
-      {contingent && (
-        <div className="note accent">
+      {hasContingent && (
+        <div className="note accent stack-2">
           <strong style={{ color: "var(--ink)" }}>
             Contingent · {formatGbp(data.contingent_total_pence, { whole: true })}
-          </strong>{" "}
-          — {contingent.unvested_units.toLocaleString()} unvested{" "}
-          {contingent.scheme_type.toUpperCase()} units
-          {contingent.price_per_unit_pence != null
-            ? ` (${contingent.price_per_unit_pence}p / unit)`
-            : ""}
-          . Not in realised total.
+          </strong>
+          {data.contingent.map((grant, i) => (
+            <div key={i}>
+              {grant.unvested_units.toLocaleString()} unvested{" "}
+              {grant.scheme_type.toUpperCase()} units
+              {grant.price_per_unit_pence != null
+                ? ` (${grant.price_per_unit_pence}p / unit)`
+                : ""}
+              {grant.est_value_pence != null
+                ? ` · ${formatGbp(grant.est_value_pence, { whole: true })}`
+                : ""}
+            </div>
+          ))}
+          <span className="faint">Not in realised total.</span>
         </div>
       )}
 

@@ -136,10 +136,22 @@ function CashflowApp() {
   if (!data) return null;
 
   const hasIncome = data.income.payslip_count > 0;
+  const isSavings = (cat: string) => cat === "savings";
   const outflowCategories = data.transactions_by_category
-    .filter((l) => l.outflow_pence > 0 && l.category !== "savings")
+    .filter((l) => l.outflow_pence > 0 && !isSavings(l.category))
     .sort((a, b) => b.outflow_pence - a.outflow_pence);
   const spendMax = Math.max(1, ...outflowCategories.map((l) => l.outflow_pence));
+
+  const inflowCategories = data.transactions_by_category
+    .filter((l) => l.inflow_pence > 0 && l.outflow_pence === 0 && !isSavings(l.category))
+    .sort((a, b) => b.inflow_pence - a.inflow_pence);
+  const inflowMax = Math.max(1, ...inflowCategories.map((l) => l.inflow_pence));
+
+  const savingsLines = data.transactions_by_category.filter((l) => isSavings(l.category));
+  const savingsOut = savingsLines.reduce((sum, l) => sum + l.outflow_pence, 0);
+  const savingsIn = savingsLines.reduce((sum, l) => sum + l.inflow_pence, 0);
+  const hasSavings = data.pot_savings_net_pence !== 0 || savingsOut > 0 || savingsIn > 0;
+
   const netPos = data.net_cashflow_pence >= 0;
 
   const trendRows = data.trend.map((t) => ({
@@ -206,6 +218,30 @@ function CashflowApp() {
             </span>
           </div>
           <MiniBars rows={trendRows} height={72} />
+          <table className="t compact mt-4">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th className="col-num">In</th>
+                <th className="col-num">Out</th>
+                <th className="col-num">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.trend.map((t, i) => (
+                <tr key={i}>
+                  <td>{monthLabel(t.month)}</td>
+                  <td className="col-num pos">{formatGbp(t.transaction_inflow_pence)}</td>
+                  <td className="col-num neg">
+                    {"−" + formatGbp(t.transaction_outflow_pence)}
+                  </td>
+                  <td className={"col-num " + (t.net_pence >= 0 ? "pos" : "neg")}>
+                    {formatGbp(t.net_pence)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -224,6 +260,53 @@ function CashflowApp() {
                 tone="neg"
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {inflowCategories.length > 0 && (
+        <div className="card">
+          <div className="card-label mb-3">
+            Other inflows · {formatGbp(data.income_total_pence)}
+          </div>
+          <div className="stack-3">
+            {inflowCategories.map((line, i) => (
+              <Meter
+                key={i}
+                name={categoryLabel(line.category)}
+                value={formatGbp(line.inflow_pence)}
+                pct={(line.inflow_pence / inflowMax) * 100}
+                tone="pos"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasSavings && (
+        <div className="card">
+          <div className="card-label mb-3">Savings &amp; investing</div>
+          <div className="stack-3">
+            {data.pot_savings_net_pence !== 0 && (
+              <KV
+                k="Into Monzo pots (stays liquid)"
+                v={formatGbp(data.pot_savings_net_pence)}
+              />
+            )}
+            {savingsOut > 0 && (
+              <KV
+                k="To external savings / investments"
+                v={"−" + formatGbp(savingsOut)}
+                tone="neg"
+              />
+            )}
+            {savingsIn > 0 && (
+              <KV k="Back from external savings" v={formatGbp(savingsIn)} tone="pos" />
+            )}
+          </div>
+          <div className="note mt-3">
+            Pot transfers stay in liquid savings; only money leaving Monzo affects net
+            cashflow.
           </div>
         </div>
       )}
