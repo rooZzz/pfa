@@ -6,7 +6,7 @@ import {
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { PFA_ICONS } from "./branding.js";
+import { PFA_ICONS } from "./icons.js";
 import { initDb } from "./db.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { resources, tools } from "./tools/registry.js";
