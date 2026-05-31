@@ -83,6 +83,7 @@ For the current balance (today), omit the date filter and just get the row with 
 | `asset_type` | TEXT | Free-form type descriptor (e.g. "crypto", "etf", "stock", "property"). |
 | `base_currency` | TEXT | The native currency of the asset (e.g. "ETH", "USD", "GBP"). |
 | `price_source` | TEXT | Strategy hint for where to fetch prices. Default `manual`. Future values: `coingecko`, `zoopla`, `web_search`. |
+| `ticker` | TEXT | Trading symbol for the asset (e.g. "ACME"), or null. Shown as the identifier for upcoming equity vests. |
 
 ---
 
@@ -167,11 +168,12 @@ ORDER BY asset_id, as_of DESC
 | `ni_employee_pence` | INTEGER | Employee National Insurance contribution this period, in pence. |
 | `pension_employee_pence` | INTEGER | Total employee pension contribution this period, in pence. Includes salary sacrifice (SMART/AVC) regardless of which payslip section they appear in. |
 | `pension_employer_pence` | INTEGER | Employer pension contribution this period, in pence. NULL if not shown. |
+| `tax_code` | TEXT | PAYE tax code from the payslip header (e.g. `1257L`, `0T`, `BR`). Event-locked per payslip — never updated. NULL if not shown. Trend changes over time by ordering on `pay_date`. |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
 | `occurred_at` | TIMESTAMP | Midnight UTC on `pay_date`. |
 | `recorded_at` | TIMESTAMP | UTC timestamp when the row was written to the database. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
-| `payload` | TEXT | JSON object holding descriptive payslip line items (`{"line_items": [{"description": "...", "amount_pence": N}]}`). Present when ingested via the upload widget. **Do not use `payload` as a source for arithmetic or aggregation** — use the typed spine columns above. The payload is for display and auditability only. |
+| `payload` | TEXT | JSON object holding descriptive payslip line items (`{"line_items": [{"description": "...", "section": "payment"\|"deduction", "amount_pence": N}]}`). Each line carries its `section` — which side of the payslip it sits on. Present when ingested via the upload widget. **Do not use `payload` as a source for arithmetic or aggregation** — use the typed spine columns above. The payload is for display and auditability only. |
 
 **Sign convention:** all amounts are positive integers. Deductions are stored as their absolute value — do not negate.
 
@@ -248,7 +250,7 @@ ORDER BY asset_id, as_of DESC
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 | `payload` | TEXT | JSON for scheme-specific terms. **Do not use for arithmetic** — payload is for display only. |
 
-**Net worth note.** Contingent (unvested) equity valuation uses `equity_grant.asset_id` → `asset_prices` for the current share price. Unvested units = `units − SUM(equity_vesting_event.units_vested)` for vesting events up to the query date.
+**Net worth note.** The vesting schedule is recorded as `equity_vesting_event` rows — one per tranche, past or future. A tranche with `vest_date <= as_of` is realised; one with `vest_date > as_of` is an upcoming (contingent) vest. Upcoming vests are valued at the current share price via `equity_grant.asset_id` → `asset_prices`: RSUs at `units × price`, options at `units × max(price − strike_pence, 0)`. Units with no recorded tranche (`units − SUM(equity_vesting_event.units_vested) > 0`) are surfaced as unscheduled.
 
 ---
 
@@ -260,9 +262,9 @@ ORDER BY asset_id, as_of DESC
 |---|---|---|
 | `id` | INTEGER | Primary key. |
 | `grant_id` | INTEGER | FK to `equity_grant.id`. |
-| `vest_date` | DATE | Date units vested. |
-| `units_vested` | INTEGER | Number of units that vested on this date. |
-| `market_price_pence` | INTEGER | Market price per unit at vesting in pence. Event-locked tax fact — never refreshed. NULL if not recorded. |
+| `vest_date` | DATE | Date the tranche vests. May be in the future (a scheduled tranche) or the past (a realised one). |
+| `units_vested` | INTEGER | Number of units in this tranche. |
+| `market_price_pence` | INTEGER | Market price per unit at vesting in pence. Event-locked tax fact — never refreshed. NULL for future tranches (not yet vested) or if not recorded. |
 | `estimated_value_pence` | INTEGER | `units_vested × market_price_pence` at time of recording. NULL if price unknown. |
 | `occurred_at` | TIMESTAMP | Midnight UTC on `vest_date`. |
 | `recorded_at` | TIMESTAMP | When this row was written. |

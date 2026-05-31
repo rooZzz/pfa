@@ -19,6 +19,8 @@ export type IncomeTotal = {
   ni_employee_pence: number;
   pension_employee_pence: number;
   pension_employer_pence: number;
+  other_deductions_pence: number;
+  tax_code: string | null;
   payslip_count: number;
 };
 

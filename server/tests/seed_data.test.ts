@@ -44,4 +44,18 @@ describe("seedData", () => {
     expect(result.contingent.length).toBeGreaterThan(0);
     expect(result.trend).toHaveLength(12);
   });
+
+  it("seeds upcoming vests across multiple months, all future-dated with a ticker", async () => {
+    await seedData();
+
+    const result = await getNetWorth("2026-05-28");
+
+    for (const vest of result.contingent) {
+      expect(vest.vest_date > "2026-05-28").toBe(true);
+      expect(vest.ticker).toBe("ACME");
+    }
+    const months = new Set(result.contingent.map((v) => v.vest_date.slice(0, 7)));
+    expect(months.size).toBeGreaterThan(1);
+    expect(result.contingent_total_pence).toBeGreaterThan(0);
+  });
 });

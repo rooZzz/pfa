@@ -2,13 +2,51 @@ import "./styles/index.css";
 import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
 import { Masthead } from "./branding.js";
-import { Btn, Meter, MiniBars, Stat } from "./components.js";
+import { Badge, Btn, CompositionBar, Icon, Meter, MiniBars, Stat } from "./components.js";
+import { topN } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 type CashflowData = CashflowResult;
+
+function TruncatedMeterList<T>({
+  items,
+  limit,
+  getValuePence,
+  render,
+}: {
+  items: T[];
+  limit: number;
+  getValuePence: (item: T) => number;
+  render: (item: T, index: number) => ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const { visible, hidden, hiddenSumPence } = topN(items, getValuePence, {
+    limit,
+    expanded,
+  });
+  return (
+    <div className="stack-3">
+      {visible.map((item, i) => render(item, i))}
+      {items.length > limit && (
+        <button
+          className="btn btn-ghost btn-sm list-more"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <span className="ico" style={expanded ? { transform: "rotate(180deg)" } : undefined}>
+            <Icon name="chevron" size={14} />
+          </span>
+          {expanded
+            ? "Show less"
+            : `Show ${hidden.length} more · ${formatGbp(hiddenSumPence)}`}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function categoryLabel(cat: string): string {
   if (cat === "income") return "Income (other)";
@@ -30,25 +68,16 @@ function monthLabel(ym: string): string {
   });
 }
 
-function SalaryBar({ income }: { income: IncomeTotal }) {
-  const segments = [
-    { cls: "seg-net", value: income.net_pence },
-    { cls: "seg-paye", value: income.paye_pence },
-    { cls: "seg-ni", value: income.ni_employee_pence },
-    { cls: "seg-pension", value: income.pension_employee_pence },
+function EarningsWaterfall({ income }: { income: IncomeTotal }) {
+  const otherDeductions = Math.max(0, income.other_deductions_pence);
+  const rows = [
+    { label: "PAYE", value: income.paye_pence, tone: "neg" as const },
+    { label: "NI", value: income.ni_employee_pence, tone: "neg" as const },
+    { label: "Pension (you)", value: income.pension_employee_pence, tone: "muted" as const },
+    { label: "Other deductions", value: otherDeductions, tone: "neg" as const },
+    { label: "Net pay", value: income.net_pence, tone: "pos" as const },
   ];
-  const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
-  return (
-    <div className="segbar">
-      {segments.map((s, i) => (
-        <span
-          key={i}
-          className={s.cls}
-          style={{ width: (s.value / total) * 100 + "%" }}
-        />
-      ))}
-    </div>
-  );
+  return <CompositionBar rows={rows} />;
 }
 
 function KV({ k, v, tone }: { k: string; v: string; tone?: "pos" | "neg" }) {
@@ -263,8 +292,11 @@ function CashflowApp() {
           <div className="card-label mb-3">
             Money out by category · {formatGbp(data.spending_total_pence)}
           </div>
-          <div className="stack-3">
-            {outflowCategories.map((line, i) => (
+          <TruncatedMeterList
+            items={outflowCategories}
+            limit={5}
+            getValuePence={(line) => line.outflow_pence}
+            render={(line, i) => (
               <Meter
                 key={i}
                 name={labelFor(line.category)}
@@ -273,8 +305,8 @@ function CashflowApp() {
                 pct={(line.outflow_pence / spendMax) * 100}
                 tone="neg"
               />
-            ))}
-          </div>
+            )}
+          />
         </div>
       )}
 
@@ -283,8 +315,11 @@ function CashflowApp() {
           <div className="card-label mb-3">
             Money in by source · {formatGbp(data.income_total_pence)}
           </div>
-          <div className="stack-3">
-            {incomeSources.map((line, i) => (
+          <TruncatedMeterList
+            items={incomeSources}
+            limit={5}
+            getValuePence={(line) => line.inflow_pence}
+            render={(line, i) => (
               <Meter
                 key={i}
                 name={line.source}
@@ -292,38 +327,59 @@ function CashflowApp() {
                 pct={(line.inflow_pence / incomeMax) * 100}
                 tone="pos"
               />
-            ))}
-          </div>
+            )}
+          />
         </div>
       )}
 
       {hasIncome && (
         <div className="card">
-          <div className="card-label mb-3">
-            Salary · tax decomposition · {data.income.payslip_count} payslip
-            {data.income.payslip_count === 1 ? "" : "s"}
+          <div
+            className="card-label mb-3"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+            }}
+          >
+            <span>
+              Salary · gross to net · {data.income.payslip_count} payslip
+              {data.income.payslip_count === 1 ? "" : "s"}
+            </span>
+            {data.income.tax_code && <Badge tone="accent">{data.income.tax_code}</Badge>}
           </div>
           <div className="stack-3">
-            <SalaryBar income={data.income} />
+            <EarningsWaterfall income={data.income} />
             <div className="grid cols-2" style={{ gap: "var(--space-2) var(--space-4)" }}>
               <KV k="Gross" v={formatGbp(data.income.gross_pence)} />
-              <KV k="Net" v={formatGbp(data.income.net_pence)} tone="pos" />
               <KV k="PAYE" v={"−" + formatGbp(data.income.paye_pence)} tone="neg" />
               <KV k="NI" v={"−" + formatGbp(data.income.ni_employee_pence)} tone="neg" />
               <KV
                 k="Pension (you)"
                 v={"−" + formatGbp(data.income.pension_employee_pence)}
-                tone="neg"
               />
-              <KV
-                k="Pension (employer)"
-                v={formatGbp(data.income.pension_employer_pence)}
-              />
+              {data.income.other_deductions_pence > 0 && (
+                <KV
+                  k="Other deductions"
+                  v={"−" + formatGbp(data.income.other_deductions_pence)}
+                  tone="neg"
+                />
+              )}
+              <KV k="Net pay" v={formatGbp(data.income.net_pence)} tone="pos" />
             </div>
             <div className="note">
-              Take-home is counted once via the bank feed. This is the gross, tax, and
-              pension split only.
+              Net pay is the salary credit landing in your account — counted once via the
+              bank feed. Deductions above are outflows of your gross earnings, not bank
+              spending; pension (you) is deferred, not spent.
             </div>
+            {data.income.pension_employer_pence > 0 && (
+              <div className="note">
+                Total reward {formatGbp(data.income.gross_pence + data.income.pension_employer_pence)} — gross plus{" "}
+                {formatGbp(data.income.pension_employer_pence)} employer pension (deferred
+                compensation, never part of take-home).
+              </div>
+            )}
           </div>
         </div>
       )}

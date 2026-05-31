@@ -17,6 +17,7 @@ const SAMPLE: StagedIncomeEvent = {
   ni_employee_pence: 36240,
   pension_employee_pence: 106016,
   pension_employer_pence: 106015,
+  tax_code: "1257L",
   payload: { line_items: [] },
 };
 

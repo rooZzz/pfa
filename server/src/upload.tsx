@@ -163,6 +163,7 @@ function UploadApp() {
     const rows: [string, string][] = [
       ["Pay date", parsed.pay_date],
       ["Tax year", parsed.tax_year ?? "not shown"],
+      ["Tax code", parsed.tax_code ?? "not shown"],
       ["Gross pay", gbpOrDash(parsed.gross_pence)],
       ["Taxable pay", gbpOrDash(parsed.taxable_pence)],
       ["Net pay", gbpOrDash(parsed.net_pence)],
@@ -220,9 +221,8 @@ function UploadApp() {
                 {payload.line_items.map((item, i) => (
                   <tr key={i}>
                     <td>{item.description}</td>
-                    <td className={"col-num" + (item.amount_pence < 0 ? " neg" : "")}>
-                      {formatGbp(item.amount_pence)}
-                    </td>
+                    <td className="muted">{item.section}</td>
+                    <td className="col-num">{formatGbp(item.amount_pence)}</td>
                   </tr>
                 ))}
               </tbody>

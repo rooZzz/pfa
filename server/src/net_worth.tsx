@@ -2,10 +2,18 @@ import "./styles/index.css";
 import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import type { NetWorthResult, RealisedLine } from "../net_worth/types.js";
+import type {
+  ContingentLine,
+  NetWorthResult,
+  RealisedLine,
+  UnscheduledLine,
+} from "../net_worth/types.js";
 import { Masthead } from "./branding.js";
 import { Btn, CompositionBar, Sparkline, Stat } from "./components.js";
+import { DataTable } from "./data_table.js";
+import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 type NetWorthData = NetWorthResult;
@@ -26,6 +34,116 @@ function ageLabel(days: number | null): string {
 
 function sumKind(lines: RealisedLine[], kind: RealisedLine["kind"]): number {
   return lines.filter((l) => l.kind === kind).reduce((sum, l) => sum + l.value_pence, 0);
+}
+
+const staleBadge = (
+  <span className="badge warn" style={{ marginLeft: 6 }}>
+    <span className="led" />
+    stale
+  </span>
+);
+
+function realisedRowLabel(line: RealisedLine): ReactNode {
+  const hasPriceMeta = line.kind === "asset" || line.kind === "property";
+  const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
+  const isStale = priceAge != null && priceAge > 30;
+  const age = hasPriceMeta ? ageLabel(priceAge) : ageLabel(daysSince(line.valid_from));
+  return (
+    <>
+      {line.name}
+      <span className="sub sub-inline">{age}</span>
+      {isStale && staleBadge}
+    </>
+  );
+}
+
+function vestRowLabel(line: ContingentLine): ReactNode {
+  const priceAge = daysSince(line.price_as_of ?? undefined);
+  const isStale = priceAge != null && priceAge > 30;
+  const identifier = line.ticker ?? line.asset_name ?? "unlinked";
+  return (
+    <>
+      {line.units.toLocaleString()} {line.scheme_type.toUpperCase()} · {identifier}
+      <span className="sub sub-inline">
+        vests {line.vest_date}
+        {line.price_per_unit_pence != null
+          ? ` · ${formatGbp(line.price_per_unit_pence)}/unit`
+          : " · no price"}
+        {line.strike_pence != null ? ` · strike ${formatGbp(line.strike_pence)}` : ""}
+      </span>
+      {isStale && staleBadge}
+    </>
+  );
+}
+
+function unscheduledRowLabel(line: UnscheduledLine): ReactNode {
+  const identifier = line.ticker ?? line.asset_name ?? "unlinked";
+  return (
+    <>
+      {line.units.toLocaleString()} {line.scheme_type.toUpperCase()} · {identifier}
+      <span className="sub sub-inline">vest dates not recorded</span>
+    </>
+  );
+}
+
+function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
+  return GROUP_ORDER.map((g) => ({
+    kind: g.kind,
+    label: g.label,
+    lines: realised.filter((l) => l.kind === g.kind),
+  }))
+    .filter((g) => g.lines.length > 0)
+    .map((g) => ({
+      key: g.kind,
+      label: g.label,
+      truncate: 5,
+      sortByValue: true,
+      rows: g.lines.map((line, i) => ({
+        key: `${g.kind}-${i}`,
+        label: realisedRowLabel(line),
+        valuePence: line.value_pence,
+      })),
+    }));
+}
+
+function buildVestGroups(
+  contingent: ContingentLine[],
+  unscheduled: UnscheduledLine[],
+): DataGroup[] {
+  const byYear = new Map<string, ContingentLine[]>();
+  for (const line of contingent) {
+    const year = line.vest_date.split("-")[0]!;
+    const bucket = byYear.get(year);
+    if (bucket) bucket.push(line);
+    else byYear.set(year, [line]);
+  }
+
+  const groups: DataGroup[] = [...byYear.entries()].map(([year, lines]) => ({
+    key: year,
+    label: year,
+    rows: lines.map((line, i) => ({
+      key: `${year}-${i}`,
+      label: vestRowLabel(line),
+      valuePence: line.projected_value_pence,
+    })),
+  }));
+
+  if (unscheduled.length > 0) {
+    groups.push({
+      key: "unscheduled",
+      label: "Not yet scheduled",
+      subtotalPence: null,
+      rows: unscheduled.map((line, i) => ({
+        key: `unscheduled-${i}`,
+        label: unscheduledRowLabel(line),
+        valuePence: null,
+        display: "—",
+        tone: "muted",
+      })),
+    });
+  }
+
+  return groups;
 }
 
 const GROUP_ORDER: { kind: RealisedLine["kind"]; label: string }[] = [
@@ -134,12 +252,9 @@ function NetWorthApp() {
     { label: "Cash", value: cash, tone: "pos" as const },
   ];
 
-  const groups = GROUP_ORDER.map((g) => ({
-    ...g,
-    lines: data.realised.filter((l) => l.kind === g.kind),
-  })).filter((g) => g.lines.length > 0);
-
-  const hasContingent = data.contingent.length > 0;
+  const realisedGroups = buildRealisedGroups(data.realised);
+  const vestGroups = buildVestGroups(data.contingent, data.contingent_unscheduled);
+  const hasContingent = vestGroups.length > 0;
 
   return (
     <div className="screen rise stack">
@@ -197,95 +312,30 @@ function NetWorthApp() {
       </div>
 
       <div className="card card--flush">
-        <table className="t compact t--inset">
-          {groups.map((group) => {
-            const subtotal = group.lines.reduce((sum, l) => sum + l.value_pence, 0);
-            return (
-              <tbody key={group.kind}>
-                <tr className="group-row">
-                  <td className="group-name">{group.label}</td>
-                  <td className="col-num group-sub">{formatGbp(subtotal)}</td>
-                </tr>
-                {group.lines.map((line, i) => {
-                  const hasPriceMeta = line.kind === "asset" || line.kind === "property";
-                  const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
-                  const isStale = priceAge != null && priceAge > 30;
-                  const age = hasPriceMeta
-                    ? ageLabel(priceAge)
-                    : ageLabel(daysSince(line.valid_from));
-                  return (
-                    <tr key={i}>
-                      <td>
-                        {line.name}
-                        <span className="sub sub-inline">{age}</span>
-                        {isStale && (
-                          <span className="badge warn" style={{ marginLeft: 6 }}>
-                            <span className="led" />
-                            stale
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        className="col-num"
-                        style={{
-                          color: line.value_pence < 0 ? "var(--negative)" : "var(--ink)",
-                        }}
-                      >
-                        {formatGbp(line.value_pence)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            );
-          })}
-          <tfoot>
-            <tr>
-              <td>Total realised</td>
-              <td className="col-num">{formatGbp(data.realised_total_pence)}</td>
-            </tr>
-          </tfoot>
-        </table>
+        <DataTable
+          groups={realisedGroups}
+          footer={{ label: "Total realised", valuePence: data.realised_total_pence }}
+        />
       </div>
 
       {hasContingent && (
         <div className="stack-2">
           <div className="lhead">
-            <h4>Contingent</h4>
-            <span className="hint">not owned · excluded from total</span>
+            <h4>Upcoming vests</h4>
+            <span className="hint">valued at today's price · excluded from total</span>
           </div>
-          <div className="card card-sunken card--flush">
-            <table className="t compact t--inset">
-              <tbody>
-                {data.contingent.map((grant, i) => (
-                  <tr key={i}>
-                    <td>
-                      {grant.unvested_units.toLocaleString()}{" "}
-                      {grant.scheme_type.toUpperCase()} units
-                      <span className="sub">
-                        granted {grant.grant_date} · {grant.basis.replace(/_/g, " ")}
-                        {grant.price_per_unit_pence != null
-                          ? ` · ${grant.price_per_unit_pence}p / unit`
-                          : ""}
-                      </span>
-                    </td>
-                    <td className="col-num">
-                      {grant.est_value_pence != null
-                        ? formatGbp(grant.est_value_pence)
-                        : "unknown"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {data.contingent_total_pence > 0 && (
-                <tfoot>
-                  <tr>
-                    <td>Total contingent (est.)</td>
-                    <td className="col-num">{formatGbp(data.contingent_total_pence)}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+          <div className="card card--flush">
+            <DataTable
+              groups={vestGroups}
+              footer={
+                data.contingent_total_pence > 0
+                  ? {
+                      label: "Total upcoming (est.)",
+                      valuePence: data.contingent_total_pence,
+                    }
+                  : undefined
+              }
+            />
           </div>
         </div>
       )}

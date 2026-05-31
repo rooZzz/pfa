@@ -75,6 +75,18 @@ describe("income_events columns", () => {
     ).map((r) => r.name);
     expect(cols).toContain("payload");
   });
+
+  it("has a nullable tax_code column", () => {
+    const db = getDb();
+    const col = (
+      db.prepare("PRAGMA table_info(income_events)").all() as {
+        name: string;
+        notnull: number;
+      }[]
+    ).find((r) => r.name === "tax_code");
+    expect(col).toBeDefined();
+    expect(col?.notnull).toBe(0);
+  });
 });
 
 describe("equity_grant columns", () => {

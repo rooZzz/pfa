@@ -34,6 +34,7 @@ export interface AssetsTable {
   asset_type: string;
   base_currency: string;
   price_source: Generated<string>;
+  ticker: string | null;
 }
 
 export interface MortgagesTable {
@@ -94,6 +95,7 @@ export interface IncomeEventsTable {
   ni_employee_pence: number;
   pension_employee_pence: number;
   pension_employer_pence: number | null;
+  tax_code: string | null;
   currency: Generated<string>;
   occurred_at: string;
   recorded_at: Generated<string>;

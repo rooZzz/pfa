@@ -11,9 +11,11 @@ const EXTRACTION_SYSTEM_PROMPT = `You extract data from UK payslips. All monetar
 
 For tax_year: the UK tax year starts April 6. If not shown explicitly, derive it from the pay date — a date on or after April 6 of year Y is in tax year "Y/YY" (e.g. 2026-05-22 → "2026/27").
 
+For tax_code: the PAYE tax code from the payslip header (e.g. 1257L, 0T, BR, K475). Return null if not shown.
+
 For pension_employee_pence: sum all employee pension lines regardless of section — salary sacrifice schemes often appear as negative entries in the Payments section rather than in Deductions.
 
-For line_items: include every individual line from the Payments and Deductions sections (not the summary totals). Amounts are always positive integers in pence regardless of whether the line is a payment or a deduction.
+For line_items: include every individual line from the Payments and Deductions sections (not the summary totals). Amounts are always positive integers in pence. Tag each line with its section — "payment" for lines in the Payments/Earnings section, "deduction" for lines in the Deductions section. A salary-sacrifice pension shown as a negative entry under Payments is still section "payment".
 
 Return null for any field not present on the payslip.`;
 
@@ -64,6 +66,11 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
         description:
           "Employer pension contribution this period in pence, if shown. Null if absent.",
       },
+      tax_code: {
+        type: ["string", "null"] as unknown as "string",
+        description:
+          "PAYE tax code from the payslip header (e.g. 1257L, 0T, BR, K475). Null if not shown.",
+      },
       line_items: {
         type: ["array", "null"] as unknown as "array",
         description:
@@ -75,12 +82,18 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
               type: "string",
               description: "Line item label as shown on the payslip.",
             },
+            section: {
+              type: "string",
+              enum: ["payment", "deduction"],
+              description:
+                "Which side of the payslip the line sits on: 'payment' for the Payments/Earnings section, 'deduction' for the Deductions section. A salary-sacrifice line shown as a negative payment is still 'payment'.",
+            },
             amount_pence: {
               type: "integer",
               description: "Amount in pence, always positive.",
             },
           },
-          required: ["description", "amount_pence"],
+          required: ["description", "section", "amount_pence"],
         },
       },
     },
@@ -97,6 +110,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
 
 const LineItemSchema = z.object({
   description: z.string(),
+  section: z.enum(["payment", "deduction"]),
   amount_pence: z.number().int(),
 });
 
@@ -113,6 +127,7 @@ const ParsedPayslipSchema = z.object({
   ni_employee_pence: z.number().int(),
   pension_employee_pence: z.number().int(),
   pension_employer_pence: z.number().int().nullable(),
+  tax_code: z.string().nullable(),
   line_items: z.array(LineItemSchema).nullable().optional(),
 });
 

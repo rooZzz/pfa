@@ -12,7 +12,8 @@ export type IconName =
   | "arrowDown"
   | "clock"
   | "info"
-  | "bank";
+  | "bank"
+  | "chevron";
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
   refresh: (
@@ -73,6 +74,7 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <path d="M3 21h18" />
     </>
   ),
+  chevron: <path d="m6 9 6 6 6-6" />,
 };
 
 export function Icon({
@@ -357,7 +359,9 @@ export function CompositionBar({
         ? "var(--positive)"
         : t === "neg"
           ? "var(--negative)"
-          : "var(--ink-faint)";
+          : t === "muted"
+            ? "var(--ink-muted)"
+            : "var(--ink-faint)";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       <div

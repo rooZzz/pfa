@@ -13,6 +13,7 @@ export type {
   NetWorthResult,
   RealisedLine,
   TrendPoint,
+  UnscheduledLine,
 } from "./types.js";
 
 function monthStartDatesUpTo(asOf: string, count: number): string[] {
@@ -97,7 +98,7 @@ async function getRealisedTotalPenceAtDate(asOf: string): Promise<number> {
 export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
   validateDate(asOf);
 
-  const [accountLines, pensionLines, mortgageLines, assetLines, contingentLines] =
+  const [accountLines, pensionLines, mortgageLines, assetLines, contingent] =
     await Promise.all([
       queryAccountLines(asOf),
       queryPensionLines(asOf),
@@ -108,8 +109,8 @@ export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
 
   const realised = [...accountLines, ...pensionLines, ...mortgageLines, ...assetLines];
   const realisedTotal = realised.reduce((sum, l) => sum + l.value_pence, 0);
-  const contingentTotal = contingentLines.reduce(
-    (sum, l) => sum + (l.est_value_pence ?? 0),
+  const contingentTotal = contingent.upcoming.reduce(
+    (sum, l) => sum + (l.projected_value_pence ?? 0),
     0,
   );
 
@@ -131,8 +132,9 @@ export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
     as_of: asOf,
     realised,
     realised_total_pence: realisedTotal,
-    contingent: contingentLines,
+    contingent: contingent.upcoming,
     contingent_total_pence: contingentTotal,
+    contingent_unscheduled: contingent.unscheduled,
     unknown,
     trend,
   };

@@ -59,6 +59,7 @@ export async function confirmStagedRows(input: { review_id: string }): Promise<s
           ni_employee_pence: staged.ni_employee_pence,
           pension_employee_pence: staged.pension_employee_pence,
           pension_employer_pence: staged.pension_employer_pence ?? null,
+          tax_code: staged.tax_code ?? null,
           currency: staged.currency,
           occurred_at: new Date(staged.pay_date + "T00:00:00.000Z").toISOString(),
           source_id: txSourceId,
