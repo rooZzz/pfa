@@ -93,7 +93,10 @@ function DisclosureToggle({
 }) {
   return (
     <button className="btn btn-ghost btn-sm" onClick={onToggle}>
-      <span className="ico" style={expanded ? { transform: "rotate(180deg)" } : undefined}>
+      <span
+        className="ico"
+        style={expanded ? { transform: "rotate(180deg)" } : undefined}
+      >
         <Icon name="chevron" size={14} />
       </span>
       {expanded ? "Show less" : `Show ${hiddenCount} more · ${formatGbp(hiddenSumPence)}`}
@@ -103,22 +106,27 @@ function DisclosureToggle({
 
 function GroupBody({ group }: { group: DataGroup }) {
   const [expanded, setExpanded] = useState(false);
-  const { visible, hidden, hiddenSumPence, subtotalPence } = partitionGroupRows(group.rows, {
-    truncate: group.truncate,
-    sortByValue: group.sortByValue,
-    expanded,
-  });
+  const { visible, hidden, hiddenSumPence, subtotalPence } = partitionGroupRows(
+    group.rows,
+    {
+      truncate: group.truncate,
+      sortByValue: group.sortByValue,
+      expanded,
+    },
+  );
 
-  const subtotal = group.subtotalPence !== undefined ? group.subtotalPence : subtotalPence;
-  const isTruncatable =
-    group.truncate != null && group.rows.length > group.truncate;
+  const subtotal =
+    group.subtotalPence !== undefined ? group.subtotalPence : subtotalPence;
+  const isTruncatable = group.truncate != null && group.rows.length > group.truncate;
   const hiddenCount = isTruncatable ? group.rows.length - group.truncate! : 0;
 
   return (
     <tbody>
       <tr className="group-row">
         <td className="group-name">{group.label}</td>
-        <td className="col-num group-sub">{subtotal == null ? "" : formatGbp(subtotal)}</td>
+        <td className="col-num group-sub">
+          {subtotal == null ? "" : formatGbp(subtotal)}
+        </td>
       </tr>
       {visible.map((row) => (
         <tr key={row.key}>

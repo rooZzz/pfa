@@ -296,8 +296,9 @@ describe("getNetWorth — contingent equity", () => {
       as_of: "2026-01-01",
       source: "manual",
     });
-    return (getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number })
-      .id;
+    return (
+      getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
+    ).id;
   }
 
   it("future vesting events appear in contingent with not_owned: true, never in realised", async () => {
@@ -336,8 +337,16 @@ describe("getNetWorth — contingent equity", () => {
       unit_price_pence: 50000,
       ticker: "ACME",
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2027-03-01", units_vested: 500 });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 500 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2027-03-01",
+      units_vested: 500,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 500,
+    });
 
     const result = await getNetWorth("2026-05-01");
     expect(result.contingent.map((l) => l.vest_date)).toEqual([
@@ -359,7 +368,11 @@ describe("getNetWorth — contingent equity", () => {
       units_vested: 250,
       market_price_pence: 48000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 750 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 750,
+    });
 
     const result = await getNetWorth("2026-05-01");
     expect(result.contingent).toHaveLength(1);
@@ -373,7 +386,11 @@ describe("getNetWorth — contingent equity", () => {
       units: 1000,
       unit_price_pence: 52000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 500 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 500,
+    });
 
     const result = await getNetWorth("2026-05-01");
     const line = result.contingent[0]!;
@@ -389,7 +406,11 @@ describe("getNetWorth — contingent equity", () => {
       strike_pence: 1200,
       unit_price_pence: 5000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 600 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 600,
+    });
 
     const result = await getNetWorth("2026-05-01");
     const line = result.contingent[0]!;
@@ -404,7 +425,11 @@ describe("getNetWorth — contingent equity", () => {
       strike_pence: 1200,
       unit_price_pence: 1000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 400 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 400,
+    });
 
     const result = await getNetWorth("2026-05-01");
     expect(result.contingent[0]!.projected_value_pence).toBe(0);
@@ -420,7 +445,11 @@ describe("getNetWorth — contingent equity", () => {
     const grantId = (
       getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
     ).id;
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 500 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 500,
+    });
 
     const result = await getNetWorth("2026-05-01");
     const line = result.contingent[0]!;
@@ -440,7 +469,11 @@ describe("getNetWorth — contingent equity", () => {
       units_vested: 250,
       market_price_pence: 48000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 250 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 250,
+    });
 
     const result = await getNetWorth("2026-05-01");
     expect(result.contingent_unscheduled).toHaveLength(1);
@@ -453,7 +486,11 @@ describe("getNetWorth — contingent equity", () => {
       units: 1000,
       unit_price_pence: 50000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 1000 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 1000,
+    });
 
     const result = await getNetWorth("2026-05-01");
     expect(result.contingent_unscheduled).toHaveLength(0);
@@ -465,7 +502,11 @@ describe("getNetWorth — contingent equity", () => {
       units: 1000,
       unit_price_pence: 50000,
     });
-    await recordVestingEvent({ grant_id: grantId, vest_date: "2026-09-01", units_vested: 1000 });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 1000,
+    });
 
     const result = await getNetWorth("2026-05-01");
     expect(result.realised_total_pence).toBe(0);

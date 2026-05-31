@@ -37,10 +37,7 @@ export async function queryContingentLines(asOf: string): Promise<ContingentResu
   const assetIds = grants.map((g) => toNum(g.asset_id)).filter((id) => id > 0);
 
   const assetById = new Map<number, { name: string; ticker: string | null }>();
-  const priceByAsset = new Map<
-    number,
-    { price: number; asOf: string; source: string }
-  >();
+  const priceByAsset = new Map<number, { price: number; asOf: string; source: string }>();
   if (assetIds.length > 0) {
     const assetRows = await runQuery(
       `SELECT id, name, ticker FROM pfa.assets WHERE ${inList("id", assetIds).sql}`,
@@ -88,8 +85,7 @@ export async function queryContingentLines(asOf: string): Promise<ContingentResu
     const asset = assetId > 0 ? assetById.get(assetId) : undefined;
     const priceEntry = assetId > 0 ? priceByAsset.get(assetId) : undefined;
     const pricePerUnit = priceEntry?.price ?? null;
-    const strikePence =
-      grant.strike_pence != null ? toNum(grant.strike_pence) : null;
+    const strikePence = grant.strike_pence != null ? toNum(grant.strike_pence) : null;
     const units = toNum(e.units_vested);
 
     upcoming.push({

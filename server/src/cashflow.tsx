@@ -36,7 +36,10 @@ function TruncatedMeterList<T>({
           className="btn btn-ghost btn-sm list-more"
           onClick={() => setExpanded(!expanded)}
         >
-          <span className="ico" style={expanded ? { transform: "rotate(180deg)" } : undefined}>
+          <span
+            className="ico"
+            style={expanded ? { transform: "rotate(180deg)" } : undefined}
+          >
             <Icon name="chevron" size={14} />
           </span>
           {expanded
@@ -73,7 +76,11 @@ function EarningsWaterfall({ income }: { income: IncomeTotal }) {
   const rows = [
     { label: "PAYE", value: income.paye_pence, tone: "neg" as const },
     { label: "NI", value: income.ni_employee_pence, tone: "neg" as const },
-    { label: "Pension (you)", value: income.pension_employee_pence, tone: "muted" as const },
+    {
+      label: "Pension (you)",
+      value: income.pension_employee_pence,
+      tone: "muted" as const,
+    },
     { label: "Other deductions", value: otherDeductions, tone: "neg" as const },
     { label: "Net pay", value: income.net_pence, tone: "pos" as const },
   ];
@@ -375,9 +382,10 @@ function CashflowApp() {
             </div>
             {data.income.pension_employer_pence > 0 && (
               <div className="note">
-                Total reward {formatGbp(data.income.gross_pence + data.income.pension_employer_pence)} — gross plus{" "}
-                {formatGbp(data.income.pension_employer_pence)} employer pension (deferred
-                compensation, never part of take-home).
+                Total reward{" "}
+                {formatGbp(data.income.gross_pence + data.income.pension_employer_pence)}{" "}
+                — gross plus {formatGbp(data.income.pension_employer_pence)} employer
+                pension (deferred compensation, never part of take-home).
               </div>
             )}
           </div>
