@@ -11,7 +11,7 @@ import type {
   UnscheduledLine,
 } from "../net_worth/types.js";
 import { Masthead } from "./branding.js";
-import { Btn, CompositionBar, Sparkline, Stat } from "./components.js";
+import { Btn, CompositionBar, CoverageGrid, Sparkline, Stat } from "./components.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
@@ -263,15 +263,18 @@ function NetWorthApp() {
         title="Net worth"
         sub={`As of ${data.as_of}`}
         action={
-          <Btn
-            variant="secondary"
-            size="sm"
-            icon="refresh"
-            onClick={() => void load(true)}
-            disabled={busy}
-          >
-            {busy ? "Syncing" : "Refresh"}
-          </Btn>
+          <div className="screen-actions">
+            {data.coverage.length > 0 && <CoverageGrid months={data.coverage} />}
+            <Btn
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              onClick={() => void load(true)}
+              disabled={busy}
+            >
+              {busy ? "Syncing" : "Refresh"}
+            </Btn>
+          </div>
         }
       />
 

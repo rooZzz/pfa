@@ -1,3 +1,4 @@
+import { queryPayslipCoverage } from "../net_worth/coverage.js";
 import { runQuery } from "../query.js";
 import { toNum, toStr, validateDate } from "../sql_util.js";
 import { queryIncome } from "./income.js";
@@ -91,13 +92,14 @@ export async function getCashflow(params: {
   const today = new Date().toISOString().split("T")[0]!;
   const as_of = params.as_of ?? (today < period_end ? today : period_end);
 
-  const [income, byCategory, incomeBySource, trend, pot_savings_net_pence] =
+  const [income, byCategory, incomeBySource, trend, pot_savings_net_pence, coverage] =
     await Promise.all([
       queryIncome(period_start, as_of),
       queryTransactionsByCategory(period_start, as_of),
       queryIncomeBySource(period_start, as_of),
       queryMonthlyTrend(period_start, as_of),
       queryPotSavingNetPence(period_start, as_of),
+      queryPayslipCoverage(as_of, period_start),
     ]);
 
   const transaction_inflow_total_pence = byCategory.reduce(
@@ -127,5 +129,6 @@ export async function getCashflow(params: {
     pot_savings_net_pence,
     net_cashflow_pence,
     trend,
+    coverage,
   };
 }

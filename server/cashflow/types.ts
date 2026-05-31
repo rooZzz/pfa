@@ -1,3 +1,5 @@
+import type { MonthCoverage } from "../net_worth/coverage.js";
+
 export type CategoryLine = {
   category: string;
   inflow_pence: number;
@@ -45,4 +47,5 @@ export type CashflowResult = {
   pot_savings_net_pence: number;
   net_cashflow_pence: number;
   trend: TrendPoint[];
+  coverage: MonthCoverage[];
 };

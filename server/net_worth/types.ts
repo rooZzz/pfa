@@ -38,6 +38,9 @@ export type TrendPoint = {
   realised_total_pence: number;
 };
 
+export type { MonthCoverage, SeriesStatus } from "./coverage.js";
+import type { MonthCoverage } from "./coverage.js";
+
 export type NetWorthResult = {
   as_of: string;
   realised: RealisedLine[];
@@ -47,4 +50,5 @@ export type NetWorthResult = {
   contingent_unscheduled: UnscheduledLine[];
   unknown: string[];
   trend: TrendPoint[];
+  coverage: MonthCoverage[];
 };

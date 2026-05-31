@@ -1,6 +1,7 @@
 import { runQuery } from "../query.js";
 import { latestPriceTick, latestRangeSnapshot } from "../snapshots.js";
 import { toNum, validateDate } from "../sql_util.js";
+import { queryNetWorthCoverage } from "./coverage.js";
 import { queryAccountLines } from "./lines/accounts.js";
 import { queryAssetLines } from "./lines/assets.js";
 import { queryContingentLines } from "./lines/contingent.js";
@@ -98,13 +99,14 @@ async function getRealisedTotalPenceAtDate(asOf: string): Promise<number> {
 export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
   validateDate(asOf);
 
-  const [accountLines, pensionLines, mortgageLines, assetLines, contingent] =
+  const [accountLines, pensionLines, mortgageLines, assetLines, contingent, coverage] =
     await Promise.all([
       queryAccountLines(asOf),
       queryPensionLines(asOf),
       queryMortgageLines(asOf),
       queryAssetLines(asOf),
       queryContingentLines(asOf),
+      queryNetWorthCoverage(asOf),
     ]);
 
   const realised = [...accountLines, ...pensionLines, ...mortgageLines, ...assetLines];
@@ -137,5 +139,6 @@ export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
     contingent_unscheduled: contingent.unscheduled,
     unknown,
     trend,
+    coverage,
   };
 }
