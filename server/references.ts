@@ -59,18 +59,28 @@ export async function ensureAsset(
   name: string,
   asset_type: string,
   base_currency: string,
+  ticker?: string,
 ): Promise<number> {
   const existing = await trx
     .selectFrom("assets")
-    .select("id")
+    .select(["id", "ticker"])
     .where("name", "=", name)
     .where("asset_type", "=", asset_type)
     .executeTakeFirst();
-  if (existing) return Number(existing.id);
+  if (existing) {
+    if (ticker && existing.ticker == null) {
+      await trx
+        .updateTable("assets")
+        .set({ ticker })
+        .where("id", "=", existing.id)
+        .execute();
+    }
+    return Number(existing.id);
+  }
 
   const row = await trx
     .insertInto("assets")
-    .values({ name, asset_type, base_currency })
+    .values({ name, asset_type, base_currency, ticker: ticker ?? null })
     .returning("id")
     .executeTakeFirstOrThrow();
   return Number(row.id);

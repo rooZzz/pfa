@@ -27,6 +27,19 @@ function monthsAgo(months: number, day: number = 1): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+function monthsFromNow(months: number, day: number = 1): string {
+  const parts = TODAY.split("-");
+  const year = parseInt(parts[0]!, 10);
+  const month = parseInt(parts[1]!, 10) - 1;
+  let m = month + months;
+  let y = year;
+  while (m > 11) {
+    m -= 12;
+    y++;
+  }
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 function clearDocumentsDir(): void {
   if (!fs.existsSync(DOCUMENTS_DIR)) return;
   for (const name of fs.readdirSync(DOCUMENTS_DIR)) {
@@ -278,6 +291,7 @@ async function seedEquity(): Promise<void> {
     currency: "GBP",
     underlying_asset_name: "ACME Corp",
     underlying_asset_type: "stock",
+    ticker: "ACME",
   });
   const rsuId = parseGrantId(rsuMessage);
   await recordAssetPrice({
@@ -301,6 +315,13 @@ async function seedEquity(): Promise<void> {
     units_vested: 1000,
     market_price_pence: 4100,
   });
+  for (const ahead of [3, 6, 9, 12]) {
+    await recordVestingEvent({
+      grant_id: rsuId,
+      vest_date: monthsFromNow(ahead, 1),
+      units_vested: 500,
+    });
+  }
 
   const emiMessage = await recordEquityGrant({
     scheme_type: "emi",
@@ -310,6 +331,7 @@ async function seedEquity(): Promise<void> {
     currency: "GBP",
     underlying_asset_name: "ACME Corp",
     underlying_asset_type: "stock",
+    ticker: "ACME",
   });
   const emiId = parseGrantId(emiMessage);
   await recordVestingEvent({
@@ -324,6 +346,16 @@ async function seedEquity(): Promise<void> {
     units_vested: 2500,
     market_price_pence: 1650,
   });
+  await recordVestingEvent({
+    grant_id: emiId,
+    vest_date: monthsFromNow(6, 1),
+    units_vested: 2500,
+  });
+  await recordVestingEvent({
+    grant_id: emiId,
+    vest_date: monthsFromNow(18, 1),
+    units_vested: 2500,
+  });
 
   const unapprovedMessage = await recordEquityGrant({
     scheme_type: "unapproved",
@@ -333,8 +365,19 @@ async function seedEquity(): Promise<void> {
     currency: "GBP",
     underlying_asset_name: "ACME Corp",
     underlying_asset_type: "stock",
+    ticker: "ACME",
   });
-  parseGrantId(unapprovedMessage);
+  const unapprovedId = parseGrantId(unapprovedMessage);
+  await recordVestingEvent({
+    grant_id: unapprovedId,
+    vest_date: monthsFromNow(4, 1),
+    units_vested: 1000,
+  });
+  await recordVestingEvent({
+    grant_id: unapprovedId,
+    vest_date: monthsFromNow(16, 1),
+    units_vested: 1000,
+  });
 
   const sayeMessage = await recordEquityGrant({
     scheme_type: "saye",
@@ -344,6 +387,7 @@ async function seedEquity(): Promise<void> {
     currency: "GBP",
     underlying_asset_name: "ACME Corp",
     underlying_asset_type: "stock",
+    ticker: "ACME",
   });
   const sayeId = parseGrantId(sayeMessage);
   await recordVestingEvent({

@@ -94,26 +94,6 @@
   color: var(--negative);
 }
 
-.segbar {
-  display: flex;
-  height: 14px;
-  border-radius: 7px;
-  overflow: hidden;
-  gap: 2px;
-}
-.segbar .seg-net {
-  background: var(--positive);
-}
-.segbar .seg-paye {
-  background: var(--negative);
-}
-.segbar .seg-ni {
-  background: color-mix(in oklch, var(--negative) 65%, var(--ink-faint));
-}
-.segbar .seg-pension {
-  background: var(--ink-faint);
-}
-
 .chip-ico {
   width: 34px;
   height: 34px;

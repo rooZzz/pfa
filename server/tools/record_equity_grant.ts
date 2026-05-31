@@ -33,6 +33,12 @@ export const recordEquityGrantSchema = {
     .describe(
       "Asset type for the underlying share, e.g. 'stock'. Required if underlying_asset_name is provided.",
     ),
+  ticker: z
+    .string()
+    .optional()
+    .describe(
+      "Ticker / trading symbol for the underlying share, e.g. 'ACME'. Shown as the identifier in the upcoming-vests view.",
+    ),
 };
 
 export async function recordEquityGrant(input: {
@@ -43,6 +49,7 @@ export async function recordEquityGrant(input: {
   currency: string;
   underlying_asset_name?: string;
   underlying_asset_type?: string;
+  ticker?: string;
 }): Promise<string> {
   const { sourceId, grantId, assetId } = await getKysely()
     .transaction()
@@ -66,6 +73,7 @@ export async function recordEquityGrant(input: {
           input.underlying_asset_name,
           assetType,
           input.currency,
+          input.ticker,
         );
       }
 

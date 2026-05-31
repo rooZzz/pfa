@@ -35,6 +35,28 @@ describe("parsePayslipVision — Experian May 2026 fixture", () => {
     expect(result.pension_employer_pence).toBe(GOLDEN.pension_employer_pence);
   });
 
+  it("extracts a well-formed tax code", async () => {
+    const fileBuffer = fs.readFileSync(FIXTURE_PATH);
+    const base64Data = fileBuffer.toString("base64");
+
+    const result = await parsePayslipVision(base64Data, "application/pdf");
+
+    expect(result.tax_code).toBeTypeOf("string");
+    expect(result.tax_code).toMatch(/^[A-Z0-9]+$/);
+  });
+
+  it("tags every line item with a payment or deduction section", async () => {
+    const fileBuffer = fs.readFileSync(FIXTURE_PATH);
+    const base64Data = fileBuffer.toString("base64");
+
+    const result = await parsePayslipVision(base64Data, "application/pdf");
+
+    expect(result.line_items?.length).toBeGreaterThan(0);
+    for (const item of result.line_items ?? []) {
+      expect(["payment", "deduction"]).toContain(item.section);
+    }
+  });
+
   it("returns integer pence values (no floats)", async () => {
     const fileBuffer = fs.readFileSync(FIXTURE_PATH);
     const base64Data = fileBuffer.toString("base64");

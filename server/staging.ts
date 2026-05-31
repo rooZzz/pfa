@@ -15,6 +15,7 @@ export interface StagedIncomeEvent {
   ni_employee_pence: number;
   pension_employee_pence: number;
   pension_employer_pence: number | null;
+  tax_code: string | null;
   payload: unknown;
 }
 

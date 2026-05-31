@@ -12,15 +12,25 @@ export type RealisedLine = {
 
 export type ContingentLine = {
   grant_id: number;
+  vest_date: string;
   scheme_type: string;
-  grant_date: string;
-  total_units: number;
-  vested_units: number;
-  unvested_units: number;
-  est_value_pence: number | null;
+  units: number;
+  ticker: string | null;
+  asset_name: string | null;
   price_per_unit_pence: number | null;
-  basis: string;
+  price_as_of: string | null;
+  price_source: string | null;
+  strike_pence: number | null;
+  projected_value_pence: number | null;
   not_owned: true;
+};
+
+export type UnscheduledLine = {
+  grant_id: number;
+  scheme_type: string;
+  units: number;
+  ticker: string | null;
+  asset_name: string | null;
 };
 
 export type TrendPoint = {
@@ -34,6 +44,7 @@ export type NetWorthResult = {
   realised_total_pence: number;
   contingent: ContingentLine[];
   contingent_total_pence: number;
+  contingent_unscheduled: UnscheduledLine[];
   unknown: string[];
   trend: TrendPoint[];
 };

@@ -22,7 +22,12 @@ function makeStagedEntry(overrides: Partial<Parameters<typeof stageReview>[0]> =
     ni_employee_pence: 36240,
     pension_employee_pence: 106016,
     pension_employer_pence: 106015,
-    payload: { line_items: [{ description: "Basic Salary", amount_pence: 974521 }] },
+    tax_code: "1257L",
+    payload: {
+      line_items: [
+        { description: "Basic Salary", section: "payment", amount_pence: 974521 },
+      ],
+    },
     ...overrides,
   };
 }
@@ -61,7 +66,7 @@ describe("confirmStagedRows", () => {
       .prepare(
         `
         SELECT ie.gross_pence, ie.net_pence, ie.paye_pence,
-               ie.pension_employee_pence,
+               ie.pension_employee_pence, ie.tax_code,
                ie.source_id, d.id AS doc_id
         FROM income_events ie
         JOIN documents d ON d.id = ie.source_id
@@ -74,12 +79,16 @@ describe("confirmStagedRows", () => {
     expect(row.net_pence).toBe(540832);
     expect(row.paye_pence).toBe(332767);
     expect(row.pension_employee_pence).toBe(106016);
+    expect(row.tax_code).toBe("1257L");
     expect(row.source_id).toBe(row.doc_id);
   });
 
-  it("stores payload JSON in income_events", async () => {
+  it("stores payload JSON with line-item sections in income_events", async () => {
     const payload = {
-      line_items: [{ description: "Basic Salary", amount_pence: 974521 }],
+      line_items: [
+        { description: "Basic Salary", section: "payment", amount_pence: 974521 },
+        { description: "Student Loan", section: "deduction", amount_pence: 12000 },
+      ],
     };
     const reviewId = stageReview(
       makeStagedEntry({ content_hash: "test-hash-005", payload }),

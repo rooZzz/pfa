@@ -270,153 +270,247 @@ describe("getNetWorth — unknown series", () => {
 });
 
 describe("getNetWorth — contingent equity", () => {
-  it("unvested equity appears in contingent with not_owned: true, never in realised", async () => {
+  async function seedGrantWithPrice(opts: {
+    scheme_type: "rsu" | "emi" | "unapproved" | "saye";
+    units: number;
+    strike_pence?: number;
+    unit_price_pence: number;
+    ticker?: string;
+  }): Promise<number> {
     await recordEquityGrant({
-      scheme_type: "rsu",
-      units: 1000,
+      scheme_type: opts.scheme_type,
+      units: opts.units,
+      strike_pence: opts.strike_pence,
       grant_date: "2025-01-01",
       currency: "GBP",
       underlying_asset_name: "ACME Corp",
       underlying_asset_type: "stock",
+      ticker: opts.ticker,
     });
     await recordAssetPrice({
       asset_name: "ACME Corp",
       asset_type: "stock",
       base_currency: "GBP",
-      unit_price_pence: 50000,
+      unit_price_pence: opts.unit_price_pence,
       currency: "GBP",
       as_of: "2026-01-01",
       source: "manual",
     });
-
-    const grantId = (
+    return (
       getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
     ).id;
+  }
 
+  it("future vesting events appear in contingent with not_owned: true, never in realised", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "rsu",
+      units: 1000,
+      unit_price_pence: 50000,
+    });
     await recordVestingEvent({
       grant_id: grantId,
-      vest_date: "2026-01-01",
-      units_vested: 250,
-      market_price_pence: 52000,
+      vest_date: "2026-09-01",
+      units_vested: 500,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2027-03-01",
+      units_vested: 500,
     });
 
     const result = await getNetWorth("2026-05-01");
 
-    expect(result.contingent).toHaveLength(1);
+    expect(result.contingent).toHaveLength(2);
     const line = result.contingent[0]!;
     expect(line.not_owned).toBe(true);
-    expect(line.total_units).toBe(1000);
-    expect(line.vested_units).toBe(250);
-    expect(line.unvested_units).toBe(750);
+    expect(line.vest_date).toBe("2026-09-01");
+    expect(line.units).toBe(500);
 
     const realisedKinds = result.realised.map((l) => l.kind);
     expect(realisedKinds).not.toContain("equity");
   });
 
-  it("uses the current asset_prices entry for unvested valuation", async () => {
-    await recordEquityGrant({
+  it("orders upcoming vests soonest-first and carries the ticker", async () => {
+    const grantId = await seedGrantWithPrice({
       scheme_type: "rsu",
       units: 1000,
-      grant_date: "2025-01-01",
-      currency: "GBP",
-      underlying_asset_name: "ACME Corp",
-      underlying_asset_type: "stock",
+      unit_price_pence: 50000,
+      ticker: "ACME",
     });
-    await recordAssetPrice({
-      asset_name: "ACME Corp",
-      asset_type: "stock",
-      base_currency: "GBP",
-      unit_price_pence: 48000,
-      currency: "GBP",
-      as_of: "2026-01-01",
-      source: "manual",
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2027-03-01",
+      units_vested: 500,
     });
-    await recordAssetPrice({
-      asset_name: "ACME Corp",
-      asset_type: "stock",
-      base_currency: "GBP",
-      unit_price_pence: 52000,
-      currency: "GBP",
-      as_of: "2026-04-01",
-      source: "manual",
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 500,
     });
 
-    const grantId = (
-      getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
-    ).id;
+    const result = await getNetWorth("2026-05-01");
+    expect(result.contingent.map((l) => l.vest_date)).toEqual([
+      "2026-09-01",
+      "2027-03-01",
+    ]);
+    expect(result.contingent[0]!.ticker).toBe("ACME");
+  });
+
+  it("excludes past vests from contingent", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "rsu",
+      units: 1000,
+      unit_price_pence: 50000,
+    });
     await recordVestingEvent({
       grant_id: grantId,
       vest_date: "2026-01-01",
       units_vested: 250,
       market_price_pence: 48000,
     });
-
-    const result = await getNetWorth("2026-05-01");
-    const line = result.contingent[0]!;
-
-    expect(line.price_per_unit_pence).toBe(52000);
-    expect(line.est_value_pence).toBe(750 * 52000);
-  });
-
-  it("shows no price when grant has no underlying asset linked", async () => {
-    await recordEquityGrant({
-      scheme_type: "rsu",
-      units: 1000,
-      grant_date: "2025-01-01",
-      currency: "GBP",
-    });
-
-    const result = await getNetWorth("2026-05-01");
-    const line = result.contingent[0]!;
-
-    expect(line.price_per_unit_pence).toBeNull();
-    expect(line.est_value_pence).toBeNull();
-  });
-
-  it("contingent equity does not contribute to realised_total_pence", async () => {
-    await recordEquityGrant({
-      scheme_type: "rsu",
-      units: 1000,
-      grant_date: "2025-01-01",
-      currency: "GBP",
-      underlying_asset_name: "ACME Corp",
-      underlying_asset_type: "stock",
-    });
-    await recordAssetPrice({
-      asset_name: "ACME Corp",
-      asset_type: "stock",
-      base_currency: "GBP",
-      unit_price_pence: 50000,
-      currency: "GBP",
-      as_of: "2026-01-01",
-      source: "manual",
-    });
-
-    const result = await getNetWorth("2026-05-01");
-    expect(result.realised_total_pence).toBe(0);
-    expect(result.contingent_total_pence).toBeGreaterThan(0);
-  });
-
-  it("fully vested grants do not appear in contingent", async () => {
-    await recordEquityGrant({
-      scheme_type: "rsu",
-      units: 400,
-      grant_date: "2024-01-01",
-      currency: "GBP",
-    });
-
-    const grantId = (
-      getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
-    ).id;
-
     await recordVestingEvent({
       grant_id: grantId,
-      vest_date: "2026-01-01",
+      vest_date: "2026-09-01",
+      units_vested: 750,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    expect(result.contingent).toHaveLength(1);
+    expect(result.contingent[0]!.vest_date).toBe("2026-09-01");
+    expect(result.contingent[0]!.units).toBe(750);
+  });
+
+  it("RSU projected value is units times current price", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "rsu",
+      units: 1000,
+      unit_price_pence: 52000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 500,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    const line = result.contingent[0]!;
+    expect(line.strike_pence).toBeNull();
+    expect(line.price_per_unit_pence).toBe(52000);
+    expect(line.projected_value_pence).toBe(500 * 52000);
+  });
+
+  it("option projected value is units times intrinsic (price minus strike), floored at zero", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "emi",
+      units: 1000,
+      strike_pence: 1200,
+      unit_price_pence: 5000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 600,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    const line = result.contingent[0]!;
+    expect(line.strike_pence).toBe(1200);
+    expect(line.projected_value_pence).toBe(600 * (5000 - 1200));
+  });
+
+  it("underwater option projects zero, never negative", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "unapproved",
+      units: 1000,
+      strike_pence: 1200,
+      unit_price_pence: 1000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
       units_vested: 400,
     });
 
     const result = await getNetWorth("2026-05-01");
-    expect(result.contingent).toHaveLength(0);
+    expect(result.contingent[0]!.projected_value_pence).toBe(0);
+  });
+
+  it("shows no projected value when grant has no underlying asset linked", async () => {
+    await recordEquityGrant({
+      scheme_type: "rsu",
+      units: 1000,
+      grant_date: "2025-01-01",
+      currency: "GBP",
+    });
+    const grantId = (
+      getDb().prepare("SELECT id FROM equity_grant LIMIT 1").get() as { id: number }
+    ).id;
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 500,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    const line = result.contingent[0]!;
+    expect(line.price_per_unit_pence).toBeNull();
+    expect(line.projected_value_pence).toBeNull();
+  });
+
+  it("surfaces unscheduled units (total minus all recorded tranches)", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "rsu",
+      units: 1000,
+      unit_price_pence: 50000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-01-01",
+      units_vested: 250,
+      market_price_pence: 48000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 250,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    expect(result.contingent_unscheduled).toHaveLength(1);
+    expect(result.contingent_unscheduled[0]!.units).toBe(500);
+  });
+
+  it("fully scheduled grants produce no unscheduled line", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "rsu",
+      units: 1000,
+      unit_price_pence: 50000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 1000,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    expect(result.contingent_unscheduled).toHaveLength(0);
+  });
+
+  it("contingent_total_pence sums projected values and does not touch realised_total_pence", async () => {
+    const grantId = await seedGrantWithPrice({
+      scheme_type: "rsu",
+      units: 1000,
+      unit_price_pence: 50000,
+    });
+    await recordVestingEvent({
+      grant_id: grantId,
+      vest_date: "2026-09-01",
+      units_vested: 1000,
+    });
+
+    const result = await getNetWorth("2026-05-01");
+    expect(result.realised_total_pence).toBe(0);
+    expect(result.contingent_total_pence).toBe(1000 * 50000);
   });
 });
 
