@@ -261,7 +261,7 @@ describe("getCashflow", () => {
     expect([...(a?.samples ?? [])].sort()).toEqual(["Vinted", "eBay"].sort());
   });
 
-  it("splits savings-category transactions into their own stream, out of spending", async () => {
+  it("treats external savings transfers as ordinary outflows and inflows", async () => {
     await recordTransaction({
       account_name: "Monzo",
       account_type: "current",
@@ -290,10 +290,49 @@ describe("getCashflow", () => {
     });
 
     const result = await getCashflow({ tax_year: "2025/26" });
-    expect(result.spending_total_pence).toBe(10000);
-    expect(result.savings_total_pence).toBe(3000);
-    expect(result.income_total_pence).toBe(0);
+    const savings = result.transactions_by_category.find((l) => l.category === "savings");
+    expect(savings?.outflow_pence).toBe(5000);
+    expect(result.spending_total_pence).toBe(15000);
+    expect(result.income_total_pence).toBe(2000);
     expect(result.net_cashflow_pence).toBe(-13000);
+  });
+
+  it("groups inflows by source description", async () => {
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: 450000,
+      category: "income",
+      description: "Acme Ltd",
+      occurred_at: "2025-06-25",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: 120000,
+      category: "income",
+      description: "Acme Ltd",
+      occurred_at: "2025-07-25",
+      currency: "GBP",
+    });
+    await recordTransaction({
+      account_name: "Monzo",
+      account_type: "current",
+      amount_pence: 80000,
+      category: "general",
+      description: "Tenant",
+      occurred_at: "2025-06-30",
+      currency: "GBP",
+    });
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    const acme = result.income_by_source.find((l) => l.source === "Acme Ltd");
+    const tenant = result.income_by_source.find((l) => l.source === "Tenant");
+    expect(acme?.inflow_pence).toBe(570000);
+    expect(acme?.count).toBe(2);
+    expect(tenant?.inflow_pence).toBe(80000);
+    expect(result.income_by_source[0]?.source).toBe("Acme Ltd");
   });
 
   it("reports net into Monzo pots separately, outside spending and net", async () => {
