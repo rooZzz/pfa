@@ -1,7 +1,11 @@
 import { runQuery } from "../query.js";
 import { toNum, toStr, validateDate } from "../sql_util.js";
 import { queryIncome } from "./income.js";
-import { queryPotSavingNetPence, queryTransactionsByCategory } from "./transactions.js";
+import {
+  queryIncomeBySource,
+  queryPotSavingNetPence,
+  queryTransactionsByCategory,
+} from "./transactions.js";
 import type { CashflowResult, TrendPoint } from "./types.js";
 
 export type { CashflowResult } from "./types.js";
@@ -87,12 +91,14 @@ export async function getCashflow(params: {
   const today = new Date().toISOString().split("T")[0]!;
   const as_of = params.as_of ?? (today < period_end ? today : period_end);
 
-  const [income, byCategory, trend, pot_savings_net_pence] = await Promise.all([
-    queryIncome(period_start, as_of),
-    queryTransactionsByCategory(period_start, as_of),
-    queryMonthlyTrend(period_start, as_of),
-    queryPotSavingNetPence(period_start, as_of),
-  ]);
+  const [income, byCategory, incomeBySource, trend, pot_savings_net_pence] =
+    await Promise.all([
+      queryIncome(period_start, as_of),
+      queryTransactionsByCategory(period_start, as_of),
+      queryIncomeBySource(period_start, as_of),
+      queryMonthlyTrend(period_start, as_of),
+      queryPotSavingNetPence(period_start, as_of),
+    ]);
 
   const transaction_inflow_total_pence = byCategory.reduce(
     (sum, l) => sum + l.inflow_pence,
@@ -103,14 +109,9 @@ export async function getCashflow(params: {
     0,
   );
 
-  const savingsLines = byCategory.filter((l) => l.category === "savings");
-  const savingsOut = savingsLines.reduce((sum, l) => sum + l.outflow_pence, 0);
-  const savingsIn = savingsLines.reduce((sum, l) => sum + l.inflow_pence, 0);
-  const savings_total_pence = savingsOut - savingsIn;
-  const spending_total_pence = transaction_outflow_total_pence - savingsOut;
-  const income_total_pence = transaction_inflow_total_pence - savingsIn;
-  const net_cashflow_pence =
-    income_total_pence - spending_total_pence - savings_total_pence;
+  const spending_total_pence = transaction_outflow_total_pence;
+  const income_total_pence = transaction_inflow_total_pence;
+  const net_cashflow_pence = income_total_pence - spending_total_pence;
 
   return {
     tax_year,
@@ -118,11 +119,11 @@ export async function getCashflow(params: {
     period_end,
     income,
     transactions_by_category: byCategory,
+    income_by_source: incomeBySource,
     transaction_inflow_total_pence,
     transaction_outflow_total_pence,
     income_total_pence,
     spending_total_pence,
-    savings_total_pence,
     pot_savings_net_pence,
     net_cashflow_pence,
     trend,

@@ -275,7 +275,7 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "query_natural_language",
     description:
-      "Answer a factual question about the user's financial data. Generates SQL via Haiku and executes it against the local database. Returns facts only — not a route to advice or recommendations.",
+      'Answer a factual question about the user\'s financial data. Generates SQL via Haiku and executes it against the local database. Returns facts only — not a route to advice or recommendations. Ask in plain language, the way a non-technical person would: name the concept you want ("total income in May", "exclude internal transfers"), never how it is stored. Do not reference columns, flags, value prefixes, or category names, and do not assume the data model — the query layer maps concepts to the schema, and over-specifying it produces wrong answers.',
     inputSchema: {
       question: z.string().describe("The financial question to answer in plain English."),
     },

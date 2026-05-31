@@ -12,6 +12,7 @@ type CashflowData = CashflowResult;
 
 function categoryLabel(cat: string): string {
   if (cat === "income") return "Income (other)";
+  if (cat === "savings") return "Savings & investing";
   return cat.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -141,21 +142,13 @@ function CashflowApp() {
   if (!data) return null;
 
   const hasIncome = data.income.payslip_count > 0;
-  const isSavings = (cat: string) => cat === "savings";
   const outflowCategories = data.transactions_by_category
-    .filter((l) => l.outflow_pence > 0 && !isSavings(l.category))
+    .filter((l) => l.outflow_pence > 0)
     .sort((a, b) => b.outflow_pence - a.outflow_pence);
   const spendMax = Math.max(1, ...outflowCategories.map((l) => l.outflow_pence));
 
-  const inflowCategories = data.transactions_by_category
-    .filter((l) => l.inflow_pence > 0 && l.outflow_pence === 0 && !isSavings(l.category))
-    .sort((a, b) => b.inflow_pence - a.inflow_pence);
-  const inflowMax = Math.max(1, ...inflowCategories.map((l) => l.inflow_pence));
-
-  const savingsLines = data.transactions_by_category.filter((l) => isSavings(l.category));
-  const savingsOut = savingsLines.reduce((sum, l) => sum + l.outflow_pence, 0);
-  const savingsIn = savingsLines.reduce((sum, l) => sum + l.inflow_pence, 0);
-  const hasSavings = data.pot_savings_net_pence !== 0 || savingsOut > 0 || savingsIn > 0;
+  const incomeSources = data.income_by_source;
+  const incomeMax = Math.max(1, ...incomeSources.map((l) => l.inflow_pence));
 
   const customNumber = new Map<string, number>();
   for (const line of data.transactions_by_category) {
@@ -211,7 +204,7 @@ function CashflowApp() {
       <div className="grid cols-2">
         <div className="card card-sunken">
           <Stat
-            label="Spending"
+            label="Money out"
             value={formatGbpk(data.spending_total_pence)}
             delta="this year"
           />
@@ -268,7 +261,7 @@ function CashflowApp() {
       {outflowCategories.length > 0 && (
         <div className="card">
           <div className="card-label mb-3">
-            Spending by category · {formatGbp(data.spending_total_pence)}
+            Money out by category · {formatGbp(data.spending_total_pence)}
           </div>
           <div className="stack-3">
             {outflowCategories.map((line, i) => (
@@ -285,50 +278,21 @@ function CashflowApp() {
         </div>
       )}
 
-      {inflowCategories.length > 0 && (
+      {incomeSources.length > 0 && (
         <div className="card">
           <div className="card-label mb-3">
-            Other inflows · {formatGbp(data.income_total_pence)}
+            Money in by source · {formatGbp(data.income_total_pence)}
           </div>
           <div className="stack-3">
-            {inflowCategories.map((line, i) => (
+            {incomeSources.map((line, i) => (
               <Meter
                 key={i}
-                name={labelFor(line.category)}
-                sub={subFor(line)}
+                name={line.source}
                 value={formatGbp(line.inflow_pence)}
-                pct={(line.inflow_pence / inflowMax) * 100}
+                pct={(line.inflow_pence / incomeMax) * 100}
                 tone="pos"
               />
             ))}
-          </div>
-        </div>
-      )}
-
-      {hasSavings && (
-        <div className="card">
-          <div className="card-label mb-3">Savings &amp; investing</div>
-          <div className="stack-3">
-            {data.pot_savings_net_pence !== 0 && (
-              <KV
-                k="Into Monzo pots (stays liquid)"
-                v={formatGbp(data.pot_savings_net_pence)}
-              />
-            )}
-            {savingsOut > 0 && (
-              <KV
-                k="To external savings / investments"
-                v={"−" + formatGbp(savingsOut)}
-                tone="neg"
-              />
-            )}
-            {savingsIn > 0 && (
-              <KV k="Back from external savings" v={formatGbp(savingsIn)} tone="pos" />
-            )}
-          </div>
-          <div className="note mt-3">
-            Pot transfers stay in liquid savings; only money leaving Monzo affects net
-            cashflow.
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { runQuery } from "../query.js";
 import { toNum, toStr } from "../sql_util.js";
-import type { CategoryLine } from "./types.js";
+import type { CategoryLine, SourceLine } from "./types.js";
 
 export async function queryTransactionsByCategory(
   start: string,
@@ -27,6 +27,31 @@ export async function queryTransactionsByCategory(
     outflow_pence: toNum(r.outflow_pence),
     count: toNum(r.count),
     samples: Array.isArray(r.samples) ? r.samples.map((s) => String(s)) : [],
+  }));
+}
+
+export async function queryIncomeBySource(
+  start: string,
+  end: string,
+): Promise<SourceLine[]> {
+  const rows = await runQuery(
+    `SELECT
+      COALESCE(description, 'Unattributed') AS source,
+      COALESCE(SUM(amount_pence), 0) AS inflow_pence,
+      COUNT(*) AS count
+    FROM pfa.transactions
+    WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+      AND is_internal = 0
+      AND amount_pence > 0
+    GROUP BY COALESCE(description, 'Unattributed')
+    ORDER BY inflow_pence DESC`,
+    [start, end],
+  );
+
+  return rows.map((r) => ({
+    source: toStr(r.source),
+    inflow_pence: toNum(r.inflow_pence),
+    count: toNum(r.count),
   }));
 }
 
