@@ -6,7 +6,16 @@ import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
 import { Masthead } from "./branding.js";
-import { Badge, Btn, CompositionBar, Icon, Meter, MiniBars, Stat } from "./components.js";
+import {
+  Badge,
+  Btn,
+  CompositionBar,
+  CoverageGrid,
+  Icon,
+  Meter,
+  MiniBars,
+  Stat,
+} from "./components.js";
 import { topN } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
@@ -216,15 +225,18 @@ function CashflowApp() {
         title="Cashflow"
         sub={`${data.tax_year} · ${data.period_start} – ${data.period_end}`}
         action={
-          <Btn
-            variant="secondary"
-            size="sm"
-            icon="refresh"
-            onClick={() => void load(true)}
-            disabled={busy}
-          >
-            {busy ? "Syncing" : "Refresh"}
-          </Btn>
+          <div className="screen-actions">
+            {data.coverage.length > 0 && <CoverageGrid months={data.coverage} />}
+            <Btn
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              onClick={() => void load(true)}
+              disabled={busy}
+            >
+              {busy ? "Syncing" : "Refresh"}
+            </Btn>
+          </div>
         }
       />
 

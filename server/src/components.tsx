@@ -1,5 +1,6 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import type { MonthCoverage, SeriesStatus } from "../net_worth/coverage.js";
 
 export type IconName =
   | "refresh"
@@ -341,6 +342,98 @@ export function MiniBars({
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+const COVERAGE_MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const COVERAGE_STATE_LABEL: Record<MonthCoverage["state"], string> = {
+  complete: "complete",
+  current: "in progress",
+  incomplete: "incomplete",
+  future: "upcoming",
+};
+
+function coverageMark(status: SeriesStatus): string {
+  if (status.state === "missing") return "missing";
+  if (status.state === "stale") {
+    return status.age_days != null ? `stale ${status.age_days}d` : "stale";
+  }
+  return status.age_days != null && status.age_days > 0
+    ? `fresh ${status.age_days}d`
+    : "fresh";
+}
+
+export function CoverageGrid({ months }: { months: MonthCoverage[] }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  if (months.length === 0) return null;
+  const open = openIndex != null ? months[openIndex] : null;
+
+  return (
+    <div className="coverage">
+      <div
+        className="coverage-grid"
+        role="group"
+        aria-label="Financial-year data coverage by month"
+      >
+        {months.map((m, i) => (
+          <button
+            key={`${m.year}-${m.month}`}
+            type="button"
+            className={"coverage-cell " + m.state}
+            aria-expanded={i === openIndex}
+            aria-label={`${COVERAGE_MONTHS[m.month - 1]} ${m.year}: ${COVERAGE_STATE_LABEL[m.state]}`}
+            onClick={() => setOpenIndex(i === openIndex ? null : i)}
+          >
+            <span
+              className="coverage-fill"
+              style={{ height: Math.round(m.fraction_fresh * 100) + "%" }}
+            />
+            <span className="coverage-letter">{m.initial}</span>
+          </button>
+        ))}
+      </div>
+
+      {open && (
+        <div className="coverage-pop" role="dialog">
+          <div className="coverage-pop-head">
+            <span>
+              {COVERAGE_MONTHS[open.month - 1]} {open.year}
+            </span>
+            <span className="coverage-detail-state">
+              {COVERAGE_STATE_LABEL[open.state]}
+            </span>
+          </div>
+          {open.series.length === 0 ? (
+            <span className="coverage-detail-note">
+              {open.state === "future" ? "not reached yet" : "no series in scope"}
+            </span>
+          ) : (
+            <ul className="coverage-detail-list">
+              {open.series.map((s) => (
+                <li key={s.label} className="coverage-detail-row">
+                  <span className="coverage-series">{s.label}</span>
+                  <span className={"coverage-mark " + s.state}>{coverageMark(s)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
