@@ -25,7 +25,12 @@ describe("buildYearCoverage — month layout", () => {
 
   it("marks months after asOf as future with no series", () => {
     const series: CoverageSeries[] = [
-      { label: "Accounts", cadence: "snapshot", window_days: 31, entities: [["2025-08-10"]] },
+      {
+        label: "Accounts",
+        cadence: "snapshot",
+        window_days: 31,
+        entities: [["2025-08-10"]],
+      },
     ];
     const months = buildYearCoverage("2025-09-15", FY_START, series);
     const october = months[6]!;
@@ -38,7 +43,12 @@ describe("buildYearCoverage — month layout", () => {
 
 describe("buildYearCoverage — snapshot classification", () => {
   const series: CoverageSeries[] = [
-    { label: "Accounts", cadence: "snapshot", window_days: 31, entities: [["2025-08-10"]] },
+    {
+      label: "Accounts",
+      cadence: "snapshot",
+      window_days: 31,
+      entities: [["2025-08-10"]],
+    },
   ];
 
   it("a fully fresh past month is complete", () => {
@@ -60,14 +70,28 @@ describe("buildYearCoverage — snapshot classification", () => {
   it("the asOf month is current and reports staleness past the window", () => {
     const september = buildYearCoverage("2025-09-15", FY_START, series)[5]!;
     expect(september.state).toBe("current");
-    expect(september.series[0]).toEqual({ label: "Accounts", state: "stale", age_days: 36 });
+    expect(september.series[0]).toEqual({
+      label: "Accounts",
+      state: "stale",
+      age_days: 36,
+    });
     expect(september.fraction_fresh).toBe(0);
   });
 
   it("per-series windows keep a slow-moving series fresh mid-cycle", () => {
     const mixed: CoverageSeries[] = [
-      { label: "Accounts", cadence: "snapshot", window_days: 31, entities: [["2025-06-01"]] },
-      { label: "Pension", cadence: "snapshot", window_days: 100, entities: [["2025-07-01"]] },
+      {
+        label: "Accounts",
+        cadence: "snapshot",
+        window_days: 31,
+        entities: [["2025-06-01"]],
+      },
+      {
+        label: "Pension",
+        cadence: "snapshot",
+        window_days: 100,
+        entities: [["2025-07-01"]],
+      },
     ];
     const september = buildYearCoverage("2025-09-15", FY_START, mixed)[5]!;
     expect(september.fraction_fresh).toBe(0.5);

@@ -39,11 +39,7 @@ function dateOnly(value: unknown): string {
 
 function parseYmd(value: string): [number, number, number] {
   const parts = value.split("-");
-  return [
-    parseInt(parts[0]!, 10),
-    parseInt(parts[1]!, 10),
-    parseInt(parts[2]!, 10),
-  ];
+  return [parseInt(parts[0]!, 10), parseInt(parts[1]!, 10), parseInt(parts[2]!, 10)];
 }
 
 function ymd(year: number, month: number, day: number): string {
@@ -83,7 +79,11 @@ function classifySeries(
       }
     }
     if (latest === null) return { label: series.label, state: "missing", age_days: null };
-    return { label: series.label, state: "fresh", age_days: daysBetween(latest, refDate) };
+    return {
+      label: series.label,
+      state: "fresh",
+      age_days: daysBetween(latest, refDate),
+    };
   }
 
   let maxAge = -1;
@@ -120,7 +120,14 @@ export function buildYearCoverage(
     const monthEnd = ymd(year, month, lastDayOfMonth(year, month));
 
     if (monthStart > asOf) {
-      months.push({ month, year, initial, state: "future", fraction_fresh: 0, series: [] });
+      months.push({
+        month,
+        year,
+        initial,
+        state: "future",
+        fraction_fresh: 0,
+        series: [],
+      });
       continue;
     }
 
@@ -135,7 +142,14 @@ export function buildYearCoverage(
         ? "complete"
         : "incomplete";
 
-    months.push({ month, year, initial, state, fraction_fresh: fraction, series: statuses });
+    months.push({
+      month,
+      year,
+      initial,
+      state,
+      fraction_fresh: fraction,
+      series: statuses,
+    });
   }
 
   return months;
@@ -225,9 +239,10 @@ async function buildNetWorthSeries(asOf: string): Promise<CoverageSeries[]> {
   for (const row of accountRows) {
     const id = toStr(row.account_id);
     const date = dateOnly(row.observed_on);
-    const balance = typeof row.balance_pence === "bigint"
-      ? Number(row.balance_pence)
-      : Number(row.balance_pence ?? 0);
+    const balance =
+      typeof row.balance_pence === "bigint"
+        ? Number(row.balance_pence)
+        : Number(row.balance_pence ?? 0);
     const bucket = accountBalances.get(id);
     if (bucket) {
       bucket.dates.push(date);
@@ -295,7 +310,12 @@ async function buildNetWorthSeries(asOf: string): Promise<CoverageSeries[]> {
   }
 
   if (payslips[0]!.length > 0) {
-    series.push({ label: "Payslip", cadence: "recurring", window_days: 0, entities: payslips });
+    series.push({
+      label: "Payslip",
+      cadence: "recurring",
+      window_days: 0,
+      entities: payslips,
+    });
   }
 
   return series;

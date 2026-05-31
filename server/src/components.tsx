@@ -373,7 +373,9 @@ function coverageMark(status: SeriesStatus): string {
   if (status.state === "stale") {
     return status.age_days != null ? `stale ${status.age_days}d` : "stale";
   }
-  return status.age_days != null && status.age_days > 0 ? `fresh ${status.age_days}d` : "fresh";
+  return status.age_days != null && status.age_days > 0
+    ? `fresh ${status.age_days}d`
+    : "fresh";
 }
 
 export function CoverageGrid({ months }: { months: MonthCoverage[] }) {
