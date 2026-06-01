@@ -16,6 +16,7 @@ export async function queryTransactionsByCategory(
     FROM pfa.transactions
     WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
       AND is_internal = 0
+      AND superseded_by IS NULL
     GROUP BY category
     ORDER BY outflow_pence DESC`,
     [start, end],
@@ -42,6 +43,7 @@ export async function queryIncomeBySource(
     FROM pfa.transactions
     WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
       AND is_internal = 0
+      AND superseded_by IS NULL
       AND amount_pence > 0
     GROUP BY COALESCE(description, 'Unattributed')
     ORDER BY inflow_pence DESC`,
@@ -67,7 +69,8 @@ export async function queryPotSavingNetPence(
       AND p.provider = 'monzo'
       AND p.type IN ('savings', 'isa')
      WHERE CAST(t.occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
-       AND t.is_internal = 1`,
+       AND t.is_internal = 1
+       AND t.superseded_by IS NULL`,
     [start, end],
   );
   return toNum(rows[0]?.net_into_pots ?? 0);

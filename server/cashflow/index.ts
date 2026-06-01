@@ -61,6 +61,7 @@ async function queryMonthlyTrend(start: string, end: string): Promise<TrendPoint
      FROM pfa.transactions t
      WHERE CAST(t.occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
        AND t.is_internal = 0
+       AND t.superseded_by IS NULL
      GROUP BY 1
      ORDER BY 1`,
     [start, end],

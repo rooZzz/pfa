@@ -5,6 +5,8 @@ import { getCashflow } from "../cashflow/index.js";
 import { getNetWorth } from "../net_worth/index.js";
 import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { confirmStagedRows } from "./confirm_staged_rows.js";
+import { correctRecordTool, correctRecordSchema } from "./correct_record.js";
+import { retractRecordTool, retractRecordSchema } from "./retract_record.js";
 import { connectMonzo, connectMonzoSchema } from "./connect_monzo.js";
 import { syncMonzo } from "./sync_monzo.js";
 import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
@@ -136,6 +138,22 @@ export const tools: ToolDescriptor[] = [
       "Record a vesting tranche for an existing equity grant — either a future scheduled vest or a past realised one. Requires the grant ID returned by record_equity_grant. For a future vest (e.g. an option maturity date), supply vest_date and units_vested and omit market_price_pence; it then appears as an upcoming vest valued from the latest asset price. For a past vest, also supply market_price_pence (the price at vest). Schedule each known future vest date this way — grants do not store their own maturity dates.",
     inputSchema: recordVestingEventSchema,
     handler: async (input) => text(await recordVestingEvent(input)),
+  }),
+  defineTool({
+    name: "correct_record",
+    description:
+      "Correct a committed financial fact that was recorded WRONG, preserving history. Use only when the original value was never true (a typo, a misparse, a wrong date or account) and you can supply the right value. Do NOT use when the value simply changed over time (a new balance, a new statement, a pay rise, a new price) — that is a fresh observation, recorded with the relevant record_* tool, not a correction. The original row is kept for audit; a superseding row at the original effective date becomes the truth. Locate the exact row with query_natural_language and confirm it with the user before calling. Connector-sourced rows cannot be corrected. To fix an equity grant's terms, retract it with retract_record and record it again.",
+    inputSchema: correctRecordSchema,
+    annotations: { destructiveHint: true },
+    handler: async (input) => text(await correctRecordTool(input)),
+  }),
+  defineTool({
+    name: "retract_record",
+    description:
+      "Remove a committed financial fact that should not exist at all — there is no correct version of it (a duplicate upload, a transaction that never happened, a bogus snapshot). The row is tombstoned: it disappears from every total, dashboard, and query, but is retained on disk for audit. This is a logical removal, never a hard delete. Retracting an equity_grant also retracts its dependent vesting events. Locate the exact row with query_natural_language and confirm it with the user before calling. Connector-sourced rows cannot be retracted.",
+    inputSchema: retractRecordSchema,
+    annotations: { destructiveHint: true },
+    handler: async (input) => text(await retractRecordTool(input)),
   }),
   defineTool({
     name: "get_cashflow",

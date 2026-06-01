@@ -55,6 +55,7 @@ export interface EquityGrantTable {
   asset_id: number | null;
   source_id: number;
   payload: string | null;
+  superseded_by: number | null;
 }
 
 export interface TransactionsTable {
@@ -69,6 +70,7 @@ export interface TransactionsTable {
   external_id: string | null;
   is_internal: Generated<number>;
   source_id: number;
+  superseded_by: number | null;
 }
 
 export interface EquityVestingEventTable {
@@ -82,6 +84,7 @@ export interface EquityVestingEventTable {
   recorded_at: Generated<string>;
   source_id: number;
   payload: string | null;
+  superseded_by: number | null;
 }
 
 export interface IncomeEventsTable {
@@ -101,6 +104,7 @@ export interface IncomeEventsTable {
   recorded_at: Generated<string>;
   source_id: number;
   payload: string | null;
+  superseded_by: number | null;
 }
 
 export interface AccountBalancesTable {
@@ -112,6 +116,7 @@ export interface AccountBalancesTable {
   valid_to: string | null;
   recorded_at: Generated<string>;
   source_id: number;
+  superseded_by: number | null;
 }
 
 export interface PensionValuesTable {
@@ -123,6 +128,7 @@ export interface PensionValuesTable {
   valid_to: string | null;
   recorded_at: Generated<string>;
   source_id: number;
+  superseded_by: number | null;
 }
 
 export interface MortgageBalanceTable {
@@ -135,6 +141,7 @@ export interface MortgageBalanceTable {
   valid_to: string | null;
   recorded_at: Generated<string>;
   source_id: number;
+  superseded_by: number | null;
 }
 
 export interface HoldingsTable {
@@ -145,6 +152,7 @@ export interface HoldingsTable {
   valid_to: string | null;
   recorded_at: Generated<string>;
   source_id: number;
+  superseded_by: number | null;
 }
 
 export interface AssetPricesTable {
@@ -156,6 +164,7 @@ export interface AssetPricesTable {
   source: string;
   recorded_at: Generated<string>;
   source_id: number | null;
+  superseded_by: number | null;
 }
 
 export interface PersonProfileTable {
@@ -168,6 +177,7 @@ export interface PersonProfileTable {
   valid_to: string | null;
   recorded_at: Generated<string>;
   source_id: number;
+  superseded_by: number | null;
 }
 
 export interface GoalsTable {

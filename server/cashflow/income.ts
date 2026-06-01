@@ -50,7 +50,8 @@ export async function queryIncome(start: string, end: string): Promise<IncomeTot
       arg_max(tax_code, pay_date) AS tax_code,
       COUNT(*) AS payslip_count
     FROM pfa.income_events
-    WHERE CAST(pay_date AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)`,
+    WHERE CAST(pay_date AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+      AND superseded_by IS NULL`,
     [start, end],
   );
 
@@ -68,7 +69,8 @@ export async function queryIncome(start: string, end: string): Promise<IncomeTot
     `SELECT payload
     FROM pfa.income_events
     WHERE CAST(pay_date AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
-      AND payload IS NOT NULL`,
+      AND payload IS NOT NULL
+      AND superseded_by IS NULL`,
     [start, end],
   );
   const payloads = payloadRows

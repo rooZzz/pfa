@@ -20,13 +20,14 @@ function projectedValuePence(
 
 export async function queryContingentLines(asOf: string): Promise<ContingentResult> {
   const grants = await runQuery(
-    `SELECT id, scheme_type, units, strike_pence, asset_id FROM pfa.equity_grant`,
+    `SELECT id, scheme_type, units, strike_pence, asset_id FROM pfa.equity_grant WHERE superseded_by IS NULL`,
   );
   if (grants.length === 0) return { upcoming: [], unscheduled: [] };
 
   const eventTotals = await runQuery(
     `SELECT grant_id, SUM(units_vested) AS total_units
      FROM pfa.equity_vesting_event
+     WHERE superseded_by IS NULL
      GROUP BY grant_id`,
   );
   const eventUnitsByGrant = new Map<number, number>();
@@ -69,6 +70,7 @@ export async function queryContingentLines(asOf: string): Promise<ContingentResu
     `SELECT grant_id, vest_date, units_vested
      FROM pfa.equity_vesting_event
      WHERE vest_date > CAST(? AS DATE)
+       AND superseded_by IS NULL
      ORDER BY vest_date ASC, grant_id ASC`,
     [asOf],
   );

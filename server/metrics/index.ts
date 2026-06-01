@@ -67,6 +67,7 @@ export async function averageMonthlyOutgoings(
        FROM pfa.transactions
        WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
          AND is_internal = 0
+         AND superseded_by IS NULL
          AND category != 'savings'
        GROUP BY 1
        HAVING ABS(SUM(amount_pence) FILTER (WHERE amount_pence < 0)) > 0
@@ -153,6 +154,7 @@ export async function isaAllowanceRemaining(
      LEFT JOIN pfa.transactions t
        ON t.account_id = a.id
       AND CAST(t.occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
+      AND t.superseded_by IS NULL
      WHERE a.type = 'isa'`,
     [period.period_start, period.period_end],
   );
