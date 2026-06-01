@@ -61,21 +61,9 @@ function TickerLead({ ticker }: { ticker: string }) {
   );
 }
 
-function schemeMeta(line: ContingentLine | UnscheduledLine): ReactNode {
-  const meta = `${line.units.toLocaleString()} ${line.scheme_type.toUpperCase()}`;
-  if (line.ticker) {
-    return (
-      <>
-        <TickerLead ticker={line.ticker} /> · {meta}
-      </>
-    );
-  }
-  return (
-    <>
-      {meta}
-      {line.asset_name ? ` · ${line.asset_name}` : ""}
-    </>
-  );
+function assetLead(ticker: string | null, fallbackName: string | null): ReactNode {
+  if (ticker) return <TickerLead ticker={ticker} />;
+  return fallbackName ?? "unlinked";
 }
 
 function realisedRowLabel(line: RealisedLine): ReactNode {
@@ -136,11 +124,12 @@ function vestDetail(line: ContingentLine): string {
 function vestRowLabel(line: ContingentLine): ReactNode {
   const priceAge = daysSince(line.price_as_of ?? undefined);
   const isStale = priceAge != null && priceAge > 30;
+  const scheme = `${line.units.toLocaleString()} ${line.scheme_type.toUpperCase()}`;
   return (
     <>
-      {schemeMeta(line)}
+      {assetLead(line.ticker, line.asset_name)}
       <span className="sub sub-inline">
-        vests {line.vest_date} · {vestDetail(line)}
+        {scheme} · {vestDetail(line)} · vests {line.vest_date} · {ageLabel(priceAge)}
       </span>
       {isStale && staleBadge}
     </>
@@ -148,10 +137,11 @@ function vestRowLabel(line: ContingentLine): ReactNode {
 }
 
 function unscheduledRowLabel(line: UnscheduledLine): ReactNode {
+  const scheme = `${line.units.toLocaleString()} ${line.scheme_type.toUpperCase()}`;
   return (
     <>
-      {schemeMeta(line)}
-      <span className="sub sub-inline">vest dates not recorded</span>
+      {assetLead(line.ticker, line.asset_name)}
+      <span className="sub sub-inline">{scheme} · vest dates not recorded</span>
     </>
   );
 }
