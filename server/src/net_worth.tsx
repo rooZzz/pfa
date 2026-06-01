@@ -15,6 +15,7 @@ import {
   Btn,
   CompositionBar,
   CoverageGrid,
+  Icon,
   Sparkline,
   Stat,
   TickerChip,
@@ -92,32 +93,76 @@ function realisedRowLabel(line: RealisedLine): ReactNode {
   );
 }
 
-function vestDetail(line: ContingentLine): string {
-  const optionPrice =
-    line.strike_pence != null ? `${formatGbp(line.strike_pence)} option price` : null;
-  const hasFloor = line.scheme_type === "saye" && line.savings_floor_pence != null;
-  const isUnderwater =
-    hasFloor &&
+function isSayeFloor(line: ContingentLine): boolean {
+  return (
+    line.scheme_type === "saye" &&
+    line.savings_floor_pence != null &&
     (line.price_per_unit_pence == null ||
       line.strike_pence == null ||
-      line.price_per_unit_pence <= line.strike_pence);
+      line.price_per_unit_pence <= line.strike_pence)
+  );
+}
 
-  if (hasFloor && isUnderwater) {
-    const perMonth =
-      line.monthly_contribution_pence != null
-        ? `${formatGbp(line.monthly_contribution_pence)}/mo → `
-        : "";
-    const returned = `${perMonth}${formatGbp(line.savings_floor_pence!)} returned`;
-    return optionPrice ? `${returned} · under ${optionPrice}` : returned;
-  }
+function SavingsFloorBadge({ line }: { line: ContingentLine }) {
+  const [open, setOpen] = useState(false);
+  const total = line.savings_floor_pence ?? 0;
+  const monthly = line.monthly_contribution_pence;
+  const months = monthly && monthly > 0 ? Math.round(total / monthly) : null;
+  const priceLine =
+    line.price_per_unit_pence != null && line.strike_pence != null
+      ? `Current price ${formatGbp(line.price_per_unit_pence)} under option price ${formatGbp(line.strike_pence)}.`
+      : "No current price; held under the option price.";
+  const savingsLine =
+    monthly != null && months != null
+      ? `${formatGbp(monthly)}/mo for ${months} months is ${formatGbp(total)}.`
+      : `Savings returned: ${formatGbp(total)}.`;
+  return (
+    <span className="floor-wrap">
+      <button
+        type="button"
+        className="floor-badge"
+        aria-label="Why this value is the savings floor"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Icon name="info" size={11} />
+      </button>
+      {open && (
+        <span className="floor-pop" role="tooltip">
+          {priceLine}
+          <br />
+          {savingsLine}
+        </span>
+      )}
+    </span>
+  );
+}
 
+function vestValueDisplay(line: ContingentLine): ReactNode | undefined {
+  if (!isSayeFloor(line)) return undefined;
+  return (
+    <span className="val-floor">
+      <SavingsFloorBadge line={line} />
+      {formatGbp(line.projected_value_pence ?? line.savings_floor_pence ?? 0)}
+    </span>
+  );
+}
+
+function vestDetail(line: ContingentLine): string {
   const parts: string[] = [
     line.price_per_unit_pence != null
       ? `${formatGbp(line.price_per_unit_pence)}/unit`
       : "no price",
   ];
-  if (optionPrice) parts.push(optionPrice);
-  if (hasFloor) parts.push(`+${formatGbp(line.savings_floor_pence!)} savings`);
+  if (line.strike_pence != null) {
+    parts.push(`${formatGbp(line.strike_pence)} option price`);
+  }
+  if (
+    line.scheme_type === "saye" &&
+    line.savings_floor_pence != null &&
+    !isSayeFloor(line)
+  ) {
+    parts.push(`+${formatGbp(line.savings_floor_pence)} savings`);
+  }
   return parts.join(" · ");
 }
 
@@ -185,6 +230,7 @@ function buildVestGroups(
       key: `${year}-${i}`,
       label: vestRowLabel(line),
       valuePence: line.projected_value_pence,
+      display: vestValueDisplay(line),
     })),
   }));
 
