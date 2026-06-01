@@ -67,7 +67,11 @@ async function insertIncomeWithPayload(
   paye: number,
   ni: number,
   pension: number,
-  lineItems: Array<{ description: string; section: "payment" | "deduction"; amount_pence: number }>,
+  lineItems: Array<{
+    description: string;
+    section: "payment" | "deduction";
+    amount_pence: number;
+  }>,
 ): Promise<void> {
   await getKysely()
     .transaction()
