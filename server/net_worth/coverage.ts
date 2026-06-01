@@ -183,7 +183,7 @@ function groupDates(rows: Record<string, unknown>[], key: string): Map<string, s
 
 async function payslipEntities(asOf: string): Promise<string[][]> {
   const rows = await runQuery(
-    `SELECT pay_date AS observed_on FROM pfa.income_events WHERE CAST(pay_date AS DATE) <= CAST(? AS DATE)`,
+    `SELECT pay_date AS observed_on FROM pfa.income_events WHERE CAST(pay_date AS DATE) <= CAST(? AS DATE) AND superseded_by IS NULL`,
     [asOf],
   );
   return [rows.map((r) => dateOnly(r.observed_on))];
@@ -202,32 +202,37 @@ async function buildNetWorthSeries(asOf: string): Promise<CoverageSeries[]> {
       `SELECT account_id, valid_from AS observed_on, balance_pence
          FROM pfa.account_balances
          WHERE valid_from <= CAST(? AS DATE)
+           AND superseded_by IS NULL
          ORDER BY account_id, valid_from, recorded_at`,
       [asOf],
     ),
     runQuery(
       `SELECT account_id, valid_from AS observed_on
          FROM pfa.pension_values
-         WHERE valid_from <= CAST(? AS DATE)`,
+         WHERE valid_from <= CAST(? AS DATE)
+           AND superseded_by IS NULL`,
       [asOf],
     ),
     runQuery(
       `SELECT mortgage_id, valid_from AS observed_on
          FROM pfa.mortgage_balance
-         WHERE valid_from <= CAST(? AS DATE)`,
+         WHERE valid_from <= CAST(? AS DATE)
+           AND superseded_by IS NULL`,
       [asOf],
     ),
     runQuery(
       `SELECT DISTINCT h.asset_id, a.asset_type
          FROM pfa.holdings h
          JOIN pfa.assets a ON a.id = h.asset_id
-         WHERE h.valid_from <= CAST(? AS DATE)`,
+         WHERE h.valid_from <= CAST(? AS DATE)
+           AND h.superseded_by IS NULL`,
       [asOf],
     ),
     runQuery(
       `SELECT ap.asset_id, ap.as_of AS observed_on
          FROM pfa.asset_prices ap
-         WHERE ap.as_of <= CAST(? AS TIMESTAMP)`,
+         WHERE ap.as_of <= CAST(? AS TIMESTAMP)
+           AND ap.superseded_by IS NULL`,
       [`${asOf} 23:59:59`],
     ),
     payslipEntities(asOf),

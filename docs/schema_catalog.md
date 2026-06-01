@@ -4,6 +4,8 @@ This document is injected into every Haiku text-to-SQL call alongside the DDL. I
 
 When generating SQL, always target DuckDB syntax. Tables are in the `pfa` schema (attached SQLite file). Prefix all table names with `pfa.` (e.g. `pfa.account_balances`).
 
+**Superseded rows.** Editable event and snapshot tables (`account_balances`, `pension_values`, `mortgage_balance`, `holdings`, `person_profile`, `transactions`, `income_events`, `equity_vesting_event`, `asset_prices`, `equity_grant`) carry a `superseded_by` column. A non-null value means the row was corrected or retracted and is retained for audit only — it is NOT current truth. Always add `AND superseded_by IS NULL` to every query against these tables so corrected and removed facts never appear in an answer.
+
 ---
 
 ## Table: `pfa.documents`
@@ -23,7 +25,7 @@ Every ingested row in this database traces back to a row in `documents`. It is t
 
 ## Table: `pfa.account_balances`
 
-**Pattern: Snapshot.** Records an observed account balance at a point in time. Rows are never updated. Corrections close the old row (`valid_to = today`) and insert a new corrected row. Gaps between observations are filled using LOCF (last observation carried forward) at query time.
+**Pattern: Snapshot.** Records an observed account balance at a point in time. A new observation (the balance changed) is a new row with a later `valid_from`; the old row stays current truth for its own window. A correction (the row was recorded wrong) inserts a superseding row at the original `valid_from` and marks the wrong row `superseded_by`. Gaps between observations are filled using LOCF (last observation carried forward) at query time.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -35,6 +37,7 @@ Every ingested row in this database traces back to a row in `documents`. It is t
 | `valid_to` | DATE | NULL means this is the current open row. Set when a correction supersedes this row. |
 | `recorded_at` | TIMESTAMP | UTC timestamp when this row was written to the database. Different from `valid_from` for backfilled entries. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. Every balance row is traceable to a source. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **LOCF gap-fill pattern.** To get the balance for a given account on a given date, use the most recent `valid_from` that is on or before the query date:
 
@@ -100,6 +103,7 @@ For the current balance (today), omit the date filter and just get the row with 
 | `valid_to` | DATE | NULL = current row. Set when holding changes. |
 | `recorded_at` | TIMESTAMP | When written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **To value a holding:** join with `asset_prices` on `asset_id` for the latest price on or before the query date, then multiply `quantity × unit_price_pence`.
 
@@ -119,6 +123,7 @@ For the current balance (today), omit the date filter and just get the row with 
 | `source` | TEXT | Where the price came from: `manual`, `coingecko`, `zoopla`, `web_search`, etc. |
 | `recorded_at` | TIMESTAMP | When this row was written. |
 | `source_id` | INTEGER | FK to `documents.id`. NULL for connector-fetched prices that have no uploaded document. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **To get the latest price for an asset:**
 
@@ -174,6 +179,7 @@ ORDER BY asset_id, as_of DESC
 | `recorded_at` | TIMESTAMP | UTC timestamp when the row was written to the database. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 | `payload` | TEXT | JSON object holding descriptive payslip line items (`{"line_items": [{"description": "...", "section": "payment"\|"deduction", "amount_pence": N}]}`). Each line carries its `section` — which side of the payslip it sits on. Present when ingested via the upload widget. **Do not use `payload` as a source for arithmetic or aggregation** — use the typed spine columns above. The payload is for display and auditability only. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted payslip, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **Sign convention:** all amounts are positive integers. Deductions are stored as their absolute value — do not negate.
 
@@ -193,6 +199,7 @@ ORDER BY asset_id, as_of DESC
 | `valid_to` | DATE | NULL = current row. Set when superseded. |
 | `recorded_at` | TIMESTAMP | When this row was written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 ---
 
@@ -211,6 +218,7 @@ ORDER BY asset_id, as_of DESC
 | `valid_to` | DATE | NULL = current row. |
 | `recorded_at` | TIMESTAMP | When written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **Property equity:** To compute equity, join the mortgage's `outstanding_pence` with the latest `asset_prices.unit_price_pence` for the property asset (matched by `mortgages.property = assets.name` where `assets.asset_type = 'property'`). Equity = property value − outstanding.
 
@@ -231,6 +239,7 @@ ORDER BY asset_id, as_of DESC
 | `valid_to` | DATE | NULL = current profile. Set on change. |
 | `recorded_at` | TIMESTAMP | When written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 ---
 
@@ -249,6 +258,7 @@ ORDER BY asset_id, as_of DESC
 | `asset_id` | INTEGER | FK to `assets.id`. The underlying share. Used to look up current price in `asset_prices` for unvested-unit valuation. NULL if not linked. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 | `payload` | TEXT | JSON for scheme-specific terms. **Do not use for arithmetic** — payload is for display only. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = retracted grant (and its vesting events), retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **Net worth note.** The vesting schedule is recorded as `equity_vesting_event` rows — one per tranche, past or future. A tranche with `vest_date <= as_of` is realised; one with `vest_date > as_of` is an upcoming (contingent) vest. Upcoming vests are valued at the current share price via `equity_grant.asset_id` → `asset_prices`: RSUs at `units × price`, options at `units × max(price − strike_pence, 0)`. Units with no recorded tranche (`units − SUM(equity_vesting_event.units_vested) > 0`) are surfaced as unscheduled.
 
@@ -270,6 +280,7 @@ ORDER BY asset_id, as_of DESC
 | `recorded_at` | TIMESTAMP | When this row was written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 | `payload` | TEXT | JSON for scheme-specific detail (e.g. tax withholding method). **Do not use for arithmetic.** |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **Sign convention.** `estimated_value_pence` is the gross estimated proceeds before tax. Tax liability is computed separately (deferred to cashflow flow).
 
@@ -292,6 +303,7 @@ ORDER BY asset_id, as_of DESC
 | `external_id` | TEXT | The provider's own transaction identifier (e.g. a Monzo transaction id). NULL for manual rows. Unique; connector syncs use it to avoid inserting the same transaction twice. |
 | `is_internal` | INTEGER | `1` if this is a movement between the user's own accounts or pots (e.g. funding a savings pot), `0` otherwise. Default `0`. Internal movements are excluded from spending totals (cashflow outflow, average monthly outgoings) since they are not consumption. They are NOT excluded from ISA contribution totals, where a current-to-ISA transfer is a genuine contribution. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
+| `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
 **Cashflow note.** `transactions` (the bank feed) is the source of truth for actual money in and out, including the salary credit, rent, and any other income — these are all positive `amount_pence` rows. `income_events` (payslips) is the tax decomposition of salary (gross, PAYE, NI, pension) and is NOT an income amount to add: summing `income_events.net_pence` together with transaction inflows double-counts the salary, which already lands as a credit in `transactions`. Use `income_events` for the gross/tax/pension split and tax-year allowance logic, never as a cashflow total. Exclude internal movements (`transactions.is_internal = 1`) from spending and inflow aggregations. Treat the `savings` category as a distinct third stream (savings and investing), separate from spending: money moved to or from savings/investments held outside the connected accounts (e.g. Monzo Investments) is a cash movement but neither consumption nor a net-worth change, so it is reported as its own net figure and excluded from the spending and income totals. Transfers into Monzo savings/ISA pots are internal (`is_internal = 1`, their `description` is the destination pot's `external_id`); they stay in liquid savings and are reported separately as "into pots", never in spending and never in the net. To anchor to a UK tax year, join `transactions.occurred_at` to `tax_periods` using `CAST(occurred_at AS DATE) BETWEEN starts_on AND ends_on`.
 

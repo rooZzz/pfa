@@ -106,6 +106,8 @@ The fan-out (rather than a single dispatching tool) keeps each tool's argument s
 
 ## Flow 2 — Edit
 
+**Status: built (2026-06-01).** Deterministic primitive in `server/corrections.ts`; `correct_record` and `retract_record` tools. `superseded_by` marker (migration `0009`) excludes corrected/retracted rows from every read; removal is a logical tombstone. Connector-sourced rows are refused; equity grants are retract-and-recreate.
+
 Edit is not a separate surface. It folds into the manual-entry path: a correction is a new manual observation that supersedes a prior one. There is no `ui://sources` browser. Editing must never destroy history — a correction is a new fact about an old fact.
 
 **Trigger.** The user knows a committed value is wrong, or wants to remove a source ("the pension figure from that March statement should be 190190").
@@ -117,7 +119,7 @@ Edit is not a separate surface. It folds into the manual-entry path: a correctio
 - Locate and confirm. Read (via the query pipeline) to resolve the target to a specific row, then confirm it with the user in chat: "correcting the 2026-03-31 pension snapshot, 185,000 to 190,190?"
 - On confirmation, write an audit JSON document (source_type `manual`) capturing the raw instruction, then apply the correction via the fixed correction primitive.
 
-**The correction primitive — never LLM-generated mutation SQL.** The model extracts intent; a deterministic code path performs the write. Snapshot: close the old row (`valid_to = today`), insert the corrected row preserving the original `valid_from`, `source_id` pointing at the audit document. Event: a superseding or reversing entry, never an in-place mutation. Removal: a superseding tombstone entry, not a hard delete.
+**The correction primitive — never LLM-generated mutation SQL.** The model extracts intent; a deterministic code path performs the write. Both snapshots and events use one mechanism: insert the corrected row (preserving the original effective date — `valid_from`/`occurred_at`/`pay_date`) with `source_id` pointing at the audit document, then set `superseded_by` on the wrong row to point at its successor. Removal sets `superseded_by` to the row's own id with no successor — a logical tombstone, not a hard delete. Financial columns of the original are never overwritten. Reads filter `superseded_by IS NULL`, so corrected and removed facts leave current truth while staying on disk for audit.
 
 **Read / written.** Reads to locate the target (DuckDB, read-only). Writes the audit document plus correction rows through the write store. Never issues `UPDATE` or `DELETE` against committed data.
 

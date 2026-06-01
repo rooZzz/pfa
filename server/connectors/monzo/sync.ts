@@ -41,6 +41,7 @@ async function upsertBalanceSnapshot(
     .where("account_id", "=", accountId)
     .where("valid_from", "=", syncDate)
     .where("valid_to", "is", null)
+    .where("superseded_by", "is", null)
     .executeTakeFirst();
 
   if (existing) {
