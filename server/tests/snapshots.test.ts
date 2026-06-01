@@ -70,6 +70,7 @@ describe("same-day snapshot resolution", () => {
       asset_name: "Vanguard FTSE All-World",
       asset_type: "etf",
       base_currency: "GBP",
+      ticker: "VWRL",
       quantity: 1,
       valid_from: AS_OF,
     });
@@ -77,6 +78,7 @@ describe("same-day snapshot resolution", () => {
       asset_name: "Vanguard FTSE All-World",
       asset_type: "etf",
       base_currency: "GBP",
+      ticker: "VWRL",
       unit_price_pence: 10000,
       currency: "GBP",
       as_of: AS_OF,
@@ -86,6 +88,7 @@ describe("same-day snapshot resolution", () => {
       asset_name: "Vanguard FTSE All-World",
       asset_type: "etf",
       base_currency: "GBP",
+      ticker: "VWRL",
       unit_price_pence: 12500,
       currency: "GBP",
       as_of: AS_OF,

@@ -53,6 +53,7 @@ export interface EquityGrantTable {
   grant_date: string;
   currency: Generated<string>;
   asset_id: number | null;
+  monthly_contribution_pence: number | null;
   source_id: number;
   payload: string | null;
   superseded_by: number | null;

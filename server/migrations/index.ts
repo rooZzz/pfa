@@ -8,6 +8,7 @@ import * as m0006 from "./0006_tax_constants.js";
 import * as m0007 from "./0007_payslip_tax_code.js";
 import * as m0008 from "./0008_asset_ticker.js";
 import * as m0009 from "./0009_superseded_by.js";
+import * as m0010 from "./0010_saye_monthly_contribution.js";
 
 type Migration = {
   name: string;
@@ -25,6 +26,7 @@ const MIGRATIONS: Migration[] = [
   { name: "0007_payslip_tax_code", ...m0007 },
   { name: "0008_asset_ticker", ...m0008 },
   { name: "0009_superseded_by", ...m0009 },
+  { name: "0010_saye_monthly_contribution", ...m0010 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {

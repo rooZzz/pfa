@@ -240,6 +240,7 @@ describe("recordAssetHolding", () => {
       asset_name: "ETH",
       asset_type: "crypto",
       base_currency: "ETH",
+      ticker: "ETH",
       quantity: 1500000000,
       valid_from: "2026-05-01",
     });
@@ -265,6 +266,7 @@ describe("recordAssetHolding", () => {
       asset_name: "ETH",
       asset_type: "crypto",
       base_currency: "ETH",
+      ticker: "ETH",
       quantity: 100,
       valid_from: "2026-01-01",
     });
@@ -272,6 +274,7 @@ describe("recordAssetHolding", () => {
       asset_name: "ETH",
       asset_type: "crypto",
       base_currency: "ETH",
+      ticker: "ETH",
       quantity: 200,
       valid_from: "2026-05-01",
     });
@@ -294,6 +297,7 @@ describe("recordAssetPrice", () => {
       asset_name: "ETH",
       asset_type: "crypto",
       base_currency: "ETH",
+      ticker: "ETH",
       unit_price_pence: 350000,
       currency: "GBP",
       as_of: "2026-05-01",
@@ -346,6 +350,7 @@ describe("recordEquityGrant", () => {
       currency: "GBP",
       underlying_asset_name: "ACME Corp",
       underlying_asset_type: "stock",
+      ticker: "ACME",
     });
 
     const db = getDb();

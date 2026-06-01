@@ -201,6 +201,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "ETH",
     asset_type: "crypto",
     base_currency: "ETH",
+    ticker: "ETH",
     quantity: 42500,
     valid_from: monthsAgo(0, 25),
   });
@@ -208,6 +209,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "ETH",
     asset_type: "crypto",
     base_currency: "ETH",
+    ticker: "ETH",
     unit_price_pence: 28,
     currency: "GBP",
     as_of: monthsAgo(0, 25),
@@ -218,6 +220,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "BTC",
     asset_type: "crypto",
     base_currency: "BTC",
+    ticker: "BTC",
     quantity: 1250,
     valid_from: monthsAgo(0, 25),
   });
@@ -225,6 +228,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "BTC",
     asset_type: "crypto",
     base_currency: "BTC",
+    ticker: "BTC",
     unit_price_pence: 676,
     currency: "GBP",
     as_of: monthsAgo(0, 25),
@@ -235,6 +239,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "Vanguard FTSE All-World",
     asset_type: "etf",
     base_currency: "GBP",
+    ticker: "VWRL",
     quantity: 320,
     valid_from: monthsAgo(1, 12),
   });
@@ -242,6 +247,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "Vanguard FTSE All-World",
     asset_type: "etf",
     base_currency: "GBP",
+    ticker: "VWRL",
     unit_price_pence: 11000,
     currency: "GBP",
     as_of: monthsAgo(1, 12),
@@ -252,6 +258,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "AAPL",
     asset_type: "stock",
     base_currency: "USD",
+    ticker: "AAPL",
     quantity: 45,
     valid_from: monthsAgo(2, 8),
   });
@@ -259,6 +266,7 @@ async function seedAssets(): Promise<void> {
     asset_name: "AAPL",
     asset_type: "stock",
     base_currency: "USD",
+    ticker: "AAPL",
     unit_price_pence: 15222,
     currency: "GBP",
     as_of: monthsAgo(2, 8),
@@ -298,6 +306,7 @@ async function seedEquity(): Promise<void> {
     asset_name: "ACME Corp",
     asset_type: "stock",
     base_currency: "GBP",
+    ticker: "ACME",
     unit_price_pence: 4250,
     currency: "GBP",
     as_of: TODAY,
@@ -388,6 +397,7 @@ async function seedEquity(): Promise<void> {
     underlying_asset_name: "ACME Corp",
     underlying_asset_type: "stock",
     ticker: "ACME",
+    monthly_contribution_pence: 50000,
   });
   const sayeId = parseGrantId(sayeMessage);
   await recordVestingEvent({

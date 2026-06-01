@@ -11,7 +11,15 @@ import type {
   UnscheduledLine,
 } from "../net_worth/types.js";
 import { Masthead } from "./branding.js";
-import { Btn, CompositionBar, CoverageGrid, Sparkline, Stat } from "./components.js";
+import {
+  Btn,
+  CompositionBar,
+  CoverageGrid,
+  Sparkline,
+  Stat,
+  TickerChip,
+} from "./components.js";
+import { tickerToLogo } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
@@ -43,33 +51,96 @@ const staleBadge = (
   </span>
 );
 
+function TickerLead({ ticker }: { ticker: string }) {
+  const hasLogo = tickerToLogo(ticker) != null;
+  return (
+    <>
+      <TickerChip ticker={ticker} />
+      {hasLogo ? ` ${ticker}` : ""}
+    </>
+  );
+}
+
+function schemeMeta(line: ContingentLine | UnscheduledLine): ReactNode {
+  const meta = `${line.units.toLocaleString()} ${line.scheme_type.toUpperCase()}`;
+  if (line.ticker) {
+    return (
+      <>
+        <TickerLead ticker={line.ticker} /> · {meta}
+      </>
+    );
+  }
+  return (
+    <>
+      {meta}
+      {line.asset_name ? ` · ${line.asset_name}` : ""}
+    </>
+  );
+}
+
 function realisedRowLabel(line: RealisedLine): ReactNode {
   const hasPriceMeta = line.kind === "asset" || line.kind === "property";
   const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
   const isStale = priceAge != null && priceAge > 30;
   const age = hasPriceMeta ? ageLabel(priceAge) : ageLabel(daysSince(line.valid_from));
+  const showUnits =
+    line.kind === "asset" && line.quantity != null && line.unit_price_pence != null;
+  const lead =
+    line.kind === "asset" && line.ticker ? (
+      <TickerLead ticker={line.ticker} />
+    ) : (
+      line.name
+    );
   return (
     <>
-      {line.name}
-      <span className="sub sub-inline">{age}</span>
+      {lead}
+      <span className="sub sub-inline">
+        {showUnits
+          ? `${line.quantity!.toLocaleString()} units · ${formatGbp(line.unit_price_pence!)}/unit · ${age}`
+          : age}
+      </span>
       {isStale && staleBadge}
     </>
   );
 }
 
+function vestDetail(line: ContingentLine): string {
+  const optionPrice =
+    line.strike_pence != null ? `${formatGbp(line.strike_pence)} option price` : null;
+  const hasFloor = line.scheme_type === "saye" && line.savings_floor_pence != null;
+  const isUnderwater =
+    hasFloor &&
+    (line.price_per_unit_pence == null ||
+      line.strike_pence == null ||
+      line.price_per_unit_pence <= line.strike_pence);
+
+  if (hasFloor && isUnderwater) {
+    const perMonth =
+      line.monthly_contribution_pence != null
+        ? `${formatGbp(line.monthly_contribution_pence)}/mo → `
+        : "";
+    const returned = `${perMonth}${formatGbp(line.savings_floor_pence!)} returned`;
+    return optionPrice ? `${returned} · under ${optionPrice}` : returned;
+  }
+
+  const parts: string[] = [
+    line.price_per_unit_pence != null
+      ? `${formatGbp(line.price_per_unit_pence)}/unit`
+      : "no price",
+  ];
+  if (optionPrice) parts.push(optionPrice);
+  if (hasFloor) parts.push(`+${formatGbp(line.savings_floor_pence!)} savings`);
+  return parts.join(" · ");
+}
+
 function vestRowLabel(line: ContingentLine): ReactNode {
   const priceAge = daysSince(line.price_as_of ?? undefined);
   const isStale = priceAge != null && priceAge > 30;
-  const identifier = line.ticker ?? line.asset_name ?? "unlinked";
   return (
     <>
-      {line.units.toLocaleString()} {line.scheme_type.toUpperCase()} · {identifier}
+      {schemeMeta(line)}
       <span className="sub sub-inline">
-        vests {line.vest_date}
-        {line.price_per_unit_pence != null
-          ? ` · ${formatGbp(line.price_per_unit_pence)}/unit`
-          : " · no price"}
-        {line.strike_pence != null ? ` · strike ${formatGbp(line.strike_pence)}` : ""}
+        vests {line.vest_date} · {vestDetail(line)}
       </span>
       {isStale && staleBadge}
     </>
@@ -77,10 +148,9 @@ function vestRowLabel(line: ContingentLine): ReactNode {
 }
 
 function unscheduledRowLabel(line: UnscheduledLine): ReactNode {
-  const identifier = line.ticker ?? line.asset_name ?? "unlinked";
   return (
     <>
-      {line.units.toLocaleString()} {line.scheme_type.toUpperCase()} · {identifier}
+      {schemeMeta(line)}
       <span className="sub sub-inline">vest dates not recorded</span>
     </>
   );
@@ -325,7 +395,9 @@ function NetWorthApp() {
         <div className="stack-2">
           <div className="lhead">
             <h4>Upcoming vests</h4>
-            <span className="hint">valued at today's price · excluded from total</span>
+            <span className="hint">
+              valued at latest captured price · excluded from total
+            </span>
           </div>
           <div className="card card--flush">
             <DataTable

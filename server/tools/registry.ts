@@ -9,6 +9,7 @@ import { correctRecordTool, correctRecordSchema } from "./correct_record.js";
 import { retractRecordTool, retractRecordSchema } from "./retract_record.js";
 import { connectMonzo, connectMonzoSchema } from "./connect_monzo.js";
 import { syncMonzo } from "./sync_monzo.js";
+import { syncPrices } from "./sync_prices.js";
 import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
 import { ingestDocument } from "./ingest_document.js";
 import { proposeGoal, proposeGoalSchema } from "./propose_goal.js";
@@ -100,30 +101,30 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "record_asset_holding",
     description:
-      "Record the quantity held for an asset (crypto, ETF, stock, property, other). Creates the asset if it does not exist. Quantity is inventory — record a separate price with record_asset_price for valuation.",
+      "Record the quantity held for an asset (crypto, ETF, stock, property, other). Creates the asset if it does not exist. Quantity is inventory — for stock/ETF/crypto a fresh price is pulled automatically on capture (Yahoo/CoinGecko, best-effort); for manual-priced types record a price with record_asset_price. For stock, ETF, and crypto a ticker is required and is the asset's identity: pass the canonical symbol you are confident maps to the holding, or ask the user before calling.",
     inputSchema: recordAssetHoldingSchema,
-    handler: async (input) => text(await recordAssetHolding(input)),
+    handler: async (input) => text(await recordAssetHolding(input, fetch)),
   }),
   defineTool({
     name: "record_asset_price",
     description:
-      "Record a per-unit price observation for an asset. Used for valuation of holdings and unvested equity. Creates the asset if it does not exist. Call this whenever the price changes — holdings stay unchanged.",
+      "Record a per-unit price observation for an asset. Used for valuation of holdings and unvested equity. Creates the asset if it does not exist. Call this whenever the price changes — holdings stay unchanged. For stock, ETF, and crypto a ticker is required so the price lands on the same canonical asset as its holding and grants. For ticker assets with an automated price source, prefer sync_prices over hand-entering prices.",
     inputSchema: recordAssetPriceSchema,
     handler: async (input) => text(await recordAssetPrice(input)),
   }),
   defineTool({
     name: "refresh_asset_price",
     description:
-      "Refresh the price for an asset according to its price_source. For manual assets, returns instructions to call record_asset_price. Connector sources are not yet implemented.",
+      "Refresh the price for a single asset according to its price_source. For automated sources (yahoo for stocks/ETFs, coingecko for crypto) it fetches and stores a fresh price tick and reports the source instrument name to confirm against the held security. For manual assets, returns instructions to call record_asset_price. To refresh every automated asset at once, use sync_prices.",
     inputSchema: refreshAssetPriceSchema,
     handler: async (input) => text(await refreshAssetPrice(input)),
   }),
   defineTool({
     name: "record_equity_grant",
     description:
-      "Record an equity grant (RSU, EMI, unapproved option, or SAYE). Records only what was granted — units, strike, grant date — not when it vests. Returns a grant ID; record each vest date (including future maturity dates) separately with record_vesting_event using that ID.",
+      "Record an equity grant (RSU, EMI, unapproved option, or SAYE). Records only what was granted — units, strike, grant date — not when it vests. Returns a grant ID; record each vest date (including future maturity dates) separately with record_vesting_event using that ID. Always link the underlying share with underlying_asset_name and its ticker (the asset identity, shared across every grant over the same share); a fresh price for the underlying is pulled automatically on capture (best-effort). SAYE grants also require monthly_contribution_pence — the savings floor that an underwater SAYE returns at maturity.",
     inputSchema: recordEquityGrantSchema,
-    handler: async (input) => text(await recordEquityGrant(input)),
+    handler: async (input) => text(await recordEquityGrant(input, fetch)),
   }),
   defineTool({
     name: "record_transaction",
@@ -244,6 +245,13 @@ export const tools: ToolDescriptor[] = [
       "Sync the latest Monzo transactions, balances, and pots into the canonical store. Idempotent — re-running does not duplicate transactions. Requires Monzo to be connected first.",
     inputSchema: {},
     handler: async () => text(await syncMonzo()),
+  }),
+  defineTool({
+    name: "sync_prices",
+    description:
+      "Fetch fresh prices for every asset with an automated price source (yahoo for stocks/ETFs, coingecko for crypto) and store a price tick for each. Appends to the price time series — net worth and unvested valuations pick up the latest. Reports each source instrument name so a mis-mapped ticker (a different company's price) is visible. Cadence is hourly at most. Assets without a ticker or with price_source 'manual' are untouched.",
+    inputSchema: {},
+    handler: async () => text(await syncPrices()),
   }),
   defineTool({
     name: "ingest_document",
