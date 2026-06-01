@@ -8,11 +8,28 @@ type ContingentResult = {
   unscheduled: UnscheduledLine[];
 };
 
+function monthsBetween(from: string, to: string): number {
+  const [fromYear, fromMonth] = from.split("-").map(Number);
+  const [toYear, toMonth] = to.split("-").map(Number);
+  return Math.max((toYear! - fromYear!) * 12 + (toMonth! - fromMonth!), 0);
+}
+
 function projectedValuePence(
+  schemeType: string,
   units: number,
   pricePerUnit: number | null,
   strikePence: number | null,
+  savingsFloorPence: number | null,
 ): number | null {
+  if (schemeType === "saye") {
+    if (savingsFloorPence == null) {
+      if (pricePerUnit == null) return null;
+      return units * Math.max(pricePerUnit - (strikePence ?? 0), 0);
+    }
+    const intrinsic =
+      pricePerUnit == null ? 0 : units * Math.max(pricePerUnit - (strikePence ?? 0), 0);
+    return savingsFloorPence + intrinsic;
+  }
   if (pricePerUnit == null) return null;
   if (strikePence == null) return units * pricePerUnit;
   return units * Math.max(pricePerUnit - strikePence, 0);
@@ -20,7 +37,8 @@ function projectedValuePence(
 
 export async function queryContingentLines(asOf: string): Promise<ContingentResult> {
   const grants = await runQuery(
-    `SELECT id, scheme_type, units, strike_pence, asset_id FROM pfa.equity_grant WHERE superseded_by IS NULL`,
+    `SELECT id, scheme_type, units, strike_pence, asset_id, grant_date, monthly_contribution_pence
+     FROM pfa.equity_grant WHERE superseded_by IS NULL`,
   );
   if (grants.length === 0) return { upcoming: [], unscheduled: [] };
 
@@ -89,11 +107,21 @@ export async function queryContingentLines(asOf: string): Promise<ContingentResu
     const pricePerUnit = priceEntry?.price ?? null;
     const strikePence = grant.strike_pence != null ? toNum(grant.strike_pence) : null;
     const units = toNum(e.units_vested);
+    const schemeType = toStr(grant.scheme_type);
+    const vestDate = toStr(e.vest_date);
+    const monthly =
+      grant.monthly_contribution_pence != null
+        ? toNum(grant.monthly_contribution_pence)
+        : null;
+    const savingsFloor =
+      schemeType === "saye" && monthly != null
+        ? monthly * monthsBetween(toStr(grant.grant_date), vestDate)
+        : null;
 
     upcoming.push({
       grant_id: grantId,
-      vest_date: toStr(e.vest_date),
-      scheme_type: toStr(grant.scheme_type),
+      vest_date: vestDate,
+      scheme_type: schemeType,
       units,
       ticker: asset?.ticker ?? null,
       asset_name: asset?.name ?? null,
@@ -101,7 +129,15 @@ export async function queryContingentLines(asOf: string): Promise<ContingentResu
       price_as_of: priceEntry?.asOf ?? null,
       price_source: priceEntry?.source ?? null,
       strike_pence: strikePence,
-      projected_value_pence: projectedValuePence(units, pricePerUnit, strikePence),
+      monthly_contribution_pence: monthly,
+      savings_floor_pence: savingsFloor,
+      projected_value_pence: projectedValuePence(
+        schemeType,
+        units,
+        pricePerUnit,
+        strikePence,
+        savingsFloor,
+      ),
       not_owned: true,
     });
   }

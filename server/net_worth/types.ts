@@ -6,6 +6,9 @@ export type RealisedLine = {
   recorded_at: string;
   source_id: number;
   currency: string;
+  ticker?: string | null;
+  quantity?: number;
+  unit_price_pence?: number;
   price_as_of?: string;
   price_source?: string;
 };
@@ -21,6 +24,8 @@ export type ContingentLine = {
   price_as_of: string | null;
   price_source: string | null;
   strike_pence: number | null;
+  monthly_contribution_pence: number | null;
+  savings_floor_pence: number | null;
   projected_value_pence: number | null;
   not_owned: true;
 };

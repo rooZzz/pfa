@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getKysely } from "../db.js";
+import { fetchAssetQuote, recordPriceTick } from "../connectors/prices/sync.js";
 
 export const refreshAssetPriceSchema = {
   asset_id: z
@@ -9,10 +10,13 @@ export const refreshAssetPriceSchema = {
     .describe("The asset ID to refresh the price for."),
 };
 
-export async function refreshAssetPrice(input: { asset_id: number }): Promise<string> {
+export async function refreshAssetPrice(
+  input: { asset_id: number },
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
   const asset = await getKysely()
     .selectFrom("assets")
-    .select(["id", "name", "asset_type", "price_source"])
+    .select(["id", "name", "asset_type", "ticker", "price_source"])
     .where("id", "=", input.asset_id)
     .executeTakeFirst();
 
@@ -27,8 +31,20 @@ export async function refreshAssetPrice(input: { asset_id: number }): Promise<st
     ].join(" ");
   }
 
+  const quote = await fetchAssetQuote(
+    {
+      id: Number(asset.id),
+      name: asset.name,
+      asset_type: asset.asset_type,
+      ticker: asset.ticker,
+      price_source: asset.price_source,
+    },
+    fetchImpl,
+  );
+  await recordPriceTick(Number(asset.id), quote, asset.price_source);
+
   return [
-    `Price source '${asset.price_source}' for ${asset.name} is not yet implemented.`,
-    `Connector integrations land in a follow-up. For now, use record_asset_price to update manually.`,
+    `Refreshed ${asset.name} (${asset.ticker}) from ${asset.price_source}: £${(quote.unit_price_pence / 100).toFixed(2)} as of ${quote.as_of} UTC.`,
+    `Source instrument: ${quote.instrument_name} (${quote.source_symbol}) — confirm this is the security you hold.`,
   ].join(" ");
 }

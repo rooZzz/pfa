@@ -54,6 +54,21 @@ export async function ensureAccount(
   return Number(row.id);
 }
 
+const TICKERED_ASSET_TYPES = new Set(["stock", "etf", "crypto"]);
+
+export function normalizeTicker(raw: string): string {
+  return raw
+    .trim()
+    .toUpperCase()
+    .replace(/\.(L|LON|UK)$/, "");
+}
+
+export function priceSourceForAssetType(asset_type: string): string {
+  if (asset_type === "crypto") return "coingecko";
+  if (asset_type === "stock" || asset_type === "etf") return "yahoo";
+  return "manual";
+}
+
 export async function ensureAsset(
   trx: Transaction<DatabaseSchema>,
   name: string,
@@ -61,27 +76,39 @@ export async function ensureAsset(
   base_currency: string,
   ticker?: string,
 ): Promise<number> {
-  const existing = await trx
-    .selectFrom("assets")
-    .select(["id", "ticker"])
-    .where("name", "=", name)
-    .where("asset_type", "=", asset_type)
-    .executeTakeFirst();
-  if (existing) {
-    if (ticker && existing.ticker == null) {
-      await trx
-        .updateTable("assets")
-        .set({ ticker })
-        .where("id", "=", existing.id)
-        .execute();
-    }
-    return Number(existing.id);
+  const normalized = ticker ? normalizeTicker(ticker) : null;
+
+  if (normalized) {
+    const byTicker = await trx
+      .selectFrom("assets")
+      .select(["id"])
+      .where("ticker", "=", normalized)
+      .executeTakeFirst();
+    if (byTicker) return Number(byTicker.id);
+  } else {
+    const byName = await trx
+      .selectFrom("assets")
+      .select(["id"])
+      .where("name", "=", name)
+      .where("asset_type", "=", asset_type)
+      .executeTakeFirst();
+    if (byName) return Number(byName.id);
   }
 
   const row = await trx
     .insertInto("assets")
-    .values({ name, asset_type, base_currency, ticker: ticker ?? null })
+    .values({
+      name,
+      asset_type,
+      base_currency,
+      ticker: normalized,
+      price_source: priceSourceForAssetType(asset_type),
+    })
     .returning("id")
     .executeTakeFirstOrThrow();
   return Number(row.id);
+}
+
+export function requiresTicker(asset_type: string): boolean {
+  return TICKERED_ASSET_TYPES.has(asset_type);
 }

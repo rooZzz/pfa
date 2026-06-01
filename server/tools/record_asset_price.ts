@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getKysely } from "../db.js";
-import { ensureAsset, writeManualDocument } from "../references.js";
+import { ensureAsset, requiresTicker, writeManualDocument } from "../references.js";
 
 export const recordAssetPriceSchema = {
   asset_name: z.string().describe("Asset name, e.g. 'ETH', 'Vanguard FTSE All-World'."),
@@ -10,6 +10,12 @@ export const recordAssetPriceSchema = {
   base_currency: z
     .string()
     .describe("Native currency of the asset, e.g. 'ETH', 'USD', 'GBP'."),
+  ticker: z
+    .string()
+    .optional()
+    .describe(
+      "Trading symbol, REQUIRED for stock, etf, and crypto: it is the asset's identity, so the price lands on the same asset as its holding and grants. Use the canonical symbol ('EXPN', 'BTC'), not the exchange-suffixed form. Map confidently or ask the user before calling. Omit only for property and other.",
+    ),
   unit_price_pence: z
     .number()
     .int()
@@ -39,11 +45,18 @@ export async function recordAssetPrice(input: {
   asset_name: string;
   asset_type: string;
   base_currency: string;
+  ticker?: string;
   unit_price_pence: number;
   currency: string;
   as_of: string;
   source: string;
 }): Promise<string> {
+  if (requiresTicker(input.asset_type) && !input.ticker?.trim()) {
+    throw new Error(
+      `A ticker is required for ${input.asset_type} assets — it is the asset's identity. Supply the trading symbol (e.g. 'EXPN' for Experian) so the price links to one canonical asset.`,
+    );
+  }
+
   const { sourceId, assetId } = await getKysely()
     .transaction()
     .execute(async (trx) => {
@@ -52,6 +65,7 @@ export async function recordAssetPrice(input: {
         entry_type: "asset_price",
         asset_name: input.asset_name,
         asset_type: input.asset_type,
+        ticker: input.ticker ?? null,
         unit_price_pence: input.unit_price_pence,
         currency: input.currency,
         as_of: input.as_of,
@@ -63,6 +77,7 @@ export async function recordAssetPrice(input: {
         input.asset_name,
         input.asset_type,
         input.base_currency,
+        input.ticker,
       );
 
       await trx

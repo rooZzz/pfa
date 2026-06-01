@@ -256,11 +256,12 @@ ORDER BY asset_id, as_of DESC
 | `grant_date` | DATE | Date the award was granted. |
 | `currency` | TEXT | ISO 4217 code. Default `GBP`. |
 | `asset_id` | INTEGER | FK to `assets.id`. The underlying share. Used to look up current price in `asset_prices` for unvested-unit valuation. NULL if not linked. |
+| `monthly_contribution_pence` | INTEGER | SAYE only: the fixed monthly savings amount in pence. NULL for other schemes. Drives the savings floor returned at maturity. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 | `payload` | TEXT | JSON for scheme-specific terms. **Do not use for arithmetic** — payload is for display only. |
 | `superseded_by` | INTEGER | NULL = current truth. Non-null = retracted grant (and its vesting events), retained for audit only. Always filter `superseded_by IS NULL`. |
 
-**Net worth note.** The vesting schedule is recorded as `equity_vesting_event` rows — one per tranche, past or future. A tranche with `vest_date <= as_of` is realised; one with `vest_date > as_of` is an upcoming (contingent) vest. Upcoming vests are valued at the current share price via `equity_grant.asset_id` → `asset_prices`: RSUs at `units × price`, options at `units × max(price − strike_pence, 0)`. Units with no recorded tranche (`units − SUM(equity_vesting_event.units_vested) > 0`) are surfaced as unscheduled.
+**Net worth note.** The vesting schedule is recorded as `equity_vesting_event` rows — one per tranche, past or future. A tranche with `vest_date <= as_of` is realised; one with `vest_date > as_of` is an upcoming (contingent) vest. Upcoming vests are valued at the latest captured share price via `equity_grant.asset_id` → `asset_prices`: RSUs at `units × price`, EMI/unapproved options at `units × max(price − strike_pence, 0)`. SAYE adds its savings floor — `savings_pot + units × max(price − strike_pence, 0)` where `savings_pot = monthly_contribution_pence × months between grant_date and vest_date` — so an underwater SAYE is valued at the cash returned, never zero. Units with no recorded tranche (`units − SUM(equity_vesting_event.units_vested) > 0`) are surfaced as unscheduled.
 
 ---
 

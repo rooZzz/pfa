@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { MonthCoverage, SeriesStatus } from "../net_worth/coverage.js";
+import { tickerToLogo } from "./logos.js";
 
 export type IconName =
   | "refresh"
@@ -177,6 +178,30 @@ export function Badge({
     <span className={"badge" + (tone ? " " + tone : "")}>
       {led && <span className="led" />}
       {children}
+    </span>
+  );
+}
+
+export function TickerChip({ ticker }: { ticker: string | null }) {
+  const trimmed = ticker?.trim();
+  const logo = tickerToLogo(trimmed);
+  if (logo) {
+    return (
+      <img
+        className="ticker-logo"
+        src={logo}
+        alt={trimmed ?? ""}
+        title={trimmed ?? undefined}
+      />
+    );
+  }
+  const label = trimmed ? trimmed.toUpperCase().slice(0, 4) : "·";
+  return (
+    <span
+      className={"ticker-chip" + (trimmed ? "" : " ticker-chip--muted")}
+      title={trimmed ?? "no ticker"}
+    >
+      {label}
     </span>
   );
 }

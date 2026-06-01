@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -11,7 +11,16 @@ import type {
   UnscheduledLine,
 } from "../net_worth/types.js";
 import { Masthead } from "./branding.js";
-import { Btn, CompositionBar, CoverageGrid, Sparkline, Stat } from "./components.js";
+import {
+  Btn,
+  CompositionBar,
+  CoverageGrid,
+  Icon,
+  Sparkline,
+  Stat,
+  TickerChip,
+} from "./components.js";
+import { tickerToLogo } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
@@ -43,33 +52,139 @@ const staleBadge = (
   </span>
 );
 
+function TickerLead({ ticker }: { ticker: string }) {
+  const hasLogo = tickerToLogo(ticker) != null;
+  return (
+    <>
+      <TickerChip ticker={ticker} />
+      {hasLogo ? ` ${ticker}` : ""}
+    </>
+  );
+}
+
+function assetLead(ticker: string | null, fallbackName: string | null): ReactNode {
+  if (ticker) return <TickerLead ticker={ticker} />;
+  return fallbackName ?? "unlinked";
+}
+
 function realisedRowLabel(line: RealisedLine): ReactNode {
   const hasPriceMeta = line.kind === "asset" || line.kind === "property";
   const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
   const isStale = priceAge != null && priceAge > 30;
   const age = hasPriceMeta ? ageLabel(priceAge) : ageLabel(daysSince(line.valid_from));
+  const showUnits =
+    line.kind === "asset" && line.quantity != null && line.unit_price_pence != null;
+  const lead =
+    line.kind === "asset" && line.ticker ? (
+      <TickerLead ticker={line.ticker} />
+    ) : (
+      line.name
+    );
   return (
     <>
-      {line.name}
-      <span className="sub sub-inline">{age}</span>
+      {lead}
+      <span className="sub sub-inline">
+        {showUnits
+          ? `${line.quantity!.toLocaleString()} units · ${formatGbp(line.unit_price_pence!)}/unit · ${age}`
+          : age}
+      </span>
       {isStale && staleBadge}
     </>
   );
 }
 
+function isSayeFloor(line: ContingentLine): boolean {
+  return (
+    line.scheme_type === "saye" &&
+    line.savings_floor_pence != null &&
+    (line.price_per_unit_pence == null ||
+      line.strike_pence == null ||
+      line.price_per_unit_pence <= line.strike_pence)
+  );
+}
+
+function SavingsFloorBadge({ line }: { line: ContingentLine }) {
+  const [open, setOpen] = useState(false);
+  const [placeUp, setPlaceUp] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPlaceUp(window.innerHeight - rect.bottom < 96);
+    }
+    setOpen((o) => !o);
+  };
+  const total = line.savings_floor_pence ?? 0;
+  const monthly = line.monthly_contribution_pence;
+  const months = monthly && monthly > 0 ? Math.round(total / monthly) : null;
+  const priceLine =
+    line.price_per_unit_pence != null && line.strike_pence != null
+      ? `Current price ${formatGbp(line.price_per_unit_pence)} under option price ${formatGbp(line.strike_pence)}.`
+      : "No current price; held under the option price.";
+  const savingsLine =
+    monthly != null && months != null
+      ? `${formatGbp(monthly)}/mo for ${months} months is ${formatGbp(total)}.`
+      : `Savings returned: ${formatGbp(total)}.`;
+  return (
+    <span className="floor-wrap">
+      <button
+        ref={btnRef}
+        type="button"
+        className="floor-badge"
+        aria-label="Why this value is the savings floor"
+        onClick={toggle}
+      >
+        <Icon name="info" size={11} />
+      </button>
+      {open && (
+        <span className={"floor-pop" + (placeUp ? " floor-pop--up" : "")} role="tooltip">
+          {priceLine}
+          <br />
+          {savingsLine}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function vestValueDisplay(line: ContingentLine): ReactNode | undefined {
+  if (!isSayeFloor(line)) return undefined;
+  return (
+    <span className="val-floor">
+      <SavingsFloorBadge line={line} />
+      {formatGbp(line.projected_value_pence ?? line.savings_floor_pence ?? 0)}
+    </span>
+  );
+}
+
+function vestDetail(line: ContingentLine): string {
+  const parts: string[] = [
+    line.price_per_unit_pence != null
+      ? `${formatGbp(line.price_per_unit_pence)}/unit`
+      : "no price",
+  ];
+  if (line.strike_pence != null) {
+    parts.push(`${formatGbp(line.strike_pence)} option price`);
+  }
+  if (
+    line.scheme_type === "saye" &&
+    line.savings_floor_pence != null &&
+    !isSayeFloor(line)
+  ) {
+    parts.push(`+${formatGbp(line.savings_floor_pence)} savings`);
+  }
+  return parts.join(" · ");
+}
+
 function vestRowLabel(line: ContingentLine): ReactNode {
   const priceAge = daysSince(line.price_as_of ?? undefined);
   const isStale = priceAge != null && priceAge > 30;
-  const identifier = line.ticker ?? line.asset_name ?? "unlinked";
+  const scheme = `${line.units.toLocaleString()} ${line.scheme_type.toUpperCase()}`;
   return (
     <>
-      {line.units.toLocaleString()} {line.scheme_type.toUpperCase()} · {identifier}
+      {assetLead(line.ticker, line.asset_name)}
       <span className="sub sub-inline">
-        vests {line.vest_date}
-        {line.price_per_unit_pence != null
-          ? ` · ${formatGbp(line.price_per_unit_pence)}/unit`
-          : " · no price"}
-        {line.strike_pence != null ? ` · strike ${formatGbp(line.strike_pence)}` : ""}
+        {scheme} · {vestDetail(line)} · vests {line.vest_date} · {ageLabel(priceAge)}
       </span>
       {isStale && staleBadge}
     </>
@@ -77,11 +192,11 @@ function vestRowLabel(line: ContingentLine): ReactNode {
 }
 
 function unscheduledRowLabel(line: UnscheduledLine): ReactNode {
-  const identifier = line.ticker ?? line.asset_name ?? "unlinked";
+  const scheme = `${line.units.toLocaleString()} ${line.scheme_type.toUpperCase()}`;
   return (
     <>
-      {line.units.toLocaleString()} {line.scheme_type.toUpperCase()} · {identifier}
-      <span className="sub sub-inline">vest dates not recorded</span>
+      {assetLead(line.ticker, line.asset_name)}
+      <span className="sub sub-inline">{scheme} · vest dates not recorded</span>
     </>
   );
 }
@@ -125,6 +240,7 @@ function buildVestGroups(
       key: `${year}-${i}`,
       label: vestRowLabel(line),
       valuePence: line.projected_value_pence,
+      display: vestValueDisplay(line),
     })),
   }));
 
@@ -325,7 +441,9 @@ function NetWorthApp() {
         <div className="stack-2">
           <div className="lhead">
             <h4>Upcoming vests</h4>
-            <span className="hint">valued at today's price · excluded from total</span>
+            <span className="hint">
+              valued at latest captured price · excluded from total
+            </span>
           </div>
           <div className="card card--flush">
             <DataTable

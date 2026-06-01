@@ -1,6 +1,6 @@
 import { runQuery } from "../../query.js";
 import { latestPriceTick, latestRangeSnapshot } from "../../snapshots.js";
-import { toNum, toStr } from "../../sql_util.js";
+import { toNum, toStr, toStrOrNull } from "../../sql_util.js";
 import type { RealisedLine } from "../types.js";
 
 export async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
@@ -18,6 +18,7 @@ export async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
     `SELECT
        COALESCE(a.name, 'Asset #' || CAST(h.asset_id AS TEXT)) AS name,
        a.asset_type,
+       a.ticker,
        h.quantity,
        h.valid_from,
        h.recorded_at,
@@ -47,6 +48,9 @@ export async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
       recorded_at: toStr(r.recorded_at),
       source_id: toNum(r.source_id),
       currency: toStr(r.currency) || "GBP",
+      ticker: toStrOrNull(r.ticker),
+      quantity: toNum(r.quantity),
+      unit_price_pence: toNum(r.unit_price_pence),
       price_as_of: toStr(r.price_as_of).split("T")[0] ?? toStr(r.price_as_of),
       price_source: toStr(r.price_source),
     });

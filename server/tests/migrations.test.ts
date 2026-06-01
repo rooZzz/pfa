@@ -35,6 +35,7 @@ describe("migration runner", () => {
       "0007_payslip_tax_code",
       "0008_asset_ticker",
       "0009_superseded_by",
+      "0010_saye_monthly_contribution",
     ]);
   });
 
@@ -58,6 +59,7 @@ describe("migration runner", () => {
       "0007_payslip_tax_code",
       "0008_asset_ticker",
       "0009_superseded_by",
+      "0010_saye_monthly_contribution",
     ]);
   });
 
@@ -142,6 +144,7 @@ describe("migration runner", () => {
       "0007_payslip_tax_code",
       "0008_asset_ticker",
       "0009_superseded_by",
+      "0010_saye_monthly_contribution",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

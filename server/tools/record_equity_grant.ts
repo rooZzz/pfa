@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getKysely } from "../db.js";
+import { tryPriceOnCapture } from "../connectors/prices/sync.js";
 import { ensureAsset, writeManualDocument } from "../references.js";
 
 export const recordEquityGrantSchema = {
@@ -37,20 +38,42 @@ export const recordEquityGrantSchema = {
     .string()
     .optional()
     .describe(
-      "Ticker / trading symbol for the underlying share, e.g. 'ACME'. Shown as the identifier in the upcoming-vests view.",
+      "Trading symbol for the underlying share, REQUIRED whenever underlying_asset_name is supplied: it is the asset's identity, so an RSU and a SAYE over the same share share one price series. Use the canonical symbol ('EXPN' for Experian), not the exchange-suffixed form. Map the company to its symbol only when confident; if unsure or more than one listing is plausible, ask the user before calling rather than guessing.",
+    ),
+  monthly_contribution_pence: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      "SAYE only, REQUIRED for saye: the fixed monthly savings amount in integer pence (e.g. 15000 for £150). Drives the savings floor — at maturity an underwater SAYE returns the full pot of contributions rather than being worth nothing. Omit for rsu, emi, and unapproved.",
     ),
 };
 
-export async function recordEquityGrant(input: {
-  scheme_type: "rsu" | "emi" | "unapproved" | "saye";
-  units: number;
-  strike_pence?: number;
-  grant_date: string;
-  currency: string;
-  underlying_asset_name?: string;
-  underlying_asset_type?: string;
-  ticker?: string;
-}): Promise<string> {
+export async function recordEquityGrant(
+  input: {
+    scheme_type: "rsu" | "emi" | "unapproved" | "saye";
+    units: number;
+    strike_pence?: number;
+    grant_date: string;
+    currency: string;
+    underlying_asset_name?: string;
+    underlying_asset_type?: string;
+    ticker?: string;
+    monthly_contribution_pence?: number;
+  },
+  fetchImpl?: typeof fetch,
+): Promise<string> {
+  if (input.underlying_asset_name && !input.ticker?.trim()) {
+    throw new Error(
+      "A ticker is required when linking an underlying share — it is the asset's identity, shared across every grant over the same share. Supply the trading symbol (e.g. 'EXPN' for Experian).",
+    );
+  }
+  if (input.scheme_type === "saye" && input.monthly_contribution_pence == null) {
+    throw new Error(
+      "monthly_contribution_pence is required for SAYE grants: it is the fixed monthly savings amount in pence, used to compute the savings floor returned at maturity.",
+    );
+  }
   const { sourceId, grantId, assetId } = await getKysely()
     .transaction()
     .execute(async (trx) => {
@@ -63,6 +86,8 @@ export async function recordEquityGrant(input: {
         grant_date: input.grant_date,
         currency: input.currency,
         underlying_asset_name: input.underlying_asset_name ?? null,
+        ticker: input.ticker ?? null,
+        monthly_contribution_pence: input.monthly_contribution_pence ?? null,
       });
 
       let assetId: number | null = null;
@@ -86,6 +111,7 @@ export async function recordEquityGrant(input: {
           grant_date: input.grant_date,
           currency: input.currency,
           asset_id: assetId,
+          monthly_contribution_pence: input.monthly_contribution_pence ?? null,
           source_id: sourceId,
           payload: null,
         })
@@ -100,9 +126,16 @@ export async function recordEquityGrant(input: {
     `Grant ID: ${grantId}, document ID: ${sourceId}.`,
   ];
   if (assetId != null) {
-    lines.push(
-      `Linked to underlying asset ID: ${assetId} (${input.underlying_asset_name}). Use record_asset_price to record a price for unvested-unit valuation.`,
-    );
+    const manualPriceHint =
+      "Use record_asset_price to record a price for unvested-unit valuation.";
+    let assetLine = `Linked to underlying asset ID: ${assetId} (${input.underlying_asset_name}).`;
+    if (fetchImpl) {
+      const priced = await tryPriceOnCapture(assetId, fetchImpl);
+      assetLine += ` ${priced.note || manualPriceHint}`;
+    } else {
+      assetLine += ` ${manualPriceHint}`;
+    }
+    lines.push(assetLine);
   } else {
     lines.push(
       `No underlying asset linked — unvested unit valuation will be unavailable. Re-record with underlying_asset_name to enable mark-to-market.`,
