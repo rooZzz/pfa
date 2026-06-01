@@ -1,7 +1,7 @@
 import "./styles/index.css";
 import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -105,6 +105,15 @@ function isSayeFloor(line: ContingentLine): boolean {
 
 function SavingsFloorBadge({ line }: { line: ContingentLine }) {
   const [open, setOpen] = useState(false);
+  const [placeUp, setPlaceUp] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPlaceUp(window.innerHeight - rect.bottom < 96);
+    }
+    setOpen((o) => !o);
+  };
   const total = line.savings_floor_pence ?? 0;
   const monthly = line.monthly_contribution_pence;
   const months = monthly && monthly > 0 ? Math.round(total / monthly) : null;
@@ -119,15 +128,16 @@ function SavingsFloorBadge({ line }: { line: ContingentLine }) {
   return (
     <span className="floor-wrap">
       <button
+        ref={btnRef}
         type="button"
         className="floor-badge"
         aria-label="Why this value is the savings floor"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
       >
         <Icon name="info" size={11} />
       </button>
       {open && (
-        <span className="floor-pop" role="tooltip">
+        <span className={"floor-pop" + (placeUp ? " floor-pop--up" : "")} role="tooltip">
           {priceLine}
           <br />
           {savingsLine}

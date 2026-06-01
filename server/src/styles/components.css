@@ -438,6 +438,10 @@
   text-align: left;
   white-space: normal;
 }
+.floor-pop--up {
+  top: auto;
+  bottom: calc(100% + var(--space-2));
+}
 
 .meter {
   display: flex;
