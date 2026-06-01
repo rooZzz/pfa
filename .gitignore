@@ -4,6 +4,9 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .env
 bun.lockb
 yarn.lock

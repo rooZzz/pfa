@@ -193,10 +193,7 @@ function UploadApp() {
           }
         />
 
-        <p className="note accent mb-4">
-          Parsed by Haiku vision. Nothing is written until you confirm — human review is
-          non-negotiable.
-        </p>
+        <p className="note accent mb-4">Nothing is written until you confirm.</p>
 
         <div className="card card--flush">
           <table className="t compact t--inset">
@@ -284,10 +281,7 @@ function UploadApp() {
           }}
         />
       </div>
-      <p className="note mt-4">
-        Files are parsed locally then staged for your review. Every saved row stays
-        auditable back to its source document.
-      </p>
+      <p className="note mt-4">Parsed locally, staged for review.</p>
     </div>
   );
 }

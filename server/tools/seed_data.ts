@@ -399,23 +399,41 @@ async function seedEquity(): Promise<void> {
 }
 
 async function seedIncome(): Promise<void> {
-  const payslips: Array<[number, number, number, number, number, number]> = [
-    [11, 620000, 460000, 124000, 22000, 14000],
-    [10, 620000, 461000, 123800, 22000, 14000],
-    [9, 620000, 459500, 124200, 22000, 14000],
-    [8, 620000, 460500, 123900, 22000, 14000],
-    [7, 620000, 462000, 123500, 22000, 14000],
-    [6, 620000, 460000, 124000, 22000, 14000],
-    [5, 620000, 461500, 123700, 22000, 14000],
-    [4, 620000, 460000, 124000, 22000, 14000],
-    [3, 620000, 459000, 124500, 22000, 14000],
-    [2, 620000, 461000, 123800, 22000, 14000],
-    [1, 620000, 460500, 123900, 22000, 14000],
-    [0, 620000, 460000, 124000, 22000, 14000],
+  const benefits: Array<{ description: string; amount_pence: number }> = [
+    { description: "Private Medical", amount_pence: 4500 },
+    { description: "Gym Membership", amount_pence: 3500 },
+  ];
+  const benefitsTotal = benefits.reduce((sum, b) => sum + b.amount_pence, 0);
+
+  const payslips: Array<[number, number, number, number, number]> = [
+    [11, 620000, 124000, 22000, 14000],
+    [10, 620000, 123800, 22000, 14000],
+    [9, 620000, 124200, 22000, 14000],
+    [8, 620000, 123900, 22000, 14000],
+    [7, 620000, 123500, 22000, 14000],
+    [6, 620000, 124000, 22000, 14000],
+    [5, 620000, 123700, 22000, 14000],
+    [4, 620000, 124000, 22000, 14000],
+    [3, 620000, 124500, 22000, 14000],
+    [2, 620000, 123800, 22000, 14000],
+    [1, 620000, 123900, 22000, 14000],
+    [0, 620000, 124000, 22000, 14000],
   ];
 
-  for (const [ago, gross, net, paye, ni, pension] of payslips) {
+  for (const [ago, gross, paye, ni, pension] of payslips) {
+    const net = gross - paye - ni - pension - benefitsTotal;
     const payDate = monthsAgo(ago, 25);
+    const line_items = [
+      { description: "Basic Salary", section: "payment", amount_pence: gross },
+      { description: "PAYE", section: "deduction", amount_pence: paye },
+      { description: "National Insurance", section: "deduction", amount_pence: ni },
+      { description: "Pension", section: "deduction", amount_pence: pension },
+      ...benefits.map((b) => ({
+        description: b.description,
+        section: "deduction" as const,
+        amount_pence: b.amount_pence,
+      })),
+    ];
     await getKysely()
       .transaction()
       .execute(async (trx) => {
@@ -438,6 +456,7 @@ async function seedIncome(): Promise<void> {
             pension_employer_pence: Math.round(pension * 0.5),
             occurred_at: `${payDate}T00:00:00.000Z`,
             source_id: sourceId,
+            payload: JSON.stringify({ line_items }),
           })
           .execute();
       });

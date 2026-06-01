@@ -11,14 +11,21 @@ export const recordVestingEventSchema = {
   vest_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
-    .describe("Date units vested."),
-  units_vested: z.number().int().positive().describe("Number of units that vested."),
+    .describe(
+      "Date the units vest. May be in the future (a scheduled vest or option maturity date) or the past (a realised vest).",
+    ),
+  units_vested: z
+    .number()
+    .int()
+    .positive()
+    .describe("Number of units vesting on this date."),
   market_price_pence: z
     .number()
     .int()
     .optional()
     .describe(
-      "Market price per unit at vesting date. Must be an integer number of pence — e.g. 2565 for a 2,565p / £25.65 share price. " +
+      "Market price per unit at the vest date, for a past realised vest. Omit for a future vest — it is then valued from the latest recorded asset price. " +
+        "Must be an integer number of pence — e.g. 2565 for a 2,565p / £25.65 share price. " +
         "UK prices are commonly quoted in pence (e.g. '2,565p', '2565p'): use that number directly, do NOT multiply by 100. " +
         "Only convert if the price was given in pounds: £25.65 → 2565.",
     ),

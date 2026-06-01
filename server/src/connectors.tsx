@@ -177,8 +177,6 @@ function ConnectorsApp() {
 
       <p className="note accent" style={{ margin: "var(--space-3) 0 var(--space-4)" }}>
         Run <span className="mono">npm run monzo:auth</span> and paste the result below.
-        For a quick test you can paste a bare access token instead. Input goes straight to
-        the local app — it never appears in chat.
       </p>
 
       {status === "error" && errorMessage && <p className="note mb-4">{errorMessage}</p>}

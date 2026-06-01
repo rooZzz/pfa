@@ -15,7 +15,7 @@ For tax_code: the PAYE tax code from the payslip header (e.g. 1257L, 0T, BR, K47
 
 For pension_employee_pence: sum all employee pension lines regardless of section — salary sacrifice schemes often appear as negative entries in the Payments section rather than in Deductions.
 
-For line_items: include every individual line from the Payments and Deductions sections (not the summary totals). Amounts are always positive integers in pence. Tag each line with its section — "payment" for lines in the Payments/Earnings section, "deduction" for lines in the Deductions section. A salary-sacrifice pension shown as a negative entry under Payments is still section "payment".
+For line_items: include every individual line from the Payments and Deductions sections (not the summary totals). Preserve the sign shown on the payslip — a line shown as negative (e.g. a salary-sacrifice reduction in the Payments section) is recorded as a negative amount. Tag each line with its section — "payment" for lines in the Payments/Earnings section, "deduction" for lines in the Deductions section. A salary-sacrifice pension shown as a negative entry under Payments is still section "payment" with a negative amount.
 
 Return null for any field not present on the payslip.`;
 
@@ -74,7 +74,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       line_items: {
         type: ["array", "null"] as unknown as "array",
         description:
-          "Every individual line from the Payments and Deductions sections. Amounts are positive integers in pence.",
+          "Every individual line from the Payments and Deductions sections, in pence, with the sign shown on the payslip preserved.",
         items: {
           type: "object",
           properties: {
@@ -90,7 +90,8 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
             },
             amount_pence: {
               type: "integer",
-              description: "Amount in pence, always positive.",
+              description:
+                "Amount in pence, with the payslip's sign preserved — negative for reduction entries such as salary-sacrifice lines in the Payments section.",
             },
           },
           required: ["description", "section", "amount_pence"],

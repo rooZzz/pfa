@@ -14,6 +14,12 @@ export type SourceLine = {
   count: number;
 };
 
+export type LineItem = {
+  description: string;
+  section: "payment" | "deduction";
+  amount_pence: number;
+};
+
 export type IncomeTotal = {
   net_pence: number;
   gross_pence: number;
@@ -24,6 +30,7 @@ export type IncomeTotal = {
   other_deductions_pence: number;
   tax_code: string | null;
   payslip_count: number;
+  line_items: LineItem[];
 };
 
 export type TrendPoint = {

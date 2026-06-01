@@ -35,46 +35,53 @@ quiet progress meter.
    columns align and digits never jitter. Typography, color, and layout exist to make those figures
    readable and trustworthy — never to upstage them.
 
-2. Calm over flashy. This is an instrument readout, not a feed. No gradients-for-drama, no bouncing,
+2. Figures over prose. Let the numbers speak. A well-labelled figure, a waterfall leg, a subtotalled
+   table row says more than a sentence describing it, and says it without going stale. Avoid always-on
+   explanatory paragraphs that narrate what the data already shows — encode the fact as a figure, a
+   label, or a structural cue instead. Reserve prose for the conditional: errors, empty states, data
+   gaps, and the irreducible context a number cannot carry. Each fact appears once, in the one place it
+   belongs — not restated across a legend, a key-value row, and a table.
+
+3. Calm over flashy. This is an instrument readout, not a feed. No gradients-for-drama, no bouncing,
    no attention-grabbing. Hierarchy comes from scale, weight, and whitespace, not from saturation.
 
-3. Warmth without decoration. The palette is a sepia system — warm near-blacks and warm papers in
+4. Warmth without decoration. The palette is a sepia system — warm near-blacks and warm papers in
    oklch — with a single clay/terracotta accent used sparingly for emphasis and interactive intent.
    One accent, applied with discipline, reads as considered; many colors read as noise.
 
-4. Honest semantics. Money in and money out use a desaturated moss and rust that share the accent's
+5. Honest semantics. Money in and money out use a desaturated moss and rust that share the accent's
    chroma. No traffic-light green/red, no alarm colors. A negative balance is rendered factually, not
    anxiously. Color states a fact; it does not pass judgment. Recommendations are observations, not
    advice — the visual language follows the same rule.
 
-5. Provenance and freshness are first-class. Every value can show where it came from and how old it
+6. Provenance and freshness are first-class. Every value can show where it came from and how old it
    is — a Monzo synced today, a price 38d ago, a stale badge, an audit link after a write. Trust is
    built by showing the seams, not hiding them.
 
-6. Light and dark are equals. Both themes are authored against the same tokens, not derived as an
+7. Light and dark are equals. Both themes are authored against the same tokens, not derived as an
    afterthought. Dark is the default (it suits a focused, instrument feel and the host's typical
    appearance), but every screen is designed to be correct in light.
 
-7. One system, composed. Screens are assembled from shared, token-backed components — tiles, meters,
+8. One system, composed. Screens are assembled from shared, token-backed components — tiles, meters,
    tables, badges, notes. New screens should reach for existing pieces before inventing. Consistency
    is a feature when the subject is financial truth.
 
-8. Respect the frame. These screens render as sandboxed iframes embedded in a chat, at side-panel
+9. Respect the frame. These screens render as sandboxed iframes embedded in a chat, at side-panel
    widths. Designs are vertical, compact, and wrap gracefully; they assume the host's theme and never
    pretend to be a full-page app. Fill the frame rather than assume a fixed width: the screen is fluid
    to a sane maximum and centered, so leftover space is balanced, never dumped as right-hand padding.
    Figures, tables, and tiles stretch to use the room; prose stays capped near a readable measure
    (~66ch) so a wider panel never produces over-long lines.
 
-9. Money is never a float. Values are integer pence end-to-end and formatted at the edge. The UI
-   reflects the data model's precision; it never introduces rounding of its own.
+10. Money is never a float. Values are integer pence end-to-end and formatted at the edge. The UI
+    reflects the data model's precision; it never introduces rounding of its own.
 
-10. Motion is a whisper. A short transform-only entrance, honest loading spinners, gentle hovers —
+11. Motion is a whisper. A short transform-only entrance, honest loading spinners, gentle hovers —
     that is the whole vocabulary. Motion never blocks reading, and it respects `prefers-reduced-motion`.
     The entrance reveal animates transform only, never opacity, so content is never hidden if the
     animation is paused in a backgrounded iframe.
 
-11. Consistent across screens. The same kind of thing looks the same everywhere. Every dashboard
+12. Consistent across screens. The same kind of thing looks the same everywhere. Every dashboard
     opens the same way — a serif title, a mono context line, then the screen's defining figure as a
     hero — so the eye learns one pattern and reuses it. Equivalent elements share a component and a
     rank; a heading, a total, or a tile should not be styled one way on net worth and another on
