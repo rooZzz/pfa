@@ -119,7 +119,7 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "record_equity_grant",
     description:
-      "Record an equity grant (RSU, EMI, unapproved option, or SAYE). Returns a grant ID that must be supplied when recording vesting events.",
+      "Record an equity grant (RSU, EMI, unapproved option, or SAYE). Records only what was granted — units, strike, grant date — not when it vests. Returns a grant ID; record each vest date (including future maturity dates) separately with record_vesting_event using that ID.",
     inputSchema: recordEquityGrantSchema,
     handler: async (input) => text(await recordEquityGrant(input)),
   }),
@@ -133,7 +133,7 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "record_vesting_event",
     description:
-      "Record a vesting event against an existing equity grant. Requires the grant ID returned by record_equity_grant.",
+      "Record a vesting tranche for an existing equity grant — either a future scheduled vest or a past realised one. Requires the grant ID returned by record_equity_grant. For a future vest (e.g. an option maturity date), supply vest_date and units_vested and omit market_price_pence; it then appears as an upcoming vest valued from the latest asset price. For a past vest, also supply market_price_pence (the price at vest). Schedule each known future vest date this way — grants do not store their own maturity dates.",
     inputSchema: recordVestingEventSchema,
     handler: async (input) => text(await recordVestingEvent(input)),
   }),

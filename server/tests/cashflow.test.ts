@@ -60,6 +60,46 @@ async function insertIncome(
     });
 }
 
+async function insertIncomeWithPayload(
+  payDate: string,
+  gross: number,
+  net: number,
+  paye: number,
+  ni: number,
+  pension: number,
+  lineItems: Array<{
+    description: string;
+    section: "payment" | "deduction";
+    amount_pence: number;
+  }>,
+): Promise<void> {
+  await getKysely()
+    .transaction()
+    .execute(async (trx) => {
+      const sourceId = await writeManualDocument(trx, {
+        source_type: "manual",
+        entry_type: "income_event_seed",
+        pay_date: payDate,
+        gross_pence: gross,
+        net_pence: net,
+      });
+      await trx
+        .insertInto("income_events")
+        .values({
+          pay_date: payDate,
+          gross_pence: gross,
+          net_pence: net,
+          paye_pence: paye,
+          ni_employee_pence: ni,
+          pension_employee_pence: pension,
+          occurred_at: `${payDate}T00:00:00.000Z`,
+          source_id: sourceId,
+          payload: JSON.stringify({ line_items: lineItems }),
+        })
+        .execute();
+    });
+}
+
 describe("getCashflow", () => {
   it("throws when no tax period covers the date", async () => {
     getDb().exec("DELETE FROM tax_periods");
@@ -102,6 +142,45 @@ describe("getCashflow", () => {
     expect(result.income.gross_pence).toBe(1200000);
     expect(result.income.net_pence).toBe(901000);
     expect(result.income.paye_pence).toBe(239500);
+  });
+
+  it("aggregates payslip line items across the period", async () => {
+    await insertIncomeWithPayload("2025-06-25", 600000, 450000, 120000, 20000, 10000, [
+      { description: "Basic Salary", section: "payment", amount_pence: 600000 },
+      { description: "PAYE", section: "deduction", amount_pence: 120000 },
+      { description: "National Insurance", section: "deduction", amount_pence: 20000 },
+      { description: "Pension", section: "deduction", amount_pence: 10000 },
+      { description: "Private Medical", section: "deduction", amount_pence: 4500 },
+    ]);
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    expect(result.income.line_items).toContainEqual({
+      description: "Private Medical",
+      section: "deduction",
+      amount_pence: 4500,
+    });
+  });
+
+  it("preserves negative salary-sacrifice payment lines", async () => {
+    await insertIncomeWithPayload("2025-06-25", 600000, 450000, 120000, 20000, 53008, [
+      { description: "Basic Salary", section: "payment", amount_pence: 653008 },
+      { description: "SMART MPS", section: "payment", amount_pence: -53008 },
+      { description: "PAYE", section: "deduction", amount_pence: 120000 },
+      { description: "NI A", section: "deduction", amount_pence: 20000 },
+    ]);
+
+    const result = await getCashflow({ tax_year: "2025/26" });
+    expect(result.income.line_items).toContainEqual({
+      description: "SMART MPS",
+      section: "payment",
+      amount_pence: -53008,
+    });
+  });
+
+  it("returns empty line items for payslips without a payload", async () => {
+    await insertIncome("2025-06-25", 600000, 450000, 120000, 20000, 10000);
+    const result = await getCashflow({ tax_year: "2025/26" });
+    expect(result.income.line_items).toEqual([]);
   });
 
   it("excludes income_events outside the period", async () => {

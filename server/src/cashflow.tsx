@@ -16,7 +16,8 @@ import {
   MiniBars,
   Stat,
 } from "./components.js";
-import { topN } from "./data_table.js";
+import { DataTable, topN } from "./data_table.js";
+import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 type CashflowData = CashflowResult;
@@ -81,19 +82,56 @@ function monthLabel(ym: string): string {
 }
 
 function EarningsWaterfall({ income }: { income: IncomeTotal }) {
-  const otherDeductions = Math.max(0, income.other_deductions_pence);
   const rows = [
     { label: "PAYE", value: income.paye_pence, tone: "neg" as const },
     { label: "NI", value: income.ni_employee_pence, tone: "neg" as const },
-    {
-      label: "Pension (you)",
-      value: income.pension_employee_pence,
-      tone: "muted" as const,
-    },
-    { label: "Other deductions", value: otherDeductions, tone: "neg" as const },
+    ...(income.other_deductions_pence > 0
+      ? [
+          {
+            label: "Other deductions",
+            value: income.other_deductions_pence,
+            tone: "neg" as const,
+          },
+        ]
+      : []),
     { label: "Net pay", value: income.net_pence, tone: "pos" as const },
   ];
   return <CompositionBar rows={rows} />;
+}
+
+function PayslipBreakdown({ income }: { income: IncomeTotal }) {
+  if (income.line_items.length === 0) return null;
+  const sectionTotal = (section: "payment" | "deduction") =>
+    income.line_items
+      .filter((item) => item.section === section)
+      .reduce((sum, item) => sum + item.amount_pence, 0);
+  const toRows = (section: "payment" | "deduction") =>
+    income.line_items
+      .filter((item) => item.section === section)
+      .map((item) => ({
+        key: `${section}-${item.description}`,
+        label: item.description,
+        valuePence: item.amount_pence,
+      }));
+  const groups: DataGroup[] = [
+    {
+      key: "payments",
+      label: "Payments",
+      rows: toRows("payment"),
+      subtotalPence: sectionTotal("payment"),
+      truncate: 5,
+      sortByValue: true,
+    },
+    {
+      key: "deductions",
+      label: "Deductions",
+      rows: toRows("deduction"),
+      subtotalPence: sectionTotal("deduction"),
+      truncate: 5,
+      sortByValue: true,
+    },
+  ];
+  return <DataTable groups={groups} />;
 }
 
 function KV({ k, v, tone }: { k: string; v: string; tone?: "pos" | "neg" }) {
@@ -372,44 +410,28 @@ function CashflowApp() {
             <EarningsWaterfall income={data.income} />
             <div className="grid cols-2" style={{ gap: "var(--space-2) var(--space-4)" }}>
               <KV k="Gross" v={formatGbp(data.income.gross_pence)} />
-              <KV k="PAYE" v={"−" + formatGbp(data.income.paye_pence)} tone="neg" />
-              <KV k="NI" v={"−" + formatGbp(data.income.ni_employee_pence)} tone="neg" />
-              <KV
-                k="Pension (you)"
-                v={"−" + formatGbp(data.income.pension_employee_pence)}
-              />
-              {data.income.other_deductions_pence > 0 && (
-                <KV
-                  k="Other deductions"
-                  v={"−" + formatGbp(data.income.other_deductions_pence)}
-                  tone="neg"
-                />
-              )}
               <KV k="Net pay" v={formatGbp(data.income.net_pence)} tone="pos" />
+              {data.income.pension_employer_pence > 0 && (
+                <>
+                  <KV
+                    k="Employer pension"
+                    v={formatGbp(data.income.pension_employer_pence)}
+                  />
+                  <KV
+                    k="Total reward"
+                    v={formatGbp(
+                      data.income.gross_pence + data.income.pension_employer_pence,
+                    )}
+                  />
+                </>
+              )}
             </div>
-            <div className="note">
-              Net pay is the salary credit landing in your account — counted once via the
-              bank feed. Deductions above are outflows of your gross earnings, not bank
-              spending; pension (you) is deferred, not spent.
-            </div>
-            {data.income.pension_employer_pence > 0 && (
-              <div className="note">
-                Total reward{" "}
-                {formatGbp(data.income.gross_pence + data.income.pension_employer_pence)}{" "}
-                — gross plus {formatGbp(data.income.pension_employer_pence)} employer
-                pension (deferred compensation, never part of take-home).
-              </div>
-            )}
+            <PayslipBreakdown income={data.income} />
           </div>
         </div>
       )}
 
-      {!hasIncome && (
-        <div className="note">
-          No payslips recorded in this period. Upload a payslip to add the salary tax
-          breakdown.
-        </div>
-      )}
+      {!hasIncome && <div className="note">No payslips this period.</div>}
     </div>
   );
 }

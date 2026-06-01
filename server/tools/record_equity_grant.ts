@@ -108,7 +108,9 @@ export async function recordEquityGrant(input: {
       `No underlying asset linked — unvested unit valuation will be unavailable. Re-record with underlying_asset_name to enable mark-to-market.`,
     );
   }
-  lines.push(`Use grant ID ${grantId} when recording vesting events.`);
+  lines.push(
+    `Vest dates are not stored on the grant. Record each one — including future maturity dates — with record_vesting_event using grant ID ${grantId}.`,
+  );
 
   return lines.join(" ");
 }
