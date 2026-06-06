@@ -1,5 +1,5 @@
 import { resolvePeriod } from "../cashflow/index.js";
-import { runQuery } from "../query.js";
+import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
 import { latestRangeSnapshot } from "../snapshots.js";
 import { toNum } from "../sql_util.js";
 import { resolveConstant } from "../tax_constants.js";
@@ -19,9 +19,12 @@ function monthsBefore(date: string, months: number): string {
   return d.toISOString().split("T")[0]!;
 }
 
-export async function liquidSavings(asOf: string): Promise<MetricValue> {
+export async function liquidSavings(
+  asOf: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
   const snap = latestRangeSnapshot(
-    "pfa.account_balances",
+    `${ctx.schema}.account_balances`,
     "account_id",
     ["account_id", "balance_pence"],
     asOf,
@@ -29,7 +32,7 @@ export async function liquidSavings(asOf: string): Promise<MetricValue> {
   const rows = await runQuery(
     `SELECT COALESCE(SUM(b.balance_pence), 0) AS total, COUNT(*) AS accounts
        FROM (${snap.sql}) b
-       JOIN pfa.accounts a ON a.id = b.account_id
+       JOIN ${ctx.schema}.accounts a ON a.id = b.account_id
        WHERE a.type IN ('current', 'savings', 'isa')`,
     snap.params,
   );
@@ -57,6 +60,7 @@ export async function liquidSavings(asOf: string): Promise<MetricValue> {
 export async function averageMonthlyOutgoings(
   asOf: string,
   months = 12,
+  ctx: ReadContext = LIVE_CONTEXT,
 ): Promise<MetricValue> {
   const start = monthsBefore(asOf, months);
   const rows = await runQuery(
@@ -64,7 +68,7 @@ export async function averageMonthlyOutgoings(
        SELECT
          DATE_TRUNC('month', CAST(occurred_at AS DATE)) AS month,
          ABS(SUM(amount_pence) FILTER (WHERE amount_pence < 0)) AS outflow_pence
-       FROM pfa.transactions
+       FROM ${ctx.schema}.transactions
        WHERE CAST(occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
          AND is_internal = 0
          AND superseded_by IS NULL
@@ -97,10 +101,13 @@ export async function averageMonthlyOutgoings(
   };
 }
 
-export async function emergencyFundMonths(asOf: string): Promise<MetricValue> {
+export async function emergencyFundMonths(
+  asOf: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
   const [liquid, outgoings] = await Promise.all([
-    liquidSavings(asOf),
-    averageMonthlyOutgoings(asOf),
+    liquidSavings(asOf, ctx),
+    averageMonthlyOutgoings(asOf, 12, ctx),
   ]);
 
   if (!liquid.resolved || !outgoings.resolved || outgoings.value === 0) {
@@ -129,9 +136,40 @@ export async function emergencyFundMonths(asOf: string): Promise<MetricValue> {
   };
 }
 
+export async function houseDepositProgress(
+  asOf: string,
+  targetPence: number,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const liquid = await liquidSavings(asOf, ctx);
+  if (!liquid.resolved) {
+    return {
+      metric: "house_deposit_progress",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: { target_pence: targetPence },
+      gap_reason: liquid.gap_reason ?? "No liquid savings recorded to track a deposit.",
+    };
+  }
+  const savedPence = liquid.value!;
+  return {
+    metric: "house_deposit_progress",
+    resolved: true,
+    value: savedPence,
+    unit: "pence",
+    detail: {
+      saved_pence: savedPence,
+      target_pence: targetPence,
+      percent: Math.round((savedPence / targetPence) * 100),
+    },
+  };
+}
+
 export async function isaAllowanceRemaining(
   asOf: string,
   taxYear?: string,
+  ctx: ReadContext = LIVE_CONTEXT,
 ): Promise<MetricValue> {
   const period = await resolvePeriod(taxYear, asOf);
   const allowanceConstant = await resolveConstant("isa_allowance", period.period_start);
@@ -150,8 +188,8 @@ export async function isaAllowanceRemaining(
     `SELECT
        COALESCE(SUM(t.amount_pence) FILTER (WHERE t.amount_pence > 0), 0) AS contributions,
        COUNT(DISTINCT a.id) AS isa_accounts
-     FROM pfa.accounts a
-     LEFT JOIN pfa.transactions t
+     FROM ${ctx.schema}.accounts a
+     LEFT JOIN ${ctx.schema}.transactions t
        ON t.account_id = a.id
       AND CAST(t.occurred_at AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
       AND t.superseded_by IS NULL
