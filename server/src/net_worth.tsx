@@ -13,6 +13,7 @@ import type {
 import { Masthead } from "./branding.js";
 import {
   Btn,
+  CollapsibleSection,
   CompositionBar,
   CoverageGrid,
   Icon,
@@ -20,6 +21,8 @@ import {
   Stat,
   TickerChip,
 } from "./components.js";
+import { GoalsSection } from "./goals_section.js";
+import type { Directive } from "./goals_section.js";
 import { tickerToLogo } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
@@ -43,6 +46,21 @@ function ageLabel(days: number | null): string {
 
 function sumKind(lines: RealisedLine[], kind: RealisedLine["kind"]): number {
   return lines.filter((l) => l.kind === kind).reduce((sum, l) => sum + l.value_pence, 0);
+}
+
+function parseBriefingDirectives(
+  settled: PromiseSettledResult<unknown>,
+): Directive[] | null {
+  if (settled.status !== "fulfilled") return null;
+  const value = settled.value as { content?: { type: string; text?: string }[] };
+  const text = value.content?.find((c) => c.type === "text");
+  if (!text?.text) return null;
+  try {
+    const briefing = JSON.parse(text.text) as { directives?: Directive[] };
+    return briefing.directives ?? null;
+  } catch {
+    return null;
+  }
 }
 
 const staleBadge = (
@@ -272,6 +290,7 @@ const GROUP_ORDER: { kind: RealisedLine["kind"]; label: string }[] = [
 
 function NetWorthApp() {
   const [data, setData] = useState<NetWorthData | null>(null);
+  const [goals, setGoals] = useState<Directive[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -289,15 +308,19 @@ function NetWorthApp() {
       setErrorMessage(null);
       try {
         const today = new Date().toISOString().split("T")[0]!;
-        const result = await app.callServerTool({
-          name: "get_net_worth",
-          arguments: { as_of: today },
-        });
-        const text = result.content?.find((c: { type: string }) => c.type === "text") as
-          | { type: "text"; text: string }
-          | undefined;
+        const [nwSettled, brSettled] = await Promise.allSettled([
+          app.callServerTool({ name: "get_net_worth", arguments: { as_of: today } }),
+          app.callServerTool({ name: "get_briefing", arguments: { as_of: today } }),
+        ]);
+
+        if (nwSettled.status === "rejected") throw nwSettled.reason;
+        const text = nwSettled.value.content?.find(
+          (c: { type: string }) => c.type === "text",
+        ) as { type: "text"; text: string } | undefined;
         if (!text) throw new Error("No response from get_net_worth.");
         setData(JSON.parse(text.text) as NetWorthData);
+
+        setGoals(parseBriefingDirectives(brSettled));
       } catch (err) {
         setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
       } finally {
@@ -408,7 +431,7 @@ function NetWorthApp() {
 
       {trendVals.length > 1 && (
         <div className="card card--chart">
-          <Sparkline data={trendVals} height={56} />
+          <Sparkline data={trendVals} height={120} />
         </div>
       )}
 
@@ -430,21 +453,32 @@ function NetWorthApp() {
         </div>
       </div>
 
-      <div className="card card--flush">
-        <DataTable
-          groups={realisedGroups}
-          footer={{ label: "Total realised", valuePence: data.realised_total_pence }}
-        />
-      </div>
+      {goals !== null && <GoalsSection directives={goals} />}
+
+      <CollapsibleSection
+        title="Breakdown"
+        defaultOpen={false}
+        summary={`${data.realised.length} line${
+          data.realised.length === 1 ? "" : "s"
+        } · ${formatGbpk(data.realised_total_pence)}`}
+      >
+        <div className="card card--flush">
+          <DataTable
+            groups={realisedGroups}
+            footer={{ label: "Total realised", valuePence: data.realised_total_pence }}
+          />
+        </div>
+      </CollapsibleSection>
 
       {hasContingent && (
-        <div className="stack-2">
-          <div className="lhead">
-            <h4>Upcoming vests</h4>
-            <span className="hint">
-              valued at latest captured price · excluded from total
-            </span>
-          </div>
+        <CollapsibleSection
+          title="Upcoming vests"
+          defaultOpen={false}
+          hint="valued at latest captured price · excluded from total"
+          summary={`${data.contingent.length} vest${
+            data.contingent.length === 1 ? "" : "s"
+          } · ${formatGbpk(data.contingent_total_pence)}`}
+        >
           <div className="card card--flush">
             <DataTable
               groups={vestGroups}
@@ -458,7 +492,7 @@ function NetWorthApp() {
               }
             />
           </div>
-        </div>
+        </CollapsibleSection>
       )}
 
       {data.unknown.length > 0 && (

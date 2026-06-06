@@ -303,6 +303,33 @@
   color: var(--ink-faint);
 }
 
+.section-toggle {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+}
+.section-toggle-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.section-toggle .ico {
+  color: var(--ink-faint);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.section-toggle:hover .ico {
+  color: var(--ink-muted);
+}
+
+.goals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 .screen-head {
   display: flex;
   align-items: flex-start;
