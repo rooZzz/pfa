@@ -80,6 +80,10 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 
 **UK edges / notes.** A Lifetime ISA adds a 25 percent government bonus on contributions up to the annual limit for a first home under the price cap — flag eligibility where it materially changes the required contribution. LISA funds are otherwise penalised on non-qualifying withdrawal.
 
+**Implemented formula.** Needs spec: `target_amount_pence` (no default — must ask) and `target_date` (YYYY-MM-DD, no default), validated at the boundary. The `deposit_progress` sub-goal binds to `house_deposit_progress`, which reuses `liquid_savings` (sum of the latest balance per `current`/`savings`/`isa` account, LOCF). The progress directive reports saved versus target and percent; a deadline directive reports days to `target_date`. Unresolved (data-gap) when no liquid balances exist.
+
+**Shared resources / contention.** Claims the full liquid pool (`current`, `savings`, `isa`) by default, so it contends with `emergency_fund` over the same money and with `isa_max` over the ISA accounts. The briefing emits a `contention` directive over the shared accounts; resolving the conflict (which goal the money serves) is advice, not an observation. Earmarks that narrow a goal to specific accounts are deferred.
+
 ---
 
 ## `emergency_fund`
@@ -107,6 +111,8 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 **UK edges / notes.** Cover is measured against essential monthly outgoings, not gross spend. Funds must be genuinely accessible — instant or near-instant access — so locked products do not count toward the metric.
 
 **Implemented formula.** `liquid_savings` = sum of the latest balance per account of type `current`, `savings`, or `isa` (LOCF as of the query date). Average monthly outgoings = mean of monthly transaction outflow over the trailing 12 months, across months that had any outflow, excluding internal transfers (`is_internal = 1`) and savings/investing contributions (`category = 'savings'`) since neither is a living expense. `emergency_fund_months` = `liquid_savings` / average monthly outgoings. The metric is unresolved (fires a data-gap directive) when there are no liquid balances or no spending transactions.
+
+**Shared resources / contention.** Claims the full liquid pool (`current`, `savings`, `isa`). It contends with `house_deposit` over the whole pool and with `isa_max` over the ISA accounts; the briefing emits a `contention` directive over the shared accounts. The same money backing the safety net cannot also fund a deposit in full — that is the observation. Choosing which goal it serves is advice.
 
 ---
 
@@ -137,6 +143,8 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 **Implemented formula.** Contributions = sum of inflow transactions (positive `amount_pence`) to accounts of type `isa` within the tax-year window resolved from `tax_periods`. `isa_allowance_remaining` = annual allowance minus contributions. The metric is unresolved (fires a data-gap directive) when no ISA account exists. The deadline directive reports days from the query date to the tax-year `ends_on`.
 
 **Stopgap.** The annual allowance is currently a hardcoded constant (`ISA_ANNUAL_ALLOWANCE_PENCE`, £20,000) in the goals catalog module, pending the dated, status-tagged `tax_constants` reference described in `docs/architecture.md`. Precise contribution modelling (distinguishing deposits from growth) is also deferred; inflow transactions to the ISA account are the current approximation.
+
+**Shared resources / contention.** Claims only `isa` accounts. It therefore contends with any goal that claims the liquid pool (`emergency_fund`, `house_deposit`) over the ISA accounts specifically — the ISA balance counted toward the safety net is the same balance whose allowance this goal tracks. The briefing emits a `contention` directive over the shared ISA accounts.
 
 ---
 

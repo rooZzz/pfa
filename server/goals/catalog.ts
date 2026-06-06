@@ -8,7 +8,11 @@ export const GOAL_TYPES = [
 ] as const;
 export type GoalType = (typeof GOAL_TYPES)[number];
 
-export const IMPLEMENTED_GOAL_TYPES = ["emergency_fund", "isa_max"] as const;
+export const IMPLEMENTED_GOAL_TYPES = [
+  "emergency_fund",
+  "isa_max",
+  "house_deposit",
+] as const;
 export type ImplementedGoalType = (typeof IMPLEMENTED_GOAL_TYPES)[number];
 
 export function isImplemented(goalType: string): goalType is ImplementedGoalType {
@@ -48,6 +52,23 @@ const NEEDS_SPECS: Record<ImplementedGoalType, NeedsSpec> = {
       },
     ],
   },
+  house_deposit: {
+    goal_type: "house_deposit",
+    supported: true,
+    summary: "Accumulate a property deposit by a target date.",
+    slots: [
+      {
+        name: "target_amount_pence",
+        description: "Deposit amount to reach, in pence.",
+        default: null,
+      },
+      {
+        name: "target_date",
+        description: "Date to have the deposit by, format YYYY-MM-DD.",
+        default: null,
+      },
+    ],
+  },
 };
 
 export function needsSpec(goalType: GoalType): NeedsSpec {
@@ -62,17 +83,33 @@ export function needsSpec(goalType: GoalType): NeedsSpec {
 
 export type EmergencyFundParams = { target_months: number };
 export type IsaMaxParams = { tax_year: string | null };
+export type HouseDepositParams = { target_amount_pence: number; target_date: string };
+export type GoalParams = EmergencyFundParams | IsaMaxParams | HouseDepositParams;
 
 export function validateParams(
   goalType: ImplementedGoalType,
   raw: Record<string, unknown>,
-): EmergencyFundParams | IsaMaxParams {
+): GoalParams {
   if (goalType === "emergency_fund") {
     const months = raw.target_months ?? 6;
     if (typeof months !== "number" || !Number.isInteger(months) || months <= 0) {
       throw new Error("target_months must be a positive integer (months of cover).");
     }
     return { target_months: months };
+  }
+
+  if (goalType === "house_deposit") {
+    const amount = raw.target_amount_pence;
+    if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+      throw new Error(
+        "target_amount_pence must be a positive integer (deposit in pence).",
+      );
+    }
+    const date = raw.target_date;
+    if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error("target_date must be in the format YYYY-MM-DD.");
+    }
+    return { target_amount_pence: amount, target_date: date };
   }
 
   const taxYear = raw.tax_year ?? null;
@@ -84,12 +121,17 @@ export function validateParams(
   return { tax_year: taxYear };
 }
 
-export type Metric = "emergency_fund_months" | "isa_allowance_remaining";
+export type Metric =
+  | "emergency_fund_months"
+  | "isa_allowance_remaining"
+  | "house_deposit_progress";
 export type SubGoalBinding = {
   key: string;
   metric: Metric;
   label: string;
   target_months?: number;
+  target_amount_pence?: number;
+  target_date?: string;
 };
 
 export function decompose(
@@ -106,6 +148,19 @@ export function decompose(
       },
     ];
   }
+
+  if (goalType === "house_deposit") {
+    return [
+      {
+        key: "deposit_progress",
+        metric: "house_deposit_progress",
+        label: "Deposit saved",
+        target_amount_pence: Number(params.target_amount_pence),
+        target_date: String(params.target_date),
+      },
+    ];
+  }
+
   return [
     {
       key: "allowance_progress",

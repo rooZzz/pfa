@@ -38,7 +38,11 @@ export function aggregateLineItems(payloads: string[]): LineItem[] {
   return [...totals.values()];
 }
 
-export async function queryIncome(start: string, end: string): Promise<IncomeTotal> {
+export async function queryIncome(
+  start: string,
+  end: string,
+  schema = "pfa",
+): Promise<IncomeTotal> {
   const rows = await runQuery(
     `SELECT
       COALESCE(SUM(net_pence), 0) AS net_pence,
@@ -49,7 +53,7 @@ export async function queryIncome(start: string, end: string): Promise<IncomeTot
       COALESCE(SUM(COALESCE(pension_employer_pence, 0)), 0) AS pension_employer_pence,
       arg_max(tax_code, pay_date) AS tax_code,
       COUNT(*) AS payslip_count
-    FROM pfa.income_events
+    FROM ${schema}.income_events
     WHERE CAST(pay_date AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
       AND superseded_by IS NULL`,
     [start, end],
@@ -67,7 +71,7 @@ export async function queryIncome(start: string, end: string): Promise<IncomeTot
 
   const payloadRows = await runQuery(
     `SELECT payload
-    FROM pfa.income_events
+    FROM ${schema}.income_events
     WHERE CAST(pay_date AS DATE) BETWEEN CAST(? AS DATE) AND CAST(? AS DATE)
       AND payload IS NOT NULL
       AND superseded_by IS NULL`,

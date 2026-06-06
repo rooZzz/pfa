@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getKysely } from "../db.js";
 import {
   IMPLEMENTED_GOAL_TYPES,
+  type ImplementedGoalType,
   decompose,
   isImplemented,
   validateParams,
@@ -28,13 +29,26 @@ export const confirmGoalSchema = {
     .describe(
       "isa_max only: UK tax year to target. Defaults to the year covering today.",
     ),
+  target_amount_pence: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("house_deposit only: deposit amount to reach, in pence."),
+  target_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+    .optional()
+    .describe("house_deposit only: date to have the deposit by."),
 };
 
 export async function confirmGoal(input: {
-  goal_type: "emergency_fund" | "isa_max";
+  goal_type: ImplementedGoalType;
   raw_utterance: string;
   target_months?: number;
   tax_year?: string;
+  target_amount_pence?: number;
+  target_date?: string;
 }): Promise<string> {
   if (!isImplemented(input.goal_type)) {
     throw new Error(`Goal type "${input.goal_type}" is not yet supported.`);
@@ -43,6 +57,8 @@ export async function confirmGoal(input: {
   const params = validateParams(input.goal_type, {
     target_months: input.target_months,
     tax_year: input.tax_year,
+    target_amount_pence: input.target_amount_pence,
+    target_date: input.target_date,
   });
 
   const { sourceId, goalId } = await getKysely()

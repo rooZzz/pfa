@@ -10,6 +10,7 @@ import { retractRecordTool, retractRecordSchema } from "./retract_record.js";
 import { connectMonzo, connectMonzoSchema } from "./connect_monzo.js";
 import { syncMonzo } from "./sync_monzo.js";
 import { syncPrices } from "./sync_prices.js";
+import { evaluateScenario, evaluateScenarioSchema } from "./evaluate_scenario.js";
 import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
 import { ingestDocument } from "./ingest_document.js";
 import { proposeGoal, proposeGoalSchema } from "./propose_goal.js";
@@ -18,6 +19,10 @@ import {
   recordAccountBalance,
   recordAccountBalanceSchema,
 } from "./record_account_balance.js";
+import {
+  recordPersonProfile,
+  recordPersonProfileSchema,
+} from "./record_person_profile.js";
 import { recordAssetHolding, recordAssetHoldingSchema } from "./record_asset_holding.js";
 import { recordAssetPrice, recordAssetPriceSchema } from "./record_asset_price.js";
 import { recordEquityGrant, recordEquityGrantSchema } from "./record_equity_grant.js";
@@ -76,6 +81,13 @@ export const tools: ToolDescriptor[] = [
       "Record a bank or ISA account balance from a manually entered value. Creates the account if it does not exist. Writes an audit JSON file and persists the balance to SQLite.",
     inputSchema: recordAccountBalanceSchema,
     handler: async (input) => text(await recordAccountBalance(input)),
+  }),
+  defineTool({
+    name: "record_person_profile",
+    description:
+      "Record the user's standing employment profile: employer, annual base salary, and PAYE tax code, effective from a date. A correctable snapshot series. Makes salary a first-class fact for the tax-position engine rather than inferring it from payslips.",
+    inputSchema: recordPersonProfileSchema,
+    handler: async (input) => text(await recordPersonProfile(input)),
   }),
   defineTool({
     name: "record_pension_value",
@@ -319,7 +331,7 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "confirm_goal",
     description:
-      "Record a financial goal after its needs_spec slots are filled. Supported goal types: emergency_fund (target_months), isa_max (tax_year). Stores the goal with its verbatim utterance and an audit document. Deterministic — no advice.",
+      "Record a financial goal after its needs_spec slots are filled. Supported goal types: emergency_fund (target_months), isa_max (tax_year), house_deposit (target_amount_pence, target_date). Stores the goal with its verbatim utterance and an audit document. Deterministic — no advice.",
     inputSchema: confirmGoalSchema,
     handler: async (input) => text(await confirmGoal(input)),
   }),
@@ -330,6 +342,14 @@ export const tools: ToolDescriptor[] = [
     inputSchema: getBriefingSchema,
     annotations: { readOnlyHint: true },
     handler: async (input) => text(await getBriefingTool(input)),
+  }),
+  defineTool({
+    name: "evaluate_scenario",
+    description:
+      "Recompute the goal briefing under a hypothetical overlay of balances and transactions layered over the real data — the grounded conditional outcome of a 'what if' (e.g. allocating a bonus). Returns facts, not a ranking or recommendation: present each scenario's outcome and let the user choose. Compose the overlay as the rows a real event produces; never compute the projected figures by hand. Defaults to today.",
+    inputSchema: evaluateScenarioSchema,
+    annotations: { readOnlyHint: true },
+    handler: async (input) => text(await evaluateScenario(input)),
   }),
 ];
 
