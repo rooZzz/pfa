@@ -238,6 +238,45 @@ export function Meter({
   );
 }
 
+export function CollapsibleSection({
+  title,
+  hint,
+  summary,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  hint?: ReactNode;
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="stack-2">
+      <button
+        className="lhead section-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="section-toggle-title">
+          <span
+            className="ico"
+            style={open ? { transform: "rotate(180deg)" } : undefined}
+          >
+            <Icon name="chevron" size={14} />
+          </span>
+          <h4>{title}</h4>
+        </span>
+        {(open ? hint : summary) != null && (
+          <span className="hint">{open ? hint : summary}</span>
+        )}
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 export function Sparkline({
   data,
   width = 240,
@@ -278,9 +317,10 @@ export function Sparkline({
   return (
     <svg
       width="100%"
+      height={height}
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
-      style={{ display: "block", overflow: "visible" }}
+      style={{ display: "block", height: `${height}px`, overflow: "visible" }}
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

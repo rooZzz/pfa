@@ -6,6 +6,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -146,10 +147,10 @@ a {
 
 @keyframes rise {
   from {
-    transform: translateY(7px);
+    opacity: 0;
   }
   to {
-    transform: none;
+    opacity: 1;
   }
 }
 .rise {
