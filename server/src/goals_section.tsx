@@ -15,14 +15,16 @@ export type Directive = {
 type GoalView = {
   goal_id: number;
   goal_type: string;
-  progress: Directive | null;
+  progress: Directive[];
   deadlines: Directive[];
-  data_gap: Directive | null;
+  data_gaps: Directive[];
 };
 
 function goalLabel(goal_type: string, progress: Directive | null): string {
   if (goal_type === "emergency_fund") return "Emergency Fund";
   if (goal_type === "house_deposit") return "House Deposit";
+  if (goal_type === "retirement") return "Retirement";
+  if (goal_type === "fire") return "FIRE";
   if (goal_type === "isa_max") {
     const year = progress?.data.tax_year;
     return year ? `ISA Allowance ${year}` : "ISA Allowance";
@@ -42,15 +44,15 @@ function groupDirectives(directives: Directive[]): { goals: GoalView[] } {
       map.set(d.goal_id, {
         goal_id: d.goal_id,
         goal_type: d.goal_type,
-        progress: null,
+        progress: [],
         deadlines: [],
-        data_gap: null,
+        data_gaps: [],
       });
     }
     const view = map.get(d.goal_id)!;
-    if (d.kind === "progress") view.progress = d;
+    if (d.kind === "progress") view.progress.push(d);
     else if (d.kind === "deadline") view.deadlines.push(d);
-    else if (d.kind === "data_gap") view.data_gap = d;
+    else if (d.kind === "data_gap") view.data_gaps.push(d);
   }
 
   return { goals: Array.from(map.values()) };
@@ -120,17 +122,39 @@ function HouseDepositMeter({ progress }: { progress: Directive }) {
   );
 }
 
-function GoalMeter({ goal_type, progress }: { goal_type: string; progress: Directive }) {
-  if (goal_type === "emergency_fund") return <EmergencyFundMeter progress={progress} />;
-  if (goal_type === "isa_max") return <IsaMeter progress={progress} />;
-  if (goal_type === "house_deposit") return <HouseDepositMeter progress={progress} />;
-  return null;
+function ProjectionMeter({ progress }: { progress: Directive }) {
+  const projected = Number(progress.data.projected_pot_pence);
+  const needed = Number(progress.data.pot_needed_pence);
+  const percent = Number(progress.data.percent);
+  const targetAge = Number(progress.data.target_age);
+  const pct = Math.min(100, percent);
+  const name = progress.goal_type === "fire" ? "FIRE number" : "Retirement pot";
+  return (
+    <Meter
+      name={name}
+      value={`${formatGbpk(projected)} / ${formatGbpk(needed)}`}
+      pct={pct}
+      tone={pct >= 100 ? "pos" : undefined}
+      sub={`projected by age ${targetAge} · ${percent}% funded`}
+    />
+  );
+}
+
+function ProgressBlock({ directive }: { directive: Directive }) {
+  const sub = directive.sub_goal;
+  if (sub === "cover_progress") return <EmergencyFundMeter progress={directive} />;
+  if (sub === "allowance_progress") return <IsaMeter progress={directive} />;
+  if (sub === "deposit_progress") return <HouseDepositMeter progress={directive} />;
+  if (sub === "pot_progress") return <ProjectionMeter progress={directive} />;
+  return <p className="note">{directive.message}</p>;
 }
 
 function DeadlineRow({ directive }: { directive: Directive }) {
   const daysLeft = directive.data.days_left;
+  const years = directive.data.years as number | undefined;
   const periodEnd = directive.data.period_end as string | undefined;
   const targetDate = directive.data.target_date as string | undefined;
+  const retirementDate = directive.data.retirement_date as string | undefined;
   const effectiveFrom = directive.data.effective_from as string | undefined;
 
   if (effectiveFrom) {
@@ -142,7 +166,13 @@ function DeadlineRow({ directive }: { directive: Directive }) {
     );
   }
 
-  const dateStr = periodEnd ?? targetDate;
+  const dateStr = periodEnd ?? targetDate ?? retirementDate;
+  const leftText =
+    daysLeft !== undefined
+      ? `${daysLeft} days`
+      : years !== undefined
+        ? `${years} years`
+        : "";
 
   return (
     <div className="row-2">
@@ -150,7 +180,7 @@ function DeadlineRow({ directive }: { directive: Directive }) {
         <Icon name="clock" size={13} />
       </span>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>
-        {daysLeft !== undefined ? `${daysLeft} days` : ""}
+        {leftText}
         {dateStr ? ` · ${formatDate(dateStr)}` : ""}
       </span>
     </div>
@@ -158,27 +188,30 @@ function DeadlineRow({ directive }: { directive: Directive }) {
 }
 
 function GoalCard({ view }: { view: GoalView }) {
-  const label = goalLabel(view.goal_type, view.progress);
+  const label = goalLabel(view.goal_type, view.progress[0] ?? null);
 
   return (
     <div className="card stack-3">
-      {view.data_gap && !view.progress ? (
-        <div className="stack-3">
-          <span className="eyebrow">{label}</span>
+      {view.progress.map((d, i) => (
+        <ProgressBlock key={`p${i}`} directive={d} />
+      ))}
+      {view.data_gaps.map((d, i) => (
+        <div key={`g${i}`} className="stack-3">
+          {view.progress.length === 0 && i === 0 && (
+            <span className="eyebrow">{label}</span>
+          )}
           <div>
             <Badge tone="warn" led>
               Data gap
             </Badge>
           </div>
-          <p className="note">{view.data_gap.message}</p>
+          <p className="note">{d.message}</p>
         </div>
-      ) : view.progress ? (
-        <GoalMeter goal_type={view.goal_type} progress={view.progress} />
-      ) : null}
+      ))}
       {view.deadlines.length > 0 && (
         <div className="stack-3">
           {view.deadlines.map((d, i) => (
-            <DeadlineRow key={i} directive={d} />
+            <DeadlineRow key={`d${i}`} directive={d} />
           ))}
         </div>
       )}
