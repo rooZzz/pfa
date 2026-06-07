@@ -4,7 +4,7 @@ import { REAL_RETURN_RATE_BPS } from "../goals/assumptions.js";
 import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
 import { latestPriceTick, latestRangeSnapshot } from "../snapshots.js";
 import { toNum } from "../sql_util.js";
-import { resolveConstant } from "../tax_constants.js";
+import { resolveConstant } from "../tax/constants.js";
 
 export type MetricValue = {
   metric: string;

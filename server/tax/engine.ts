@@ -2,7 +2,7 @@ import { resolvePeriod } from "../cashflow/index.js";
 import { queryIncome } from "../cashflow/income.js";
 import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
 import { toNum } from "../sql_util.js";
-import { taxConstantsForDate } from "../tax_constants.js";
+import { taxConstantsForDate } from "./constants.js";
 
 export type TaxPositionContext = {
   resolved: boolean;

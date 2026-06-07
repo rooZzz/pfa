@@ -1,5 +1,5 @@
-import { runQuery } from "./query.js";
-import { toNum, toStr } from "./sql_util.js";
+import { runQuery } from "../query.js";
+import { toNum, toStr } from "../sql_util.js";
 
 export const TAX_CONSTANT_KEYS = [
   "isa_allowance",
