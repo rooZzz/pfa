@@ -6,6 +6,14 @@ Copied locally and inlined at build time so the UI renders fully offline (no ren
 
 All logos are assumed square and rendered in a uniform `object-fit: contain` box. To add one, drop a square SVG or PNG in this folder and add a line to `src/logos.ts`.
 
+## Glyph marks (`glyph/`)
+
+Monochrome single-fill versions of the crypto marks (background disc removed, `fill="currentColor"`), inlined and clay-tinted via `TickerChip`. Derived from the color sources above; same CC0 terms.
+
+## Category marks (`category/`)
+
+`cash`, `investment`, `pension`, `property` — original geometric glyphs authored for this project (no third-party source), single-fill `currentColor`, used as per-line category marks in the net-worth table.
+
 ## Brand logos
 
-`experian.png` is the square Experian brand mark. Company logos are trademarks of their owners; used here only to identify the account holder's own holding in a private, single-user local app (nominative use).
+`experian.png` is the square Experian brand mark. `brand/monzo.svg` is the Monzo mark from [simple-icons](https://github.com/simple-icons/simple-icons) (icon paths released under CC0 1.0), recolored to `currentColor`. Company logos are trademarks of their owners; used here only to identify the account holder's own holdings in a private, single-user local app (nominative use).

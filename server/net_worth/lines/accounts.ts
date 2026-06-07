@@ -13,6 +13,7 @@ export async function queryAccountLines(asOf: string): Promise<RealisedLine[]> {
   const rows = await runQuery(
     `SELECT
        COALESCE(a.name, 'Account #' || CAST(b.account_id AS TEXT)) AS name,
+       a.provider,
        b.balance_pence,
        b.valid_from,
        b.recorded_at,
@@ -26,6 +27,7 @@ export async function queryAccountLines(asOf: string): Promise<RealisedLine[]> {
   return rows.map((r) => ({
     kind: "account" as const,
     name: toStr(r.name),
+    institution: r.provider == null ? null : toStr(r.provider),
     value_pence: toNum(r.balance_pence),
     valid_from: toStr(r.valid_from),
     recorded_at: toStr(r.recorded_at),

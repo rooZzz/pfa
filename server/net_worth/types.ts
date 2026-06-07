@@ -7,6 +7,7 @@ export type RealisedLine = {
   source_id: number;
   currency: string;
   ticker?: string | null;
+  institution?: string | null;
   quantity?: number;
   quantity_scale?: number;
   unit_price_pence?: number;

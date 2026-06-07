@@ -22,6 +22,7 @@ import {
 } from "./components.js";
 import { GoalsSection } from "./goals_section.js";
 import type { Directive } from "./goals_section.js";
+import { categoryGlyph, institutionToGlyph } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { ABSENCE_LABEL, formatGbp, formatGbpk } from "./format.js";
@@ -87,31 +88,48 @@ function assetLead(ticker: string | null, fallbackName: string | null): ReactNod
   return fallbackName ?? ABSENCE_LABEL.not_recorded;
 }
 
-function realisedRowLabel(line: RealisedLine): ReactNode {
-  const hasPriceMeta = line.kind === "asset" || line.kind === "property";
-  const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
-  const isStale = priceAge != null && priceAge > 30;
-  const age = hasPriceMeta ? ageLabel(priceAge) : ageLabel(daysSince(line.valid_from));
-  const showUnits =
-    line.kind === "asset" && line.quantity != null && line.unit_price_pence != null;
-  const lead =
-    line.kind === "asset" && line.ticker ? (
-      <TickerLead ticker={line.ticker} />
-    ) : (
-      line.name
-    );
+function GlyphMark({ svg, label }: { svg: string; label?: string }) {
   return (
-    <>
-      {lead}
-      <span className="sub sub-inline">
-        {showUnits
-          ? `${(line.quantity! / (line.quantity_scale ?? 1)).toLocaleString(undefined, {
-              maximumFractionDigits: 8,
-            })} units · ${formatGbp(line.unit_price_pence!)}/unit · ${age}`
-          : age}
+    <span
+      className="ticker-mark"
+      role="img"
+      aria-label={label}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
+function LineMark({ line }: { line: RealisedLine }) {
+  if (line.kind === "asset") return <TickerChip ticker={line.ticker ?? null} />;
+  const brand = institutionToGlyph(line.institution);
+  const svg = brand ?? categoryGlyph(line.kind);
+  if (svg) return <GlyphMark svg={svg} label={line.institution ?? line.kind} />;
+  return <TickerChip ticker={line.ticker ?? null} />;
+}
+
+function realisedSub(line: RealisedLine): ReactNode {
+  if (line.kind === "asset" && line.quantity != null && line.unit_price_pence != null) {
+    const qty = (line.quantity / (line.quantity_scale ?? 1)).toLocaleString(undefined, {
+      maximumFractionDigits: 8,
+    });
+    return `${qty} × ${formatGbp(line.unit_price_pence)}`;
+  }
+  return null;
+}
+
+function realisedRowLabel(line: RealisedLine): ReactNode {
+  const priceAge = line.kind === "asset" ? daysSince(line.price_as_of) : null;
+  const isStale = priceAge != null && priceAge > 30;
+  const sub = realisedSub(line);
+  return (
+    <span className="line-lead">
+      <LineMark line={line} />
+      <span className="line-name">
+        {line.name}
+        {sub && <span className="sub sub-inline">{sub}</span>}
       </span>
       {isStale && staleBadge}
-    </>
+    </span>
   );
 }
 
@@ -223,8 +241,53 @@ function unscheduledRowLabel(line: UnscheduledLine): ReactNode {
   );
 }
 
+function splitMortgageName(name: string): { lender: string; property: string } {
+  const idx = name.indexOf(" — ");
+  if (idx === -1) return { lender: "", property: name };
+  return { lender: name.slice(0, idx), property: name.slice(idx + 3) };
+}
+
+function propertyItemLabel(
+  name: string,
+  property: RealisedLine | undefined,
+  mortgage: RealisedLine | undefined,
+): ReactNode {
+  const split = splitMortgageName(name);
+  const parts: string[] = [];
+  if (split.lender) parts.push(split.lender);
+  if (property) parts.push(`${formatGbpk(property.value_pence)} value`);
+  if (mortgage) parts.push(`${formatGbpk(-mortgage.value_pence)} mortgage`);
+  return (
+    <span className="line-lead">
+      <GlyphMark svg={categoryGlyph("property") ?? ""} label="property" />
+      <span className="line-name">
+        {split.property}
+        <span className="sub sub-inline">{parts.join(" · ")}</span>
+      </span>
+    </span>
+  );
+}
+
+function buildPropertyGroup(realised: RealisedLine[]): DataGroup | null {
+  const byName = new Map<string, { property?: RealisedLine; mortgage?: RealisedLine }>();
+  for (const line of realised) {
+    if (line.kind !== "property" && line.kind !== "mortgage") continue;
+    const entry = byName.get(line.name) ?? {};
+    if (line.kind === "property") entry.property = line;
+    else entry.mortgage = line;
+    byName.set(line.name, entry);
+  }
+  if (byName.size === 0) return null;
+  const rows = [...byName.entries()].map(([name, entry], i) => ({
+    key: `property-${i}`,
+    label: propertyItemLabel(name, entry.property, entry.mortgage),
+    valuePence: (entry.property?.value_pence ?? 0) + (entry.mortgage?.value_pence ?? 0),
+  }));
+  return { key: "property", label: "Property", rows };
+}
+
 function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
-  return GROUP_ORDER.map((g) => ({
+  const groups: DataGroup[] = FLAT_GROUPS.map((g) => ({
     kind: g.kind,
     label: g.label,
     lines: realised.filter((l) => l.kind === g.kind),
@@ -241,6 +304,10 @@ function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
         valuePence: line.value_pence,
       })),
     }));
+
+  const propertyGroup = buildPropertyGroup(realised);
+  if (propertyGroup) groups.push(propertyGroup);
+  return groups;
 }
 
 function buildVestGroups(
@@ -284,12 +351,10 @@ function buildVestGroups(
   return groups;
 }
 
-const GROUP_ORDER: { kind: RealisedLine["kind"]; label: string }[] = [
+const FLAT_GROUPS: { kind: RealisedLine["kind"]; label: string }[] = [
   { kind: "account", label: "Cash" },
   { kind: "asset", label: "Investments" },
   { kind: "pension", label: "Pension" },
-  { kind: "property", label: "Property" },
-  { kind: "mortgage", label: "Liabilities" },
 ];
 
 function NetWorthApp() {

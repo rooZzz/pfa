@@ -11,6 +11,11 @@ import matic from "./logos/glyph/matic.svg?raw";
 import avax from "./logos/glyph/avax.svg?raw";
 import usdt from "./logos/glyph/usdt.svg?raw";
 import usdc from "./logos/glyph/usdc.svg?raw";
+import cash from "./logos/category/cash.svg?raw";
+import investment from "./logos/category/investment.svg?raw";
+import pension from "./logos/category/pension.svg?raw";
+import property from "./logos/category/property.svg?raw";
+import monzo from "./logos/brand/monzo.svg?raw";
 
 const GLYPHS: Record<string, string> = {
   BTC: btc,
@@ -35,4 +40,27 @@ export function tickerToGlyph(ticker: string | null | undefined): string | null 
     .toUpperCase()
     .replace(/\.(L|LON|UK)$/, "");
   return GLYPHS[key] ?? null;
+}
+
+const INSTITUTIONS: Record<string, string> = {
+  monzo,
+};
+
+export function institutionToGlyph(
+  institution: string | null | undefined,
+): string | null {
+  if (!institution) return null;
+  return INSTITUTIONS[institution.trim().toLowerCase()] ?? null;
+}
+
+const CATEGORY_GLYPHS: Record<string, string> = {
+  account: cash,
+  asset: investment,
+  pension,
+  property,
+  mortgage: property,
+};
+
+export function categoryGlyph(kind: string): string | null {
+  return CATEGORY_GLYPHS[kind] ?? null;
 }
