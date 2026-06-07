@@ -18,15 +18,19 @@ import {
   CoverageGrid,
   Icon,
   Sparkline,
-  Stat,
   TickerChip,
 } from "./components.js";
 import { GoalsSection } from "./goals_section.js";
 import type { Directive } from "./goals_section.js";
-import { tickerToLogo } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
-import { formatGbp, formatGbpk } from "./format.js";
+import { ABSENCE_LABEL, formatGbp, formatGbpk } from "./format.js";
+
+function monthYear(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleString("en-GB", { month: "short", year: "2-digit" });
+}
 
 type NetWorthData = NetWorthResult;
 
@@ -38,7 +42,7 @@ function daysSince(dateStr: string | undefined): number | null {
 }
 
 function ageLabel(days: number | null): string {
-  if (days === null) return "no date";
+  if (days === null) return ABSENCE_LABEL.no_date;
   if (days <= 0) return "today";
   if (days === 1) return "1 day ago";
   return `${days} days ago`;
@@ -64,25 +68,23 @@ function parseBriefingDirectives(
 }
 
 const staleBadge = (
-  <span className="badge warn" style={{ marginLeft: 6 }}>
+  <span className="badge warn ml-2">
     <span className="led" />
     stale
   </span>
 );
 
 function TickerLead({ ticker }: { ticker: string }) {
-  const hasLogo = tickerToLogo(ticker) != null;
   return (
     <>
-      <TickerChip ticker={ticker} />
-      {hasLogo ? ` ${ticker}` : ""}
+      <TickerChip ticker={ticker} /> {ticker}
     </>
   );
 }
 
 function assetLead(ticker: string | null, fallbackName: string | null): ReactNode {
   if (ticker) return <TickerLead ticker={ticker} />;
-  return fallbackName ?? "unlinked";
+  return fallbackName ?? ABSENCE_LABEL.not_recorded;
 }
 
 function realisedRowLabel(line: RealisedLine): ReactNode {
@@ -273,8 +275,8 @@ function buildVestGroups(
         key: `unscheduled-${i}`,
         label: unscheduledRowLabel(line),
         valuePence: null,
-        display: "—",
-        tone: "muted",
+        absence: "na",
+        labelTone: "muted",
       })),
     });
   }
@@ -384,13 +386,12 @@ function NetWorthApp() {
   const investments = sumKind(data.realised, "asset");
   const pension = sumKind(data.realised, "pension");
   const property = sumKind(data.realised, "property");
-  const accountCount = data.realised.filter((l) => l.kind === "account").length;
 
   const composition = [
-    { label: "Property", value: property, tone: "accent" as const },
-    { label: "Pension", value: pension, tone: "muted" as const },
-    { label: "Investments", value: investments, tone: "pos" as const },
-    { label: "Cash", value: cash, tone: "pos" as const },
+    { label: "Property", value: property },
+    { label: "Pension", value: pension },
+    { label: "Investments", value: investments },
+    { label: "Cash", value: cash },
   ];
 
   const realisedGroups = buildRealisedGroups(data.realised);
@@ -413,7 +414,7 @@ function NetWorthApp() {
               onClick={() => void load(true)}
               disabled={busy}
             >
-              {busy ? "Syncing" : "Refresh"}
+              {busy ? "Refreshing" : "Refresh"}
             </Btn>
           </div>
         }
@@ -425,7 +426,7 @@ function NetWorthApp() {
         </div>
         {change != null && (
           <div className={"stat-delta mt-2 " + (change >= 0 ? "pos" : "neg")}>
-            {(change >= 0 ? "+" : "") + formatGbp(change, { whole: true })}
+            {(change >= 0 ? "+" : "") + formatGbpk(change)}
             {changePct != null ? ` (${changePct}%)` : ""} over {trendVals.length} months
           </div>
         )}
@@ -433,26 +434,18 @@ function NetWorthApp() {
 
       {trendVals.length > 1 && (
         <div className="card card--chart">
-          <Sparkline data={trendVals} height={120} />
+          <Sparkline
+            data={trendVals}
+            height={120}
+            startLabel={monthYear(data.trend[0]!.date)}
+            endLabel={monthYear(data.trend[data.trend.length - 1]!.date)}
+          />
         </div>
       )}
 
       <div className="card">
         <div className="card-label mb-3">Composition</div>
         <CompositionBar rows={composition} />
-      </div>
-
-      <div className="grid cols-2">
-        <div className="card card-sunken">
-          <Stat
-            label="Liquid cash"
-            value={formatGbpk(cash)}
-            delta={`${accountCount} account${accountCount === 1 ? "" : "s"}`}
-          />
-        </div>
-        <div className="card card-sunken">
-          <Stat label="Investments" value={formatGbpk(investments)} delta="holdings" />
-        </div>
       </div>
 
       {goals !== null && <GoalsSection directives={goals} />}

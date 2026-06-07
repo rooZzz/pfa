@@ -87,6 +87,48 @@ quiet progress meter.
     rank; a heading, a total, or a tile should not be styled one way on net worth and another on
     cashflow. When two screens diverge, that difference must mean something.
 
+13. One table primitive. Every labelled-amount list uses the one `DataTable`: optional column header,
+    grouped rows, an optional per-row bar, and exactly one truncation control. A meter is for
+    part-to-whole on a single magnitude axis; a table row is for exact, multi-column, or comparative
+    figures. No hand-rolled `<table>`.
+
+14. A disclosure ladder. Truncate (top-N plus one show-more) within a section; collapse whole
+    secondary sections, with one default everywhere — the hero figure and primary chart always open,
+    all detail collapsed by default; scroll only for a genuinely unbounded pick-list, never nested.
+    One component owns each tier; the show-more control has a single implementation.
+
+15. A badge taxonomy. A status badge states workflow or connection state, at most one, only in the
+    masthead action slot. A quality flag marks freshness or a data gap, inline next to the datum. A
+    literal datum like a tax code is a value chip, not a badge. A badge states machine or data state,
+    never a category, never decoration.
+
+16. Mono is machine-literal. Figures, tickers, dates, codes, and IDs only. Labels, eyebrows, and copy
+    are Hanken. Two named serif roles (display and heading); one fewer sans weight.
+
+17. A prose system. Three sans tiers: body (read to understand), caption (passing hints), and one
+    empty-state pattern, identical on every screen. No raw tool strings rendered as prose; structure
+    the connector returns.
+
+18. One flow chrome. The masthead carries identity and at most one status badge, never navigation.
+    Every step ends in one action bar: secondary or back on the left, primary on the right, a top
+    divider, fixed spacing. Leaving a flow is a distinct labelled action, also bottom-left. Multi-step
+    flows carry a quiet "step N of M". Every step, every flow.
+
+19. Asset identity is one clay treatment per list. A clay-masked glyph mark where a clean glyph
+    exists, a monogram otherwise — same accent, same chip, nothing privileged by colour. Always show
+    the text ticker; marks live only in asset lists and the connector picker.
+
+20. Each fact appears once. No tile that restates a chart segment that restates a table row. The one
+    place a fact belongs is the one place it is shown.
+
+21. One vocabulary for absence. "Not recorded" (never captured), "—" (not applicable), "no date"
+    (value known, timing unknown) — three fixed meanings, one muted style, everywhere. Absence is
+    provenance.
+
+22. Nothing routes around the tokens. No hardcoded hex (the logo mark included), no inline style
+    objects (charts especially) for anything a token or class covers. Motion obeys its own
+    transform-only rule.
+
 ## Type
 
 - Newsreader (serif) for titles and section headings — literary warmth, a scholarly note.
@@ -142,7 +184,11 @@ self-contained HTML document.
 - Fonts: woff2 files in `server/src/fonts/` (Newsreader 400/500, Hanken Grotesk 400/500/600,
   IBM Plex Mono 400/500), base64-inlined at build time. No CDN, no network at render.
 - Components: `server/src/components.tsx` — `Icon`, `Btn`, `Stat`, `Badge`, `Meter`, `Sparkline`,
-  `MiniBars`, `CompositionBar`. All class-driven; charts are inline SVG computed from data.
+  `MiniBars`, `CompositionBar`, `ActionBar` (the one bottom flow-chrome bar), `EmptyState` (the one
+  empty pattern), `TickerChip` (clay-masked glyph or monogram). The single labelled-amount table is
+  `server/src/data_table.tsx` (`DataTable`, rows or bars variant, one `DisclosureToggle`). All
+  class-driven; charts are inline SVG computed from data, with dimensions and opacities in chart
+  tokens (`tokens.css`) and classes (`components.css`), not inline literals.
 - Formatting: `server/src/format.ts` — `formatGbp` and `formatGbpk`, the single edge where integer
   pence become display strings (U+2212 minus, en-GB grouping).
 - Theme: `server/src/theme.ts` sets `data-theme` from the host `prefers-color-scheme`, defaulting to

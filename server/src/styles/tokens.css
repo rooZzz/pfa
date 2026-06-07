@@ -13,6 +13,9 @@
   --text-2xl: 2rem;
   --text-3xl: 2.75rem;
 
+  --text-display: var(--text-lg);
+  --text-heading: var(--text-md);
+
   --leading-tight: 1.15;
   --leading-snug: 1.3;
   --leading-normal: 1.55;
@@ -36,6 +39,19 @@
   --dur-fast: 120ms;
   --dur: 200ms;
   --dur-slow: 360ms;
+
+  --chart-bar-gap: 10px;
+  --chart-bar-pair-gap: 3px;
+  --chart-bar-width: 6px;
+  --chart-bar-radius: 2px;
+  --chart-fill-opacity: 0.85;
+  --chart-fill-opacity-out: 0.7;
+  --chart-area-opacity: 0.18;
+  --chart-segment-opacity: 0.9;
+  --chart-segment-gap: 2px;
+  --chart-segment-height: 12px;
+  --chart-swatch: 8px;
+  --chart-rise: 6px;
 }
 
 :root,

@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { MonthCoverage, SeriesStatus } from "../net_worth/coverage.js";
-import { tickerToLogo } from "./logos.js";
+import { tickerToGlyph } from "./logos.js";
 
 export type IconName =
   | "refresh"
@@ -28,10 +28,9 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
   ),
   sync: (
     <>
-      <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8" />
-      <path d="M21 4v4h-4" />
-      <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" />
-      <path d="M3 20v-4h4" />
+      <path d="M12 13v8" />
+      <path d="m8 17 4 4 4-4" />
+      <path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" />
     </>
   ),
   upload: (
@@ -185,16 +184,59 @@ export function Badge({
   );
 }
 
+export function ActionBar({
+  secondary,
+  primary,
+  step,
+}: {
+  secondary?: ReactNode;
+  primary?: ReactNode;
+  step?: string;
+}) {
+  return (
+    <div className="action-bar">
+      <div className="action-bar-side">
+        {secondary}
+        {step && <span className="step-indicator">{step}</span>}
+      </div>
+      <div className="action-bar-side">{primary}</div>
+    </div>
+  );
+}
+
+export function EmptyState({
+  icon,
+  children,
+  action,
+}: {
+  icon?: IconName;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="empty">
+      {icon && (
+        <span className="empty-ico">
+          <Icon name={icon} size={22} />
+        </span>
+      )}
+      <span className="empty-line">{children}</span>
+      {action}
+    </div>
+  );
+}
+
 export function TickerChip({ ticker }: { ticker: string | null }) {
   const trimmed = ticker?.trim();
-  const logo = tickerToLogo(trimmed);
-  if (logo) {
+  const glyph = tickerToGlyph(trimmed);
+  if (glyph) {
     return (
-      <img
-        className="ticker-logo"
-        src={logo}
-        alt={trimmed ?? ""}
+      <span
+        className="ticker-mark"
+        role="img"
+        aria-label={trimmed ?? undefined}
         title={trimmed ?? undefined}
+        dangerouslySetInnerHTML={{ __html: glyph }}
       />
     );
   }
@@ -216,11 +258,11 @@ export function Meter({
   tone,
   sub,
 }: {
-  name: string;
-  value: string;
+  name: ReactNode;
+  value: ReactNode;
   pct: number;
   tone?: "neg" | "pos" | "muted";
-  sub?: string;
+  sub?: ReactNode;
 }) {
   return (
     <div className="meter">
@@ -286,12 +328,18 @@ export function Sparkline({
   height = 48,
   tone = "accent",
   fill = true,
+  baseline = true,
+  startLabel,
+  endLabel,
 }: {
   data: number[];
   width?: number;
   height?: number;
   tone?: "pos" | "neg" | "accent";
   fill?: boolean;
+  baseline?: boolean;
+  startLabel?: string;
+  endLabel?: string;
 }) {
   const gradientId = useId();
   if (data.length < 2) return null;
@@ -317,38 +365,59 @@ export function Sparkline({
         ? "var(--negative)"
         : "var(--chart-ink)";
   const last = points[points.length - 1]!;
+  const baseY = points[0]![1];
   return (
-    <svg
-      width="100%"
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-      style={{ display: "block", height: `${height}px`, overflow: "visible" }}
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {fill && <path d={area} fill={`url(#${gradientId})`} />}
-      <path
-        d={line}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx={last[0]}
-        cy={last[1]}
-        r="2.4"
-        fill="var(--surface)"
-        stroke={color}
-        strokeWidth="1.6"
-      />
-    </svg>
+    <>
+      <svg
+        className="spark"
+        width="100%"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop
+              offset="0%"
+              style={{ stopColor: color, stopOpacity: "var(--chart-area-opacity)" }}
+            />
+            <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+          </linearGradient>
+        </defs>
+        {baseline && (
+          <line
+            className="spark-baseline"
+            x1={pad}
+            y1={baseY}
+            x2={width - pad}
+            y2={baseY}
+          />
+        )}
+        {fill && <path d={area} fill={`url(#${gradientId})`} />}
+        <path
+          d={line}
+          fill="none"
+          stroke={color}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle
+          cx={last[0]}
+          cy={last[1]}
+          r="2.4"
+          fill="var(--surface)"
+          stroke={color}
+          strokeWidth="1.6"
+        />
+      </svg>
+      {(startLabel || endLabel) && (
+        <div className="spark-axis num">
+          <span>{startLabel}</span>
+          <span>{endLabel}</span>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -361,53 +430,20 @@ export function MiniBars({
 }) {
   const max = Math.max(1, ...rows.flatMap((r) => [r.in, r.out]));
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height }}>
+    <div className="minibars" style={{ height }}>
       {rows.map((r, i) => (
-        <div
-          key={i}
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              gap: 3,
-              height,
-              width: "100%",
-              justifyContent: "center",
-            }}
-          >
+        <div key={i} className="minibars-col">
+          <div className="minibars-pair" style={{ height }}>
             <span
-              style={{
-                width: 6,
-                height: Math.max(2, (r.in / max) * height) + "px",
-                background: "var(--positive)",
-                borderRadius: 2,
-                opacity: 0.85,
-              }}
+              className="minibar in"
+              style={{ height: Math.max(2, (r.in / max) * height) + "px" }}
             />
             <span
-              style={{
-                width: 6,
-                height: Math.max(2, (r.out / max) * height) + "px",
-                background: "var(--negative)",
-                borderRadius: 2,
-                opacity: 0.7,
-              }}
+              className="minibar out"
+              style={{ height: Math.max(2, (r.out / max) * height) + "px" }}
             />
           </div>
-          <span
-            className="num"
-            style={{ fontSize: "var(--text-2xs)", color: "var(--ink-faint)" }}
-          >
-            {r.label}
-          </span>
+          <span className="num minibars-label">{r.label}</span>
         </div>
       ))}
     </div>
@@ -508,11 +544,14 @@ export function CoverageGrid({ months }: { months: MonthCoverage[] }) {
 
 export function CompositionBar({
   rows,
+  variant = "ramp",
 }: {
   rows: { label: string; value: number; tone?: Tone }[];
+  variant?: "ramp" | "tone";
 }) {
   const assets = rows.filter((r) => r.value > 0);
   const total = assets.reduce((sum, r) => sum + r.value, 0) || 1;
+  const count = assets.length;
   const toneColor = (t?: Tone) =>
     t === "accent"
       ? "var(--accent)"
@@ -523,55 +562,26 @@ export function CompositionBar({
           : t === "muted"
             ? "var(--ink-muted)"
             : "var(--ink-faint)";
+  const segColor = (r: { tone?: Tone }, i: number) =>
+    variant === "tone"
+      ? toneColor(r.tone)
+      : `color-mix(in oklch, var(--accent) ${85 - Math.round((i / Math.max(1, count - 1)) * 60)}%, var(--surface-2))`;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-      <div
-        style={{
-          display: "flex",
-          height: 12,
-          borderRadius: 6,
-          overflow: "hidden",
-          gap: 2,
-        }}
-      >
+    <div className="composition">
+      <div className="composition-track">
         {assets.map((r, i) => (
           <span
             key={i}
+            className="composition-seg"
             title={r.label}
-            style={{
-              width: (r.value / total) * 100 + "%",
-              background: toneColor(r.tone),
-              opacity: 0.9,
-            }}
+            style={{ width: (r.value / total) * 100 + "%", background: segColor(r, i) }}
           />
         ))}
       </div>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "var(--space-2) var(--space-4)",
-        }}
-      >
+      <div className="composition-legend">
         {assets.map((r, i) => (
-          <span
-            key={i}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: "var(--text-xs)",
-              color: "var(--ink-muted)",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 2,
-                background: toneColor(r.tone),
-              }}
-            />
+          <span key={i} className="composition-key">
+            <span className="composition-swatch" style={{ background: segColor(r, i) }} />
             {r.label}
           </span>
         ))}

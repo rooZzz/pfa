@@ -1,4 +1,4 @@
-import { Badge, Icon, Meter } from "./components.js";
+import { Badge, EmptyState, Icon, Meter } from "./components.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap" | "contention";
@@ -175,11 +175,11 @@ function DeadlineRow({ directive }: { directive: Directive }) {
         : "";
 
   return (
-    <div className="row-2">
-      <span style={{ color: "var(--ink-muted)", display: "flex", alignItems: "center" }}>
+    <div className="row-2 deadline">
+      <span className="deadline-ico">
         <Icon name="clock" size={13} />
       </span>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>
+      <span>
         {leftText}
         {dateStr ? ` · ${formatDate(dateStr)}` : ""}
       </span>
@@ -228,11 +228,9 @@ export function GoalsSection({ directives }: { directives: Directive[] }) {
         <h4>Goals</h4>
       </div>
       {goals.length === 0 ? (
-        <div className="card">
-          <p className="note">
-            No active goals yet. Ask to set one with propose_goal then confirm_goal.
-          </p>
-        </div>
+        <EmptyState>
+          No active goals yet. Ask to set one with propose_goal then confirm_goal.
+        </EmptyState>
       ) : (
         <div className="goals-grid">
           {goals.map((view) => (

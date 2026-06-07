@@ -1,6 +1,14 @@
 const MINUS = "−";
 const POUND = "£";
 
+export type Absence = "not_recorded" | "na" | "no_date";
+
+export const ABSENCE_LABEL: Record<Absence, string> = {
+  not_recorded: "not recorded",
+  na: "—",
+  no_date: "no date",
+};
+
 export function formatGbp(pence: number, opts: { whole?: boolean } = {}): string {
   const abs = Math.abs(pence);
   const sign = pence < 0 ? MINUS : "";

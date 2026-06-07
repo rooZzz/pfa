@@ -1,19 +1,18 @@
-import btc from "./logos/btc.svg";
-import eth from "./logos/eth.svg";
-import link from "./logos/link.svg";
-import sol from "./logos/sol.svg";
-import ada from "./logos/ada.svg";
-import xrp from "./logos/xrp.svg";
-import doge from "./logos/doge.svg";
-import ltc from "./logos/ltc.svg";
-import dot from "./logos/dot.svg";
-import matic from "./logos/matic.svg";
-import avax from "./logos/avax.svg";
-import usdt from "./logos/usdt.svg";
-import usdc from "./logos/usdc.svg";
-import experian from "./logos/experian.png";
+import btc from "./logos/glyph/btc.svg?raw";
+import eth from "./logos/glyph/eth.svg?raw";
+import link from "./logos/glyph/link.svg?raw";
+import sol from "./logos/glyph/sol.svg?raw";
+import ada from "./logos/glyph/ada.svg?raw";
+import xrp from "./logos/glyph/xrp.svg?raw";
+import doge from "./logos/glyph/doge.svg?raw";
+import ltc from "./logos/glyph/ltc.svg?raw";
+import dot from "./logos/glyph/dot.svg?raw";
+import matic from "./logos/glyph/matic.svg?raw";
+import avax from "./logos/glyph/avax.svg?raw";
+import usdt from "./logos/glyph/usdt.svg?raw";
+import usdc from "./logos/glyph/usdc.svg?raw";
 
-const LOGOS: Record<string, string> = {
+const GLYPHS: Record<string, string> = {
   BTC: btc,
   ETH: eth,
   LINK: link,
@@ -27,14 +26,13 @@ const LOGOS: Record<string, string> = {
   AVAX: avax,
   USDT: usdt,
   USDC: usdc,
-  EXPN: experian,
 };
 
-export function tickerToLogo(ticker: string | null | undefined): string | null {
+export function tickerToGlyph(ticker: string | null | undefined): string | null {
   if (!ticker) return null;
   const key = ticker
     .trim()
     .toUpperCase()
     .replace(/\.(L|LON|UK)$/, "");
-  return LOGOS[key] ?? null;
+  return GLYPHS[key] ?? null;
 }
