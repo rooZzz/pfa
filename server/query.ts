@@ -70,6 +70,7 @@ export type OverlayIncome = {
   paye_pence?: number;
   ni_employee_pence?: number;
   pension_employee_pence?: number;
+  pension_employer_pence?: number;
   tax_code?: string;
 };
 export type Overlay = {
@@ -79,7 +80,13 @@ export type Overlay = {
 };
 
 const SCENARIO_SCHEMA = "scen";
-const CLONE_TABLES = ["accounts", "account_balances", "transactions", "income_events"];
+const CLONE_TABLES = [
+  "accounts",
+  "account_balances",
+  "transactions",
+  "income_events",
+  "pension_values",
+];
 
 export async function setupScenario(overlay: Overlay): Promise<ReadContext> {
   await runExec(`DROP SCHEMA IF EXISTS ${SCENARIO_SCHEMA} CASCADE`);
@@ -125,12 +132,13 @@ export async function setupScenario(overlay: Overlay): Promise<ReadContext> {
     const paye = event.paye_pence ?? 0;
     const ni = event.ni_employee_pence ?? 0;
     const pension = event.pension_employee_pence ?? 0;
+    const employerPension = event.pension_employer_pence ?? 0;
     const net = event.gross_pence - paye - ni - pension;
     await runQuery(
       `INSERT INTO ${SCENARIO_SCHEMA}.income_events
          (id, pay_date, gross_pence, net_pence, paye_pence, ni_employee_pence,
-          pension_employee_pence, tax_code, occurred_at, recorded_at)
-       VALUES (?, CAST(? AS DATE), ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP), CAST(? AS TIMESTAMP))`,
+          pension_employee_pence, pension_employer_pence, tax_code, occurred_at, recorded_at)
+       VALUES (?, CAST(? AS DATE), ?, ?, ?, ?, ?, ?, ?, CAST(? AS TIMESTAMP), CAST(? AS TIMESTAMP))`,
       [
         nextId++,
         event.pay_date,
@@ -139,6 +147,7 @@ export async function setupScenario(overlay: Overlay): Promise<ReadContext> {
         paye,
         ni,
         pension,
+        employerPension,
         event.tax_code ?? null,
         event.pay_date,
         event.pay_date,

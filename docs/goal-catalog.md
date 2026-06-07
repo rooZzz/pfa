@@ -53,6 +53,10 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 
 **UK edges / notes.** Pension access age is 57 from 2028. Retiring before it means the pension pot cannot fund the early years, so `bridge_fund` must be held in accessible ISA/GIA rather than pension. This is the edge that separates `fire` from `retirement`.
 
+**Implemented formula.** Needs spec: `target_annual_spend_pence`, `safe_withdrawal_rate_bps` (default 400 = 4%), `target_retirement_age`, `date_of_birth` (validated at the boundary; age is derived from the DOB at briefing time, never frozen in the goal row). Decomposes to three sub-goals. `pot_progress` binds to `projected_invested_assets`: `invested_assets` (pension pot via `pension_values`, ISA balances, and non-property `holdings × asset_prices`; cash excluded) projected in real terms by year-by-year integer-pence compounding at the 3% real return in `server/goals/assumptions.ts`, plus annualised employee-plus-employer pension contributions (`income_events`), over the whole years to `target_retirement_age`; the FIRE number is `target_annual_spend / SWR`. `contribution_gap` binds to `contribution_rate`. `bridge_fund` binds to `bridge_fund`: accessible assets (cash + ISA + non-property holdings, everything except the locked pension) against `annual_spend × (pension_access_age − target_retirement_age)`, zero when retiring at or after the access age resolved from `tax_constants`. Cash funds the bridge but is excluded from the safe-withdrawal sufficiency total and never grown at the investment return; ISA and holdings serve both the sufficiency and the bridge tests, never summed. Observation-only; the assumptions surface in the briefing's `retirement_projection` block, which also reports invested assets, cash, and total drawable wealth.
+
+**Shared resources / contention.** Claims `pension` plus the full liquid pool (`current`/`savings`/`isa`), because the bridge draws on accessible savings. It therefore contends with `emergency_fund`/`house_deposit` over the liquid accounts and with `retirement` over the pension pot.
+
 ---
 
 ## `house_deposit`
@@ -201,3 +205,7 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 | `contribution_gap` | `contribution_rate`. |
 
 **UK edges / notes.** Distinguished from `fire` by the absence of an early-access bridge — retirement at or after pension access age can draw the pension directly, so no `bridge_fund` sub-goal. Pension and ISA annual-allowance headroom inform `contribution_gap` but do not, on their own, cross into advice.
+
+**Implemented formula.** Needs spec: `target_annual_income_pence`, `retirement_age`, `date_of_birth` (validated at the boundary; age is derived from the DOB at briefing time). Decomposes to `pot_progress` (`projected_pension_pot`) and `contribution_gap` (`contribution_rate`). The projected pot is real-terms year-by-year integer-pence compounding at the 3% real return from the current pot (`pension_values`, LOCF) plus annualised employee-plus-employer contributions (`income_events`) to the retirement age; the pot needed is `target_annual_income / SWR` (4% default). No `bridge_fund`, since the pension can be drawn directly at or after access age. Observation-only; the assumptions surface in the briefing's `retirement_projection` block, with State Pension excluded (it would lower the pot needed).
+
+**Shared resources / contention.** Claims `pension` only, so it contends with `fire` over the pot but not with the liquid-pool goals.

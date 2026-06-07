@@ -1,6 +1,8 @@
 import { resolvePeriod } from "../cashflow/index.js";
+import { queryIncome } from "../cashflow/income.js";
+import { REAL_RETURN_RATE_BPS } from "../goals/assumptions.js";
 import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
-import { latestRangeSnapshot } from "../snapshots.js";
+import { latestPriceTick, latestRangeSnapshot } from "../snapshots.js";
 import { toNum } from "../sql_util.js";
 import { resolveConstant } from "../tax_constants.js";
 
@@ -219,6 +221,342 @@ export async function isaAllowanceRemaining(
       contributions_pence: contributions,
       tax_year: period.tax_year,
       period_end: period.period_end,
+    },
+  };
+}
+
+function addYearsToDate(date: string, years: number): string {
+  const [y, m, d] = date.split("-");
+  return `${Number(y) + years}-${m}-${d}`;
+}
+
+function wholeYearsBetween(from: string, to: string): number {
+  const [fromYear, fromMonth, fromDay] = from.split("-").map(Number);
+  const [toYear, toMonth, toDay] = to.split("-").map(Number);
+  let years = toYear! - fromYear!;
+  if (toMonth! < fromMonth! || (toMonth === fromMonth && toDay! < fromDay!)) {
+    years -= 1;
+  }
+  return Math.max(0, years);
+}
+
+function projectPotPence(
+  potPence: number,
+  annualContributionPence: number,
+  years: number,
+  rateBps: number,
+): number {
+  let pot = potPence;
+  for (let year = 0; year < years; year++) {
+    const growth = Math.round((pot * rateBps) / 10000);
+    pot = pot + growth + annualContributionPence;
+  }
+  return pot;
+}
+
+export async function currentPensionPot(
+  asOf: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const snap = latestRangeSnapshot(
+    `${ctx.schema}.pension_values`,
+    "account_id",
+    ["account_id", "value_pence"],
+    asOf,
+  );
+  const rows = await runQuery(
+    `SELECT COALESCE(SUM(p.value_pence), 0) AS total, COUNT(*) AS accounts
+       FROM (${snap.sql}) p
+       JOIN ${ctx.schema}.accounts a ON a.id = p.account_id
+       WHERE a.type = 'pension'`,
+    snap.params,
+  );
+  const row = rows[0]!;
+  const accounts = toNum(row.accounts);
+  if (accounts === 0) {
+    return {
+      metric: "current_pension_pot",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: {},
+      gap_reason: "No pension pot value recorded.",
+    };
+  }
+  return {
+    metric: "current_pension_pot",
+    resolved: true,
+    value: toNum(row.total),
+    unit: "pence",
+    detail: { accounts },
+  };
+}
+
+export async function contributionRate(
+  asOf: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const period = await resolvePeriod(undefined, asOf);
+  const income = await queryIncome(period.period_start, asOf, ctx.schema);
+  if (income.payslip_count === 0) {
+    return {
+      metric: "contribution_rate",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: { tax_year: period.tax_year },
+      gap_reason:
+        "No payslip data captured this tax year; pension contributions are ungrounded.",
+    };
+  }
+  const employeeAnnual = Math.round(
+    (income.pension_employee_pence * 12) / income.payslip_count,
+  );
+  const employerAnnual = Math.round(
+    (income.pension_employer_pence * 12) / income.payslip_count,
+  );
+  return {
+    metric: "contribution_rate",
+    resolved: true,
+    value: employeeAnnual + employerAnnual,
+    unit: "pence",
+    detail: {
+      employee_annual_pence: employeeAnnual,
+      employer_annual_pence: employerAnnual,
+      payslip_count: income.payslip_count,
+      tax_year: period.tax_year,
+    },
+  };
+}
+
+async function accountBalanceSum(
+  asOf: string,
+  types: readonly string[],
+  ctx: ReadContext,
+): Promise<{ total: number; accounts: number }> {
+  const snap = latestRangeSnapshot(
+    `${ctx.schema}.account_balances`,
+    "account_id",
+    ["account_id", "balance_pence"],
+    asOf,
+  );
+  const placeholders = types.map(() => "?").join(", ");
+  const rows = await runQuery(
+    `SELECT COALESCE(SUM(b.balance_pence), 0) AS total, COUNT(*) AS accounts
+       FROM (${snap.sql}) b
+       JOIN ${ctx.schema}.accounts a ON a.id = b.account_id
+       WHERE a.type IN (${placeholders})`,
+    [...snap.params, ...types],
+  );
+  const row = rows[0]!;
+  return { total: toNum(row.total), accounts: toNum(row.accounts) };
+}
+
+async function holdingsExcludingPropertyPence(asOf: string): Promise<number> {
+  const holdings = latestRangeSnapshot(
+    "pfa.holdings",
+    "asset_id",
+    ["asset_id", "quantity"],
+    asOf,
+  );
+  const prices = latestPriceTick(["ap.asset_id", "ap.unit_price_pence"], asOf);
+  const rows = await runQuery(
+    `SELECT COALESCE(SUM(CAST(h.quantity AS BIGINT) * p.unit_price_pence), 0) AS total
+       FROM (${holdings.sql}) h
+       JOIN pfa.assets a ON a.id = h.asset_id
+       JOIN (${prices.sql}) p ON p.asset_id = h.asset_id
+       WHERE a.asset_type != 'property'`,
+    [...holdings.params, ...prices.params],
+  );
+  return toNum(rows[0]!.total);
+}
+
+export async function cashSavings(
+  asOf: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const { total, accounts } = await accountBalanceSum(asOf, ["current", "savings"], ctx);
+  if (accounts === 0) {
+    return {
+      metric: "cash_savings",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: {},
+      gap_reason: "No current or savings balances recorded.",
+    };
+  }
+  return {
+    metric: "cash_savings",
+    resolved: true,
+    value: total,
+    unit: "pence",
+    detail: { accounts },
+  };
+}
+
+export async function investedAssets(
+  asOf: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const pension = await currentPensionPot(asOf, ctx);
+  const isa = await accountBalanceSum(asOf, ["isa"], ctx);
+  const holdingsPence = await holdingsExcludingPropertyPence(asOf);
+  const pensionPence = pension.resolved ? pension.value! : 0;
+  if (!pension.resolved && isa.accounts === 0 && holdingsPence === 0) {
+    return {
+      metric: "invested_assets",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: {},
+      gap_reason: "No pension, ISA, or investment holdings recorded.",
+    };
+  }
+  return {
+    metric: "invested_assets",
+    resolved: true,
+    value: pensionPence + isa.total + holdingsPence,
+    unit: "pence",
+    detail: {
+      pension_pence: pensionPence,
+      isa_pence: isa.total,
+      holdings_pence: holdingsPence,
+    },
+  };
+}
+
+function projectFrom(
+  metricName: string,
+  base: MetricValue,
+  contribution: MetricValue,
+  asOf: string,
+  targetAge: number,
+  dateOfBirth: string,
+): MetricValue {
+  if (!base.resolved) {
+    return {
+      metric: metricName,
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: {},
+      gap_reason: base.gap_reason ?? "Nothing recorded to project from.",
+    };
+  }
+  const annualContribution = contribution.resolved ? contribution.value! : 0;
+  const retirementDate = addYearsToDate(dateOfBirth, targetAge);
+  const years = wholeYearsBetween(asOf, retirementDate);
+  const projected = projectPotPence(
+    base.value!,
+    annualContribution,
+    years,
+    REAL_RETURN_RATE_BPS,
+  );
+  return {
+    metric: metricName,
+    resolved: true,
+    value: projected,
+    unit: "pence",
+    detail: {
+      current_pot_pence: base.value!,
+      annual_contribution_pence: annualContribution,
+      contribution_grounded: contribution.resolved ? 1 : 0,
+      years,
+      target_age: targetAge,
+      retirement_date: retirementDate,
+      real_return_bps: REAL_RETURN_RATE_BPS,
+    },
+  };
+}
+
+export async function projectedPensionPot(
+  asOf: string,
+  targetAge: number,
+  dateOfBirth: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const base = await currentPensionPot(asOf, ctx);
+  const contribution = await contributionRate(asOf, ctx);
+  return projectFrom(
+    "projected_pension_pot",
+    base,
+    contribution,
+    asOf,
+    targetAge,
+    dateOfBirth,
+  );
+}
+
+export async function projectedInvestedAssets(
+  asOf: string,
+  targetAge: number,
+  dateOfBirth: string,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const base = await investedAssets(asOf, ctx);
+  const contribution = await contributionRate(asOf, ctx);
+  return projectFrom(
+    "projected_invested_assets",
+    base,
+    contribution,
+    asOf,
+    targetAge,
+    dateOfBirth,
+  );
+}
+
+export async function bridgeFund(
+  asOf: string,
+  annualSpendPence: number,
+  targetRetirementAge: number,
+  ctx: ReadContext = LIVE_CONTEXT,
+): Promise<MetricValue> {
+  const accessAgeConstant = await resolveConstant("pension_access_age", asOf);
+  if (!accessAgeConstant) {
+    return {
+      metric: "bridge_fund",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: {},
+      gap_reason: "Pension access age constant not found.",
+    };
+  }
+  const accessAge = accessAgeConstant.value;
+  const bridgeYears = Math.max(0, accessAge - targetRetirementAge);
+  const bridgeNeed = annualSpendPence * bridgeYears;
+
+  const liquid = await liquidSavings(asOf, ctx);
+  const holdingsPence = await holdingsExcludingPropertyPence(asOf);
+  const hasAccessible = liquid.resolved || holdingsPence > 0;
+  if (bridgeYears > 0 && !hasAccessible) {
+    return {
+      metric: "bridge_fund",
+      resolved: false,
+      value: null,
+      unit: "pence",
+      detail: {
+        bridge_years: bridgeYears,
+        pension_access_age: accessAge,
+        target_retirement_age: targetRetirementAge,
+      },
+      gap_reason: "No accessible savings or holdings recorded to assess the bridge.",
+    };
+  }
+  const accessible = (liquid.resolved ? liquid.value! : 0) + holdingsPence;
+  return {
+    metric: "bridge_fund",
+    resolved: true,
+    value: Math.max(0, bridgeNeed - accessible),
+    unit: "pence",
+    detail: {
+      accessible_pence: accessible,
+      bridge_need_pence: bridgeNeed,
+      bridge_years: bridgeYears,
+      pension_access_age: accessAge,
+      annual_spend_pence: annualSpendPence,
+      target_retirement_age: targetRetirementAge,
     },
   };
 }

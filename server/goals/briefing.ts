@@ -1,18 +1,31 @@
 import { getKysely } from "../db.js";
 import {
+  bridgeFund,
+  cashSavings,
+  contributionRate,
+  currentPensionPot,
   emergencyFundMonths,
   houseDepositProgress,
+  investedAssets,
   isaAllowanceRemaining,
   type MetricValue,
+  projectedInvestedAssets,
+  projectedPensionPot,
 } from "../metrics/index.js";
 import { LIVE_CONTEXT, type ReadContext } from "../query.js";
 import { type TaxPositionContext, taxPosition } from "../tax/engine.js";
 import { type EarningsContext, earningsContext } from "./earnings.js";
 import {
   type ResolvedConstant,
+  resolveConstant,
   taxConstantsForDate,
   upcomingChange,
 } from "../tax_constants.js";
+import {
+  PROJECTION_ASSUMPTIONS,
+  REAL_RETURN_RATE_BPS,
+  SAFE_WITHDRAWAL_RATE_BPS,
+} from "./assumptions.js";
 import {
   decompose,
   type ImplementedGoalType,
@@ -32,11 +45,26 @@ export type Directive = {
   data: Record<string, number | string>;
 };
 
+export type RetirementProjection = {
+  resolved: boolean;
+  invested_assets_pence: number | null;
+  pension_pot_pence: number | null;
+  cash_pence: number | null;
+  total_drawable_pence: number | null;
+  annual_contribution_pence: number | null;
+  real_return_bps: number;
+  safe_withdrawal_rate_bps: number;
+  pension_access_age: number | null;
+  assumptions: string[];
+  gap_reason?: string;
+};
+
 export type Briefing = {
   as_of: string;
   directives: Directive[];
   earnings: EarningsContext;
   tax_position: TaxPositionContext;
+  retirement_projection: RetirementProjection;
   tax_constants: Record<string, ResolvedConstant>;
   text: string;
 };
@@ -65,6 +93,28 @@ async function evaluateMetric(
   }
   if (binding.metric === "house_deposit_progress") {
     return houseDepositProgress(asOf, binding.target_amount_pence!, ctx);
+  }
+  if (binding.metric === "projected_pension_pot") {
+    return projectedPensionPot(asOf, binding.target_age!, binding.date_of_birth!, ctx);
+  }
+  if (binding.metric === "projected_invested_assets") {
+    return projectedInvestedAssets(
+      asOf,
+      binding.target_age!,
+      binding.date_of_birth!,
+      ctx,
+    );
+  }
+  if (binding.metric === "contribution_rate") {
+    return contributionRate(asOf, ctx);
+  }
+  if (binding.metric === "bridge_fund") {
+    return bridgeFund(
+      asOf,
+      binding.target_annual_income_pence!,
+      binding.target_age!,
+      ctx,
+    );
   }
   const taxYear = typeof params.tax_year === "string" ? params.tax_year : undefined;
   return isaAllowanceRemaining(asOf, taxYear, ctx);
@@ -127,6 +177,102 @@ async function directivesFor(
         kind: "deadline",
         message: `House deposit: ${daysLeft} days until ${targetDate}.`,
         data: { days_left: daysLeft, target_date: targetDate },
+      },
+    ];
+  }
+
+  if (
+    binding.metric === "projected_pension_pot" ||
+    binding.metric === "projected_invested_assets"
+  ) {
+    const isFire = binding.metric === "projected_invested_assets";
+    const label = isFire ? "Financial independence" : "Retirement";
+    const potWord = isFire ? "projected investable wealth" : "projected pot";
+    const projected = metric.value!;
+    const income = binding.target_annual_income_pence!;
+    const swrBps = binding.safe_withdrawal_rate_bps ?? SAFE_WITHDRAWAL_RATE_BPS;
+    const potNeeded = Math.round((income * 10000) / swrBps);
+    const percent = Math.round((projected / potNeeded) * 100);
+    const shortfall = Math.max(0, potNeeded - projected);
+    const targetAge = binding.target_age!;
+    const years = metric.detail.years as number;
+    const retirementDate = metric.detail.retirement_date as string;
+    return [
+      {
+        ...base,
+        kind: "progress",
+        message: `${label}: ${potWord} ${formatPence(projected)} in today's money by age ${targetAge}, against ${formatPence(potNeeded)} needed for ${formatPence(income)}/yr (${percent}% funded).`,
+        data: {
+          projected_pot_pence: projected,
+          pot_needed_pence: potNeeded,
+          shortfall_pence: shortfall,
+          percent,
+          target_age: targetAge,
+          target_annual_income_pence: income,
+          years,
+          real_return_bps: metric.detail.real_return_bps as number,
+        },
+      },
+      {
+        ...base,
+        kind: "deadline",
+        message: `${label}: ${years} years until age ${targetAge} (${retirementDate}).`,
+        data: { years, target_age: targetAge, retirement_date: retirementDate },
+      },
+    ];
+  }
+
+  if (binding.metric === "contribution_rate") {
+    const annual = metric.value!;
+    const employee = metric.detail.employee_annual_pence as number;
+    const employer = metric.detail.employer_annual_pence as number;
+    return [
+      {
+        ...base,
+        kind: "progress",
+        message: `Pension contributions: ${formatPence(annual)}/yr going in (employee ${formatPence(employee)} + employer ${formatPence(employer)}).`,
+        data: {
+          annual_contribution_pence: annual,
+          employee_annual_pence: employee,
+          employer_annual_pence: employer,
+        },
+      },
+    ];
+  }
+
+  if (binding.metric === "bridge_fund") {
+    const bridgeYears = metric.detail.bridge_years as number;
+    const accessAge = metric.detail.pension_access_age as number;
+    if (bridgeYears === 0) {
+      const targetAge = metric.detail.target_retirement_age as number;
+      return [
+        {
+          ...base,
+          kind: "progress",
+          message: `Bridge fund: retiring at age ${targetAge} at or after pension-access age ${accessAge}, so no bridge is required.`,
+          data: {
+            bridge_years: 0,
+            pension_access_age: accessAge,
+            bridge_shortfall_pence: 0,
+          },
+        },
+      ];
+    }
+    const accessible = metric.detail.accessible_pence as number;
+    const need = metric.detail.bridge_need_pence as number;
+    const shortfall = metric.value!;
+    return [
+      {
+        ...base,
+        kind: "progress",
+        message: `Bridge fund: ${formatPence(accessible)} accessible against ${formatPence(need)} needed to span ${bridgeYears} years to pension access at age ${accessAge} (${formatPence(shortfall)} short).`,
+        data: {
+          accessible_pence: accessible,
+          bridge_need_pence: need,
+          bridge_shortfall_pence: shortfall,
+          bridge_years: bridgeYears,
+          pension_access_age: accessAge,
+        },
       },
     ];
   }
@@ -223,6 +369,56 @@ async function contentionDirectives(
   return directives;
 }
 
+async function buildRetirementProjection(
+  asOf: string,
+  active: boolean,
+  ctx: ReadContext,
+): Promise<RetirementProjection> {
+  if (!active) {
+    return {
+      resolved: false,
+      invested_assets_pence: null,
+      pension_pot_pence: null,
+      cash_pence: null,
+      total_drawable_pence: null,
+      annual_contribution_pence: null,
+      real_return_bps: REAL_RETURN_RATE_BPS,
+      safe_withdrawal_rate_bps: SAFE_WITHDRAWAL_RATE_BPS,
+      pension_access_age: null,
+      assumptions: [],
+      gap_reason: "No retirement or FIRE goal set.",
+    };
+  }
+  const invested = await investedAssets(asOf, ctx);
+  const pension = await currentPensionPot(asOf, ctx);
+  const cash = await cashSavings(asOf, ctx);
+  const contribution = await contributionRate(asOf, ctx);
+  const accessAge = await resolveConstant("pension_access_age", asOf);
+  const assumptions = [...PROJECTION_ASSUMPTIONS];
+  if (!contribution.resolved) {
+    assumptions.push(
+      "Pension contributions are unknown (no payslips captured); wealth is projected with no further contributions.",
+    );
+  }
+  const investedPence = invested.resolved ? invested.value! : null;
+  const cashPence = cash.resolved ? cash.value! : 0;
+  return {
+    resolved: invested.resolved,
+    invested_assets_pence: investedPence,
+    pension_pot_pence: pension.resolved ? pension.value! : null,
+    cash_pence: cash.resolved ? cash.value! : null,
+    total_drawable_pence: investedPence != null ? investedPence + cashPence : null,
+    annual_contribution_pence: contribution.resolved ? contribution.value! : null,
+    real_return_bps: REAL_RETURN_RATE_BPS,
+    safe_withdrawal_rate_bps: SAFE_WITHDRAWAL_RATE_BPS,
+    pension_access_age: accessAge ? accessAge.value : null,
+    assumptions,
+    gap_reason: invested.resolved
+      ? undefined
+      : (invested.gap_reason ?? "No invested assets recorded."),
+  };
+}
+
 export async function getBriefing(
   asOf: string,
   ctx: ReadContext = LIVE_CONTEXT,
@@ -258,6 +454,14 @@ export async function getBriefing(
   const earnings = await earningsContext(asOf, ctx);
   const tax_position = await taxPosition(asOf, ctx);
   const tax_constants = await taxConstantsForDate(asOf);
+  const hasRetirementGoal = activeGoals.some(
+    (g) => g.goal_type === "retirement" || g.goal_type === "fire",
+  );
+  const retirement_projection = await buildRetirementProjection(
+    asOf,
+    hasRetirementGoal,
+    ctx,
+  );
 
   const lines =
     directives.length === 0
@@ -293,7 +497,30 @@ export async function getBriefing(
   } else {
     lines.push(`Tax position: ${tax_position.gap_reason}`);
   }
+  if (hasRetirementGoal) {
+    if (retirement_projection.resolved) {
+      const cashText =
+        retirement_projection.cash_pence != null
+          ? formatPence(retirement_projection.cash_pence)
+          : "none";
+      lines.push(
+        `Retirement projection (today's money): invested assets ${formatPence(
+          retirement_projection.invested_assets_pence!,
+        )}, cash ${cashText} (bridge only), ${(REAL_RETURN_RATE_BPS / 100).toFixed(1)}% real return assumed.`,
+      );
+    } else {
+      lines.push(`Retirement projection: ${retirement_projection.gap_reason}`);
+    }
+  }
   const text = lines.join("\n");
 
-  return { as_of: asOf, directives, earnings, tax_position, tax_constants, text };
+  return {
+    as_of: asOf,
+    directives,
+    earnings,
+    tax_position,
+    retirement_projection,
+    tax_constants,
+    text,
+  };
 }

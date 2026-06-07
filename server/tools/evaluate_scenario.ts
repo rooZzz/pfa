@@ -46,6 +46,7 @@ export const evaluateScenarioSchema = {
             paye_pence: z.number().int().optional(),
             ni_employee_pence: z.number().int().optional(),
             pension_employee_pence: z.number().int().optional(),
+            pension_employer_pence: z.number().int().optional(),
             tax_code: z.string().optional(),
           }),
         )

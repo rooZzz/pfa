@@ -77,10 +77,20 @@ describe("proposeGoal", () => {
   });
 
   it("flags a recognised but unsupported goal type", async () => {
-    mockClassify("fire");
-    const out = JSON.parse(await proposeGoal({ utterance: "retire at 45" }));
-    expect(out.goal_type).toBe("fire");
+    mockClassify("debt_payoff");
+    const out = JSON.parse(await proposeGoal({ utterance: "clear my credit card" }));
+    expect(out.goal_type).toBe("debt_payoff");
     expect(out.supported).toBe(false);
+  });
+
+  it("classifies retirement and returns its needs spec", async () => {
+    mockClassify("retirement");
+    const out = JSON.parse(await proposeGoal({ utterance: "retire comfortably at 65" }));
+    expect(out.goal_type).toBe("retirement");
+    expect(out.supported).toBe(true);
+    expect(out.needs_spec.map((s: { name: string }) => s.name)).toContain(
+      "date_of_birth",
+    );
   });
 });
 
