@@ -3,7 +3,9 @@ import { z } from "zod";
 import { resetDb } from "../db.js";
 import { getCashflow } from "../cashflow/index.js";
 import { getNetWorth } from "../net_worth/index.js";
+import { archiveGoal, archiveGoalSchema } from "./archive_goal.js";
 import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
+import { updateGoal, updateGoalSchema } from "./update_goal.js";
 import { confirmStagedRows } from "./confirm_staged_rows.js";
 import { correctRecordTool, correctRecordSchema } from "./correct_record.js";
 import { retractRecordTool, retractRecordSchema } from "./retract_record.js";
@@ -334,6 +336,22 @@ export const tools: ToolDescriptor[] = [
       "Record a financial goal after its needs_spec slots are filled. Supported goal types: emergency_fund (target_months), isa_max (tax_year), house_deposit (target_amount_pence, target_date). Stores the goal with its verbatim utterance and an audit document. Deterministic — no advice.",
     inputSchema: confirmGoalSchema,
     handler: async (input) => text(await confirmGoal(input)),
+  }),
+  defineTool({
+    name: "update_goal",
+    description:
+      "Change a goal's targets or parameters (a new retirement income, a later FIRE age, a different deposit amount or date). Archives the existing goal and records a new version in its place, preserving history; parameters you do not pass carry over from the old goal. Supply the goal_id (from get_briefing or query_natural_language) and only the fields that change; pass goal_type only to reclassify. The goal id changes. Locate the exact goal and confirm it with the user before calling.",
+    inputSchema: updateGoalSchema,
+    annotations: { destructiveHint: true },
+    handler: async (input) => text(await updateGoal(input)),
+  }),
+  defineTool({
+    name: "archive_goal",
+    description:
+      "Remove a goal the user no longer wants to track. The goal is archived: it drops out of every briefing but is retained on disk for history, never hard-deleted. Supply the goal_id (from get_briefing or query_natural_language) and confirm the exact goal with the user before calling.",
+    inputSchema: archiveGoalSchema,
+    annotations: { destructiveHint: true },
+    handler: async (input) => text(await archiveGoal(input)),
   }),
   defineTool({
     name: "get_briefing",
