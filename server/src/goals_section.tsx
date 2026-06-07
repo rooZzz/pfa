@@ -194,7 +194,7 @@ function ProgressBlock({ directive }: { directive: Directive }) {
   if (sub === "deposit_progress") return <HouseDepositMeter progress={directive} />;
   if (sub === "pot_progress") return <ProjectionMeter progress={directive} />;
   if (sub === "bridge_fund") return <BridgeFundMeter progress={directive} />;
-  if (sub === "contribution_rate") return <ContributionBlock progress={directive} />;
+  if (sub === "contribution_gap") return <ContributionBlock progress={directive} />;
   return <p className="note">{directive.message}</p>;
 }
 
