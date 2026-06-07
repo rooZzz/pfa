@@ -82,7 +82,7 @@ async function seedFullPicture() {
     asset_type: "crypto",
     base_currency: "ETH",
     ticker: "ETH",
-    quantity: 100 * 100_000_000,
+    quantity: 100,
     valid_from: "2026-01-01",
   });
   await recordAssetPrice({
@@ -213,7 +213,7 @@ describe("getNetWorth — LOCF", () => {
       asset_type: "crypto",
       base_currency: "ETH",
       ticker: "ETH",
-      quantity: 10 * 100_000_000,
+      quantity: 10,
       valid_from: "2026-01-01",
     });
     await recordAssetPrice({

@@ -241,7 +241,7 @@ describe("recordAssetHolding", () => {
       asset_type: "crypto",
       base_currency: "ETH",
       ticker: "ETH",
-      quantity: 1500000000,
+      quantity: 15,
       valid_from: "2026-05-01",
     });
 
@@ -259,6 +259,51 @@ describe("recordAssetHolding", () => {
     };
     expect(row.quantity).toBe(1500000000);
     expect(row.source_id).toBeGreaterThan(0);
+  });
+
+  it("scales a fractional crypto quantity to 1e8 sub-units", async () => {
+    await recordAssetHolding({
+      asset_name: "BTC",
+      asset_type: "crypto",
+      base_currency: "BTC",
+      ticker: "BTC",
+      quantity: 0.125,
+      valid_from: "2026-05-01",
+    });
+
+    const row = getDb().prepare("SELECT quantity FROM holdings LIMIT 1").get() as {
+      quantity: number;
+    };
+    expect(row.quantity).toBe(12500000);
+  });
+
+  it("stores non-crypto quantities unscaled as whole units", async () => {
+    await recordAssetHolding({
+      asset_name: "Vanguard FTSE All-World",
+      asset_type: "etf",
+      base_currency: "GBP",
+      ticker: "VWRL",
+      quantity: 320,
+      valid_from: "2026-05-01",
+    });
+
+    const row = getDb().prepare("SELECT quantity FROM holdings LIMIT 1").get() as {
+      quantity: number;
+    };
+    expect(row.quantity).toBe(320);
+  });
+
+  it("rejects a fractional quantity for a non-crypto holding", async () => {
+    await expect(
+      recordAssetHolding({
+        asset_name: "Vanguard FTSE All-World",
+        asset_type: "etf",
+        base_currency: "GBP",
+        ticker: "VWRL",
+        quantity: 10.5,
+        valid_from: "2026-05-01",
+      }),
+    ).rejects.toThrow(/fractional/i);
   });
 
   it("upserts the asset on repeated calls", async () => {

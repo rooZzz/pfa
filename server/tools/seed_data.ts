@@ -202,7 +202,7 @@ async function seedAssets(): Promise<void> {
     asset_type: "crypto",
     base_currency: "ETH",
     ticker: "ETH",
-    quantity: 425000000,
+    quantity: 4.25,
     valid_from: monthsAgo(0, 25),
   });
   await recordAssetPrice({
@@ -221,7 +221,7 @@ async function seedAssets(): Promise<void> {
     asset_type: "crypto",
     base_currency: "BTC",
     ticker: "BTC",
-    quantity: 12500000,
+    quantity: 0.125,
     valid_from: monthsAgo(0, 25),
   });
   await recordAssetPrice({
