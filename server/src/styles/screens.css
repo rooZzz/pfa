@@ -127,3 +127,111 @@
   color: var(--ink-faint);
   margin-top: 2px;
 }
+
+.connector-card {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.connector-card:hover {
+  border-color: var(--ink-faint);
+  background: var(--surface-2);
+}
+.connector-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.connector-card .chev {
+  color: var(--ink-faint);
+  flex: 0 0 auto;
+}
+.connector-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.connector-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-strong);
+}
+.connector-sub {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.asset-select-bar {
+  margin: var(--space-4) 0 var(--space-2);
+}
+.asset-select-count {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+.asset-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(52vh, 380px);
+  overflow-y: auto;
+  padding: 2px;
+  margin: 0 -2px;
+}
+
+.asset-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+.asset-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.asset-row .ticker-chip,
+.asset-row .ticker-logo {
+  flex: 0 0 auto;
+}
+.asset-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.asset-sym {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--ink-strong);
+}
+.asset-name {
+  font-size: var(--text-2xs);
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.asset-bal {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.connector-actions {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}

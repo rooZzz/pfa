@@ -575,18 +575,6 @@
 .note b {
   color: var(--ink);
 }
-.note.accent {
-  background: var(--accent-soft);
-  border: 1px solid color-mix(in oklch, var(--accent) 22%, transparent);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  color: var(--ink);
-}
-.note.accent strong,
-.note.accent b,
-.note.accent .mono.accent {
-  color: var(--accent-ink);
-}
 
 .spinner {
   width: 15px;

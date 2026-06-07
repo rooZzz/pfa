@@ -8,6 +8,7 @@ export type RealisedLine = {
   currency: string;
   ticker?: string | null;
   quantity?: number;
+  quantity_scale?: number;
   unit_price_pence?: number;
   price_as_of?: string;
   price_source?: string;

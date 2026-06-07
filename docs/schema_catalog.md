@@ -85,8 +85,10 @@ For the current balance (today), omit the date filter and just get the row with 
 | `name` | TEXT | Human-readable name (e.g. "ETH", "Vanguard FTSE All-World", "12 Acacia Avenue"). |
 | `asset_type` | TEXT | Free-form type descriptor (e.g. "crypto", "etf", "stock", "property"). |
 | `base_currency` | TEXT | The native currency of the asset (e.g. "ETH", "USD", "GBP"). |
-| `price_source` | TEXT | Strategy hint for where to fetch prices. Default `manual`. Future values: `coingecko`, `zoopla`, `web_search`. |
+| `price_source` | TEXT | Strategy hint for where to fetch prices. Default `manual`. Values include `coingecko`, `yahoo`, `web_search`. |
 | `ticker` | TEXT | Trading symbol for the asset (e.g. "ACME"), or null. Shown as the identifier for upcoming equity vests. |
+| `quantity_scale` | INTEGER | Divisor relating `holdings.quantity` to whole units. `1` for shares/property/other; `100000000` (1e8) for crypto, whose quantity is held in 1e8 sub-units. Value is always `quantity × unit_price_pence / quantity_scale`. |
+| `contract_address` | TEXT | For wallet-imported ERC-20 tokens, the Ethereum contract address (the token's identity); null otherwise. |
 
 ---
 
@@ -98,14 +100,14 @@ For the current balance (today), omit the date filter and just get the row with 
 |---|---|---|
 | `id` | INTEGER | Primary key. |
 | `asset_id` | INTEGER | FK to `assets.id`. |
-| `quantity` | INTEGER | Units held. For whole shares use units directly. For fractional shares use units × 10000. For property use 1. |
+| `quantity` | INTEGER | Units held, in the asset's smallest unit. Divide by `assets.quantity_scale` for whole units (crypto is held in 1e8 sub-units; shares/property are scale 1). |
 | `valid_from` | DATE | Date the holding became effective. |
 | `valid_to` | DATE | NULL = current row. Set when holding changes. |
 | `recorded_at` | TIMESTAMP | When written. |
 | `source_id` | INTEGER | NOT NULL. FK to `documents.id`. |
 | `superseded_by` | INTEGER | NULL = current truth. Non-null = corrected or retracted, retained for audit only. Always filter `superseded_by IS NULL`. |
 
-**To value a holding:** join with `asset_prices` on `asset_id` for the latest price on or before the query date, then multiply `quantity × unit_price_pence`.
+**To value a holding:** join with `asset_prices` on `asset_id` for the latest price on or before the query date, and with `assets` for `quantity_scale`, then compute `quantity × unit_price_pence / quantity_scale` (integer division).
 
 ---
 

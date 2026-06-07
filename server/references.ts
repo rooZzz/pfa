@@ -56,6 +56,8 @@ export async function ensureAccount(
 
 const TICKERED_ASSET_TYPES = new Set(["stock", "etf", "crypto"]);
 
+export const CRYPTO_QUANTITY_SCALE = 100_000_000;
+
 export function normalizeTicker(raw: string): string {
   return raw
     .trim()
@@ -69,16 +71,35 @@ export function priceSourceForAssetType(asset_type: string): string {
   return "manual";
 }
 
+export function quantityScaleForAssetType(asset_type: string): number {
+  return asset_type === "crypto" ? CRYPTO_QUANTITY_SCALE : 1;
+}
+
+function normalizeContractAddress(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
 export async function ensureAsset(
   trx: Transaction<DatabaseSchema>,
   name: string,
   asset_type: string,
   base_currency: string,
   ticker?: string,
+  opts?: { contract_address?: string },
 ): Promise<number> {
   const normalized = ticker ? normalizeTicker(ticker) : null;
+  const contract = opts?.contract_address
+    ? normalizeContractAddress(opts.contract_address)
+    : null;
 
-  if (normalized) {
+  if (contract) {
+    const byContract = await trx
+      .selectFrom("assets")
+      .select(["id"])
+      .where("contract_address", "=", contract)
+      .executeTakeFirst();
+    if (byContract) return Number(byContract.id);
+  } else if (normalized) {
     const byTicker = await trx
       .selectFrom("assets")
       .select(["id"])
@@ -103,6 +124,8 @@ export async function ensureAsset(
       base_currency,
       ticker: normalized,
       price_source: priceSourceForAssetType(asset_type),
+      quantity_scale: quantityScaleForAssetType(asset_type),
+      contract_address: contract,
     })
     .returning("id")
     .executeTakeFirstOrThrow();

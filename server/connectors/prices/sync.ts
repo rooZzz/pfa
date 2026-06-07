@@ -1,5 +1,5 @@
 import { getKysely } from "../../db.js";
-import { fetchCoinGeckoQuote } from "./coingecko.js";
+import { fetchCoinGeckoQuote, fetchCoinGeckoTokenQuote } from "./coingecko.js";
 import { fetchYahooQuote } from "./yahoo.js";
 import type { PriceQuote } from "./types.js";
 
@@ -9,12 +9,16 @@ export type PriceAsset = {
   asset_type: string;
   ticker: string | null;
   price_source: string;
+  contract_address: string | null;
 };
 
 export async function fetchAssetQuote(
   asset: PriceAsset,
   fetchImpl: typeof fetch = fetch,
 ): Promise<PriceQuote> {
+  if (asset.price_source === "coingecko" && asset.contract_address) {
+    return fetchCoinGeckoTokenQuote(asset.contract_address, fetchImpl);
+  }
   if (!asset.ticker) {
     throw new Error(`${asset.name} has no ticker; cannot fetch an automated price.`);
   }
@@ -35,7 +39,7 @@ export async function tryPriceOnCapture(
 ): Promise<{ priced: boolean; note: string }> {
   const asset = await getKysely()
     .selectFrom("assets")
-    .select(["id", "name", "asset_type", "ticker", "price_source"])
+    .select(["id", "name", "asset_type", "ticker", "price_source", "contract_address"])
     .where("id", "=", assetId)
     .executeTakeFirst();
   if (!asset || asset.price_source === "manual") {
@@ -49,6 +53,7 @@ export async function tryPriceOnCapture(
         asset_type: asset.asset_type,
         ticker: asset.ticker,
         price_source: asset.price_source,
+        contract_address: asset.contract_address,
       },
       fetchImpl,
     );
@@ -97,7 +102,7 @@ export type PriceSyncRow = {
 async function loadAutomatedAssets(): Promise<PriceAsset[]> {
   const rows = await getKysely()
     .selectFrom("assets")
-    .select(["id", "name", "asset_type", "ticker", "price_source"])
+    .select(["id", "name", "asset_type", "ticker", "price_source", "contract_address"])
     .where("price_source", "!=", "manual")
     .execute();
   return rows.map((r) => ({
@@ -106,6 +111,7 @@ async function loadAutomatedAssets(): Promise<PriceAsset[]> {
     asset_type: r.asset_type,
     ticker: r.ticker,
     price_source: r.price_source,
+    contract_address: r.contract_address,
   }));
 }
 
