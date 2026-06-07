@@ -1,3 +1,5 @@
+import { SAFE_WITHDRAWAL_RATE_BPS } from "./assumptions.js";
+
 export const GOAL_TYPES = [
   "emergency_fund",
   "isa_max",
@@ -12,6 +14,8 @@ export const IMPLEMENTED_GOAL_TYPES = [
   "emergency_fund",
   "isa_max",
   "house_deposit",
+  "retirement",
+  "fire",
 ] as const;
 export type ImplementedGoalType = (typeof IMPLEMENTED_GOAL_TYPES)[number];
 
@@ -69,6 +73,58 @@ const NEEDS_SPECS: Record<ImplementedGoalType, NeedsSpec> = {
       },
     ],
   },
+  retirement: {
+    goal_type: "retirement",
+    supported: true,
+    summary:
+      "Project the pension pot to a target retirement age against the income wanted.",
+    slots: [
+      {
+        name: "target_annual_income_pence",
+        description: "Annual retirement income wanted, in pence.",
+        default: null,
+      },
+      {
+        name: "retirement_age",
+        description: "Age to retire at.",
+        default: null,
+      },
+      {
+        name: "date_of_birth",
+        description: "Date of birth, format YYYY-MM-DD, used to derive age.",
+        default: null,
+      },
+    ],
+  },
+  fire: {
+    goal_type: "fire",
+    supported: true,
+    summary:
+      "Financial independence: a pot that funds annual spend at a safe withdrawal rate, plus a bridge to pension-access age if retiring early.",
+    slots: [
+      {
+        name: "target_annual_spend_pence",
+        description: "Annual spending to support in retirement, in pence.",
+        default: null,
+      },
+      {
+        name: "safe_withdrawal_rate_bps",
+        description:
+          "Safe withdrawal rate in basis points (400 = 4%), sets the pot multiple.",
+        default: "400",
+      },
+      {
+        name: "target_retirement_age",
+        description: "Age to be financially independent by.",
+        default: null,
+      },
+      {
+        name: "date_of_birth",
+        description: "Date of birth, format YYYY-MM-DD, used to derive age.",
+        default: null,
+      },
+    ],
+  },
 };
 
 export function needsSpec(goalType: GoalType): NeedsSpec {
@@ -84,7 +140,23 @@ export function needsSpec(goalType: GoalType): NeedsSpec {
 export type EmergencyFundParams = { target_months: number };
 export type IsaMaxParams = { tax_year: string | null };
 export type HouseDepositParams = { target_amount_pence: number; target_date: string };
-export type GoalParams = EmergencyFundParams | IsaMaxParams | HouseDepositParams;
+export type RetirementParams = {
+  target_annual_income_pence: number;
+  retirement_age: number;
+  date_of_birth: string;
+};
+export type FireParams = {
+  target_annual_spend_pence: number;
+  safe_withdrawal_rate_bps: number;
+  target_retirement_age: number;
+  date_of_birth: string;
+};
+export type GoalParams =
+  | EmergencyFundParams
+  | IsaMaxParams
+  | HouseDepositParams
+  | RetirementParams
+  | FireParams;
 
 export function validateParams(
   goalType: ImplementedGoalType,
@@ -112,6 +184,63 @@ export function validateParams(
     return { target_amount_pence: amount, target_date: date };
   }
 
+  if (goalType === "retirement") {
+    const income = raw.target_annual_income_pence;
+    if (typeof income !== "number" || !Number.isInteger(income) || income <= 0) {
+      throw new Error(
+        "target_annual_income_pence must be a positive integer (annual income in pence).",
+      );
+    }
+    const age = raw.retirement_age;
+    if (typeof age !== "number" || !Number.isInteger(age) || age <= 0 || age > 120) {
+      throw new Error("retirement_age must be a positive integer age up to 120.");
+    }
+    const dob = raw.date_of_birth;
+    if (typeof dob !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      throw new Error("date_of_birth must be in the format YYYY-MM-DD.");
+    }
+    return {
+      target_annual_income_pence: income,
+      retirement_age: age,
+      date_of_birth: dob,
+    };
+  }
+
+  if (goalType === "fire") {
+    const spend = raw.target_annual_spend_pence;
+    if (typeof spend !== "number" || !Number.isInteger(spend) || spend <= 0) {
+      throw new Error(
+        "target_annual_spend_pence must be a positive integer (annual spend in pence).",
+      );
+    }
+    const rawRate = raw.safe_withdrawal_rate_bps ?? SAFE_WITHDRAWAL_RATE_BPS;
+    const rate = typeof rawRate === "string" ? Number(rawRate) : rawRate;
+    if (
+      typeof rate !== "number" ||
+      !Number.isInteger(rate) ||
+      rate < 100 ||
+      rate > 1000
+    ) {
+      throw new Error(
+        "safe_withdrawal_rate_bps must be an integer between 100 and 1000 (1% to 10%).",
+      );
+    }
+    const age = raw.target_retirement_age;
+    if (typeof age !== "number" || !Number.isInteger(age) || age <= 0 || age > 120) {
+      throw new Error("target_retirement_age must be a positive integer age up to 120.");
+    }
+    const dob = raw.date_of_birth;
+    if (typeof dob !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      throw new Error("date_of_birth must be in the format YYYY-MM-DD.");
+    }
+    return {
+      target_annual_spend_pence: spend,
+      safe_withdrawal_rate_bps: rate,
+      target_retirement_age: age,
+      date_of_birth: dob,
+    };
+  }
+
   const taxYear = raw.tax_year ?? null;
   if (taxYear !== null) {
     if (typeof taxYear !== "string" || !/^\d{4}\/\d{2}$/.test(taxYear)) {
@@ -124,7 +253,11 @@ export function validateParams(
 export type Metric =
   | "emergency_fund_months"
   | "isa_allowance_remaining"
-  | "house_deposit_progress";
+  | "house_deposit_progress"
+  | "projected_pension_pot"
+  | "projected_invested_assets"
+  | "contribution_rate"
+  | "bridge_fund";
 export type SubGoalBinding = {
   key: string;
   metric: Metric;
@@ -132,6 +265,10 @@ export type SubGoalBinding = {
   target_months?: number;
   target_amount_pence?: number;
   target_date?: string;
+  target_annual_income_pence?: number;
+  target_age?: number;
+  date_of_birth?: string;
+  safe_withdrawal_rate_bps?: number;
 };
 
 export function decompose(
@@ -157,6 +294,51 @@ export function decompose(
         label: "Deposit saved",
         target_amount_pence: Number(params.target_amount_pence),
         target_date: String(params.target_date),
+      },
+    ];
+  }
+
+  if (goalType === "retirement") {
+    return [
+      {
+        key: "pot_progress",
+        metric: "projected_pension_pot",
+        label: "Projected pot vs needed",
+        target_annual_income_pence: Number(params.target_annual_income_pence),
+        target_age: Number(params.retirement_age),
+        date_of_birth: String(params.date_of_birth),
+        safe_withdrawal_rate_bps: SAFE_WITHDRAWAL_RATE_BPS,
+      },
+      {
+        key: "contribution_gap",
+        metric: "contribution_rate",
+        label: "Pension contributions",
+      },
+    ];
+  }
+
+  if (goalType === "fire") {
+    return [
+      {
+        key: "pot_progress",
+        metric: "projected_invested_assets",
+        label: "Projected investable wealth vs FIRE number",
+        target_annual_income_pence: Number(params.target_annual_spend_pence),
+        target_age: Number(params.target_retirement_age),
+        date_of_birth: String(params.date_of_birth),
+        safe_withdrawal_rate_bps: Number(params.safe_withdrawal_rate_bps),
+      },
+      {
+        key: "contribution_gap",
+        metric: "contribution_rate",
+        label: "Pension contributions",
+      },
+      {
+        key: "bridge_fund",
+        metric: "bridge_fund",
+        label: "Bridge to pension access",
+        target_annual_income_pence: Number(params.target_annual_spend_pence),
+        target_age: Number(params.target_retirement_age),
       },
     ];
   }

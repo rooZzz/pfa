@@ -40,6 +40,41 @@ export const confirmGoalSchema = {
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
     .optional()
     .describe("house_deposit only: date to have the deposit by."),
+  target_annual_income_pence: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("retirement only: annual retirement income wanted, in pence."),
+  retirement_age: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("retirement only: age to retire at."),
+  target_annual_spend_pence: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("fire only: annual spending to support in retirement, in pence."),
+  safe_withdrawal_rate_bps: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("fire only: safe withdrawal rate in basis points (400 = 4%). Default 400."),
+  target_retirement_age: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("fire only: age to be financially independent by."),
+  date_of_birth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+    .optional()
+    .describe("retirement and fire only: date of birth, used to derive age."),
 };
 
 export async function confirmGoal(input: {
@@ -49,6 +84,12 @@ export async function confirmGoal(input: {
   tax_year?: string;
   target_amount_pence?: number;
   target_date?: string;
+  target_annual_income_pence?: number;
+  retirement_age?: number;
+  target_annual_spend_pence?: number;
+  safe_withdrawal_rate_bps?: number;
+  target_retirement_age?: number;
+  date_of_birth?: string;
 }): Promise<string> {
   if (!isImplemented(input.goal_type)) {
     throw new Error(`Goal type "${input.goal_type}" is not yet supported.`);
@@ -59,6 +100,12 @@ export async function confirmGoal(input: {
     tax_year: input.tax_year,
     target_amount_pence: input.target_amount_pence,
     target_date: input.target_date,
+    target_annual_income_pence: input.target_annual_income_pence,
+    retirement_age: input.retirement_age,
+    target_annual_spend_pence: input.target_annual_spend_pence,
+    safe_withdrawal_rate_bps: input.safe_withdrawal_rate_bps,
+    target_retirement_age: input.target_retirement_age,
+    date_of_birth: input.date_of_birth,
   });
 
   const { sourceId, goalId } = await getKysely()

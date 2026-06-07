@@ -7,6 +7,8 @@ const CLAIMED_ACCOUNT_TYPES: Record<ImplementedGoalType, readonly string[]> = {
   emergency_fund: ["current", "savings", "isa"],
   house_deposit: ["current", "savings", "isa"],
   isa_max: ["isa"],
+  retirement: ["pension"],
+  fire: ["pension", "current", "savings", "isa"],
 };
 
 export type ClaimedAccount = { account_id: number; balance_pence: number };
