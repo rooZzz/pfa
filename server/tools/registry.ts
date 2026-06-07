@@ -11,6 +11,12 @@ import { correctRecordTool, correctRecordSchema } from "./correct_record.js";
 import { retractRecordTool, retractRecordSchema } from "./retract_record.js";
 import { connectMonzo, connectMonzoSchema } from "./connect_monzo.js";
 import { syncMonzo } from "./sync_monzo.js";
+import {
+  discoverEthereumWallet,
+  discoverEthereumWalletSchema,
+} from "./discover_ethereum_wallet.js";
+import { connectEthereum, connectEthereumSchema } from "./connect_ethereum.js";
+import { syncEthereum } from "./sync_ethereum.js";
 import { syncPrices } from "./sync_prices.js";
 import { evaluateScenario, evaluateScenarioSchema } from "./evaluate_scenario.js";
 import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
@@ -259,6 +265,30 @@ export const tools: ToolDescriptor[] = [
       "Sync the latest Monzo transactions, balances, and pots into the canonical store. Idempotent — re-running does not duplicate transactions. Requires Monzo to be connected first.",
     inputSchema: {},
     handler: async () => text(await syncMonzo()),
+  }),
+  defineTool({
+    name: "discover_ethereum_wallet",
+    description:
+      "Read an Ethereum wallet's ETH balance and the ERC-20 tokens it holds, for the user to choose which to track. Called from the connectors widget — not model-visible. Uses the ETHERSCAN_API_KEY from server config. Read-only: writes no holdings.",
+    inputSchema: discoverEthereumWalletSchema,
+    app: { title: "Discover Wallet", resourceUri: CONNECTORS_URI, visibility: ["app"] },
+    annotations: { readOnlyHint: true },
+    handler: async (input) => text(await discoverEthereumWallet(input)),
+  }),
+  defineTool({
+    name: "connect_ethereum",
+    description:
+      "Save the Ethereum wallet and the chosen assets, then import them as connector-owned holdings. Called from the connectors widget — not model-visible. Credentials are never passed through chat.",
+    inputSchema: connectEthereumSchema,
+    app: { title: "Connect Ethereum", resourceUri: CONNECTORS_URI, visibility: ["app"] },
+    handler: async (input) => text(await connectEthereum(input)),
+  }),
+  defineTool({
+    name: "sync_ethereum",
+    description:
+      "Refresh the connected Ethereum wallet: re-read on-chain balances for the tracked assets and write fresh holding snapshots. Idempotent. Requires Ethereum to be connected first. Prices refresh separately via sync_prices.",
+    inputSchema: {},
+    handler: async () => text(await syncEthereum()),
   }),
   defineTool({
     name: "sync_prices",

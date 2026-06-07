@@ -36,6 +36,7 @@ describe("migration runner", () => {
       "0008_asset_ticker",
       "0009_superseded_by",
       "0010_saye_monthly_contribution",
+      "0011_asset_quantity_scale_contract",
     ]);
   });
 
@@ -60,6 +61,7 @@ describe("migration runner", () => {
       "0008_asset_ticker",
       "0009_superseded_by",
       "0010_saye_monthly_contribution",
+      "0011_asset_quantity_scale_contract",
     ]);
   });
 
@@ -145,6 +147,7 @@ describe("migration runner", () => {
       "0008_asset_ticker",
       "0009_superseded_by",
       "0010_saye_monthly_contribution",
+      "0011_asset_quantity_scale_contract",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

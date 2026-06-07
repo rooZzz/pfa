@@ -35,6 +35,8 @@ export interface AssetsTable {
   base_currency: string;
   price_source: Generated<string>;
   ticker: string | null;
+  quantity_scale: Generated<number>;
+  contract_address: Generated<string | null>;
 }
 
 export interface MortgagesTable {

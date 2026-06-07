@@ -83,10 +83,12 @@ export function Icon({
   name,
   size = 16,
   style,
+  className,
 }: {
   name: IconName;
   size?: number;
   style?: CSSProperties;
+  className?: string;
 }) {
   return (
     <svg
@@ -99,6 +101,7 @@ export function Icon({
       strokeLinecap="round"
       strokeLinejoin="round"
       style={style}
+      className={className}
     >
       {ICON_PATHS[name]}
     </svg>

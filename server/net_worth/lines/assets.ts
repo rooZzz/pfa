@@ -20,6 +20,7 @@ export async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
        a.asset_type,
        a.ticker,
        h.quantity,
+       a.quantity_scale,
        h.valid_from,
        h.recorded_at,
        h.source_id,
@@ -27,7 +28,7 @@ export async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
        p.currency,
        p.as_of AS price_as_of,
        p.source AS price_source,
-       CAST(h.quantity AS BIGINT) * p.unit_price_pence AS gbp_equivalent_pence
+       CAST(h.quantity AS BIGINT) * p.unit_price_pence // a.quantity_scale AS gbp_equivalent_pence
      FROM (${holdings.sql}) h
      JOIN pfa.assets a ON a.id = h.asset_id
      LEFT JOIN (${prices.sql}) p ON p.asset_id = h.asset_id
@@ -50,6 +51,7 @@ export async function queryAssetLines(asOf: string): Promise<RealisedLine[]> {
       currency: toStr(r.currency) || "GBP",
       ticker: toStrOrNull(r.ticker),
       quantity: toNum(r.quantity),
+      quantity_scale: toNum(r.quantity_scale),
       unit_price_pence: toNum(r.unit_price_pence),
       price_as_of: toStr(r.price_as_of).split("T")[0] ?? toStr(r.price_as_of),
       price_source: toStr(r.price_source),

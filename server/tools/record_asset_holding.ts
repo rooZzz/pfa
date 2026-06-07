@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { getKysely } from "../db.js";
 import { tryPriceOnCapture } from "../connectors/prices/sync.js";
-import { ensureAsset, requiresTicker, writeManualDocument } from "../references.js";
+import {
+  ensureAsset,
+  quantityScaleForAssetType,
+  requiresTicker,
+  writeManualDocument,
+} from "../references.js";
 
 export const recordAssetHoldingSchema = {
   asset_name: z.string().describe("Asset name, e.g. 'ETH', 'Vanguard FTSE All-World'."),
@@ -19,9 +24,9 @@ export const recordAssetHoldingSchema = {
     ),
   quantity: z
     .number()
-    .int()
+    .positive()
     .describe(
-      "Quantity in the asset's smallest unit. For whole shares use units directly. For fractional shares use units × 10000. For property use 1.",
+      "The natural quantity held, in the asset's own units: e.g. 1.5 for 1.5 ETH, 320 for 320 shares, 1 for property. Crypto may be fractional and is recorded to 8 decimal places; stocks, ETFs, property, and other are recorded as whole units. Do not pre-scale to sub-units — pass the real amount.",
     ),
   valid_from: z
     .string()
@@ -43,6 +48,19 @@ export async function recordAssetHolding(
   if (requiresTicker(input.asset_type) && !input.ticker?.trim()) {
     throw new Error(
       `A ticker is required for ${input.asset_type} assets — it is the asset's identity. Supply the trading symbol (e.g. 'EXPN' for Experian) so the holding links to one canonical asset.`,
+    );
+  }
+
+  const scale = quantityScaleForAssetType(input.asset_type);
+  if (scale === 1 && !Number.isInteger(input.quantity)) {
+    throw new Error(
+      `Fractional quantities are not supported for ${input.asset_type} holdings; record a whole number of units.`,
+    );
+  }
+  const scaledQuantity = Math.round(input.quantity * scale);
+  if (scaledQuantity <= 0 || scaledQuantity > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Quantity ${input.quantity} is outside the supported range for a ${input.asset_type} holding.`,
     );
   }
 
@@ -72,7 +90,7 @@ export async function recordAssetHolding(
         .insertInto("holdings")
         .values({
           asset_id: assetId,
-          quantity: input.quantity,
+          quantity: scaledQuantity,
           valid_from: input.valid_from,
           source_id: sourceId,
         })

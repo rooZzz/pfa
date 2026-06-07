@@ -16,7 +16,7 @@ export async function refreshAssetPrice(
 ): Promise<string> {
   const asset = await getKysely()
     .selectFrom("assets")
-    .select(["id", "name", "asset_type", "ticker", "price_source"])
+    .select(["id", "name", "asset_type", "ticker", "price_source", "contract_address"])
     .where("id", "=", input.asset_id)
     .executeTakeFirst();
 
@@ -38,6 +38,7 @@ export async function refreshAssetPrice(
       asset_type: asset.asset_type,
       ticker: asset.ticker,
       price_source: asset.price_source,
+      contract_address: asset.contract_address,
     },
     fetchImpl,
   );

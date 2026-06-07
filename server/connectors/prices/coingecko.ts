@@ -28,6 +28,23 @@ export function coinId(ticker: string): string {
   return id;
 }
 
+function toQuote(
+  entry: { gbp?: number; last_updated_at?: number } | undefined,
+  label: string,
+): PriceQuote {
+  if (!entry || typeof entry.gbp !== "number") {
+    throw new Error(`CoinGecko returned no GBP price for ${label}.`);
+  }
+  const ms = entry.last_updated_at ? entry.last_updated_at * 1000 : Date.now();
+  return {
+    unit_price_pence: Math.round(entry.gbp * 100),
+    currency: "GBP",
+    as_of: formatUtcTimestamp(ms),
+    instrument_name: label,
+    source_symbol: label,
+  };
+}
+
 export async function fetchCoinGeckoQuote(
   ticker: string,
   fetchImpl: typeof fetch = fetch,
@@ -45,16 +62,27 @@ export async function fetchCoinGeckoQuote(
     string,
     { gbp?: number; last_updated_at?: number }
   >;
-  const entry = json[id];
-  if (!entry || typeof entry.gbp !== "number") {
-    throw new Error(`CoinGecko returned no GBP price for ${id}.`);
+  return toQuote(json[id], id);
+}
+
+export async function fetchCoinGeckoTokenQuote(
+  contractAddress: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PriceQuote> {
+  const contract = contractAddress.trim().toLowerCase();
+  const url = `${COINGECKO_BASE}/simple/token_price/ethereum?contract_addresses=${contract}&vs_currencies=gbp&include_last_updated_at=true`;
+  const res = await fetchImpl(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `CoinGecko token price request for ${contract} failed (HTTP ${res.status}).`,
+    );
   }
-  const ms = entry.last_updated_at ? entry.last_updated_at * 1000 : Date.now();
-  return {
-    unit_price_pence: Math.round(entry.gbp * 100),
-    currency: "GBP",
-    as_of: formatUtcTimestamp(ms),
-    instrument_name: id,
-    source_symbol: id,
-  };
+  const json = (await res.json()) as Record<
+    string,
+    { gbp?: number; last_updated_at?: number }
+  >;
+  return toQuote(json[contract], contract);
 }

@@ -361,7 +361,7 @@ async function holdingsExcludingPropertyPence(asOf: string): Promise<number> {
   );
   const prices = latestPriceTick(["ap.asset_id", "ap.unit_price_pence"], asOf);
   const rows = await runQuery(
-    `SELECT COALESCE(SUM(CAST(h.quantity AS BIGINT) * p.unit_price_pence), 0) AS total
+    `SELECT COALESCE(SUM(CAST(h.quantity AS BIGINT) * p.unit_price_pence // a.quantity_scale), 0) AS total
        FROM (${holdings.sql}) h
        JOIN pfa.assets a ON a.id = h.asset_id
        JOIN (${prices.sql}) p ON p.asset_id = h.asset_id

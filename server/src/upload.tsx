@@ -193,7 +193,7 @@ function UploadApp() {
           }
         />
 
-        <p className="note accent mb-4">Nothing is written until you confirm.</p>
+        <p className="note mb-4">Nothing is written until you confirm.</p>
 
         <div className="card card--flush">
           <table className="t compact t--inset">

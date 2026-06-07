@@ -103,7 +103,9 @@ function realisedRowLabel(line: RealisedLine): ReactNode {
       {lead}
       <span className="sub sub-inline">
         {showUnits
-          ? `${line.quantity!.toLocaleString()} units · ${formatGbp(line.unit_price_pence!)}/unit · ${age}`
+          ? `${(line.quantity! / (line.quantity_scale ?? 1)).toLocaleString(undefined, {
+              maximumFractionDigits: 8,
+            })} units · ${formatGbp(line.unit_price_pence!)}/unit · ${age}`
           : age}
       </span>
       {isStale && staleBadge}

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { fetchCoinGeckoQuote, coinId } from "../connectors/prices/coingecko.js";
+import {
+  fetchCoinGeckoQuote,
+  fetchCoinGeckoTokenQuote,
+  coinId,
+} from "../connectors/prices/coingecko.js";
 import { fetchYahooQuote, toGbpPence, yahooSymbol } from "../connectors/prices/yahoo.js";
 
 function jsonResponse(body: unknown): Response {
@@ -85,5 +89,22 @@ describe("fetchCoinGeckoQuote", () => {
     const quote = await fetchCoinGeckoQuote("BTC", fetchImpl);
     expect(quote.unit_price_pence).toBe(5000050);
     expect(quote.instrument_name).toBe("bitcoin");
+  });
+});
+
+describe("fetchCoinGeckoTokenQuote", () => {
+  it("prices an ERC-20 token by contract address in GBP pence", async () => {
+    const contract = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      expect(url).toContain("/simple/token_price/ethereum");
+      expect(url).toContain(contract.toLowerCase());
+      return jsonResponse({
+        [contract.toLowerCase()]: { gbp: 0.79, last_updated_at: 1700000000 },
+      });
+    }) as typeof fetch;
+    const quote = await fetchCoinGeckoTokenQuote(contract, fetchImpl);
+    expect(quote.unit_price_pence).toBe(79);
+    expect(quote.currency).toBe("GBP");
   });
 });

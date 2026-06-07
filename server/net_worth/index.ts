@@ -72,7 +72,7 @@ async function getRealisedTotalPenceAtDate(asOf: string): Promise<number> {
       mortgage_total AS (SELECT COALESCE(SUM(outstanding_pence), 0) AS total FROM (${mortgages.sql})),
       property_total AS (SELECT COALESCE(SUM(unit_price_pence), 0) AS total FROM (${propertyPrices.sql})),
       asset_total AS (
-        SELECT COALESCE(SUM(CAST(h.quantity AS BIGINT) * p.unit_price_pence), 0) AS total
+        SELECT COALESCE(SUM(CAST(h.quantity AS BIGINT) * p.unit_price_pence // a.quantity_scale), 0) AS total
         FROM (${holdings.sql}) h
         JOIN (${assetPrices.sql}) p ON p.asset_id = h.asset_id
         JOIN pfa.assets a ON a.id = h.asset_id
