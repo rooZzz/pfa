@@ -5,7 +5,7 @@ import {
   resolveConstant,
   taxConstantsForDate,
   upcomingChange,
-} from "../tax_constants.js";
+} from "../tax/constants.js";
 
 afterEach(() => {
   resetDuck();

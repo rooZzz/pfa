@@ -16,22 +16,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "src",
-    "server.ts",
-    "main.ts",
-    "db.ts",
-    "query.ts",
-    "staging.ts",
-    "references.ts",
-    "snapshots.ts",
-    "sql_util.ts",
-    "schema.ts",
-    "net_worth",
-    "cashflow",
-    "migrations",
-    "tools",
-    "tests",
-    "vitest.config.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
 }
