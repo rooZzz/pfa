@@ -1,4 +1,4 @@
-import { Badge, CompositionBar, EmptyState, Icon, Meter } from "./components.js";
+import { Badge, EmptyState, Icon, Meter, Stat } from "./components.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap" | "contention";
@@ -177,20 +177,12 @@ function ContributionBlock({ progress }: { progress: Directive }) {
   const employer = Number(progress.data.employer_annual_pence);
   return (
     <div className="stack-2">
-      <div className="meter-top">
-        <span className="meter-name">
-          Pension contributions
-          <span className="meter-sub">employee + employer / yr</span>
-        </span>
-        <span className="meter-val">{formatGbpk(annual)}</span>
+      <span className="card-label">Pension contributions / yr</span>
+      <div className="grid cols-3">
+        <Stat label="Annual" value={formatGbpk(annual)} />
+        <Stat label="Employee" value={formatGbpk(employee)} />
+        <Stat label="Employer" value={formatGbpk(employer)} />
       </div>
-      <CompositionBar
-        variant="tone"
-        rows={[
-          { label: `Employee ${formatGbpk(employee)}`, value: employee, tone: "accent" },
-          { label: `Employer ${formatGbpk(employer)}`, value: employer, tone: "muted" },
-        ]}
-      />
     </div>
   );
 }
