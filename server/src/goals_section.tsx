@@ -1,4 +1,4 @@
-import { Badge, EmptyState, Icon, Meter } from "./components.js";
+import { Badge, CompositionBar, EmptyState, Icon, Meter } from "./components.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap" | "contention";
@@ -140,12 +140,69 @@ function ProjectionMeter({ progress }: { progress: Directive }) {
   );
 }
 
+function BridgeFundMeter({ progress }: { progress: Directive }) {
+  const bridgeYears = Number(progress.data.bridge_years);
+  const accessAge = Number(progress.data.pension_access_age);
+  if (bridgeYears === 0) {
+    return (
+      <Meter
+        name="Bridge fund"
+        value="Not needed"
+        pct={100}
+        tone="pos"
+        sub={`retiring at or after pension access (age ${accessAge})`}
+      />
+    );
+  }
+  const accessible = Number(progress.data.accessible_pence);
+  const need = Number(progress.data.bridge_need_pence);
+  const shortfall = Number(progress.data.bridge_shortfall_pence);
+  const pct = need > 0 ? Math.min(100, (accessible / need) * 100) : 100;
+  const subParts = [`${bridgeYears}y to age ${accessAge}`];
+  if (shortfall > 0) subParts.push(`${formatGbpk(shortfall)} short`);
+  return (
+    <Meter
+      name="Bridge fund"
+      value={`${formatGbpk(accessible)} / ${formatGbpk(need)}`}
+      pct={pct}
+      tone={accessible >= need ? "pos" : undefined}
+      sub={subParts.join(" · ")}
+    />
+  );
+}
+
+function ContributionBlock({ progress }: { progress: Directive }) {
+  const annual = Number(progress.data.annual_contribution_pence);
+  const employee = Number(progress.data.employee_annual_pence);
+  const employer = Number(progress.data.employer_annual_pence);
+  return (
+    <div className="stack-2">
+      <div className="meter-top">
+        <span className="meter-name">
+          Pension contributions
+          <span className="meter-sub">employee + employer / yr</span>
+        </span>
+        <span className="meter-val">{formatGbpk(annual)}</span>
+      </div>
+      <CompositionBar
+        variant="tone"
+        rows={[
+          { label: `Employee ${formatGbpk(employee)}`, value: employee, tone: "accent" },
+          { label: `Employer ${formatGbpk(employer)}`, value: employer, tone: "muted" },
+        ]}
+      />
+    </div>
+  );
+}
+
 function ProgressBlock({ directive }: { directive: Directive }) {
   const sub = directive.sub_goal;
   if (sub === "cover_progress") return <EmergencyFundMeter progress={directive} />;
   if (sub === "allowance_progress") return <IsaMeter progress={directive} />;
   if (sub === "deposit_progress") return <HouseDepositMeter progress={directive} />;
   if (sub === "pot_progress") return <ProjectionMeter progress={directive} />;
+  if (sub === "bridge_fund") return <BridgeFundMeter progress={directive} />;
+  if (sub === "contribution_rate") return <ContributionBlock progress={directive} />;
   return <p className="note">{directive.message}</p>;
 }
 
