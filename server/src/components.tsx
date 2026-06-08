@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type { MonthCoverage, SeriesStatus } from "../net_worth/coverage.js";
 import { tickerToGlyph } from "./logos.js";
@@ -324,7 +324,6 @@ export function CollapsibleSection({
 
 export function Sparkline({
   data,
-  width = 240,
   height = 48,
   tone = "accent",
   fill = true,
@@ -333,7 +332,6 @@ export function Sparkline({
   endLabel,
 }: {
   data: number[];
-  width?: number;
   height?: number;
   tone?: "pos" | "neg" | "accent";
   fill?: boolean;
@@ -342,38 +340,53 @@ export function Sparkline({
   endLabel?: string;
 }) {
   const gradientId = useId();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const next = entries[0]?.contentRect.width ?? 0;
+      if (next > 0) setWidth(Math.round(next));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   if (data.length < 2) return null;
   const min = Math.min(...data);
   const max = Math.max(...data);
   const span = max - min || 1;
   const pad = 3;
-  const stepX = (width - pad * 2) / (data.length - 1);
-  const points = data.map((v, i) => {
-    const x = pad + i * stepX;
-    const y = pad + (height - pad * 2) * (1 - (v - min) / span);
-    return [x, y] as const;
-  });
-  const line = points
-    .map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1))
-    .join(" ");
-  const area =
-    line + ` L${(width - pad).toFixed(1)} ${height - pad} L${pad} ${height - pad} Z`;
   const color =
     tone === "pos"
       ? "var(--positive)"
       : tone === "neg"
         ? "var(--negative)"
         : "var(--chart-ink)";
-  const last = points[points.length - 1]!;
-  const baseY = points[0]![1];
-  return (
-    <>
+
+  let svg = null;
+  if (width > 0) {
+    const stepX = (width - pad * 2) / (data.length - 1);
+    const points = data.map((v, i) => {
+      const x = pad + i * stepX;
+      const y = pad + (height - pad * 2) * (1 - (v - min) / span);
+      return [x, y] as const;
+    });
+    const line = points
+      .map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1))
+      .join(" ");
+    const area =
+      line + ` L${(width - pad).toFixed(1)} ${height - pad} L${pad} ${height - pad} Z`;
+    const last = points[points.length - 1]!;
+    const baseY = points[0]![1];
+    svg = (
       <svg
         className="spark"
-        width="100%"
+        width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -411,6 +424,14 @@ export function Sparkline({
           strokeWidth="1.6"
         />
       </svg>
+    );
+  }
+
+  return (
+    <>
+      <div ref={wrapRef} className="spark-wrap" style={{ height }}>
+        {svg}
+      </div>
       {(startLabel || endLabel) && (
         <div className="spark-axis num">
           <span>{startLabel}</span>

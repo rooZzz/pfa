@@ -565,6 +565,9 @@
   background: var(--ink-faint);
 }
 
+.spark-wrap {
+  width: 100%;
+}
 .spark {
   display: block;
   overflow: visible;
