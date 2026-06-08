@@ -1,4 +1,5 @@
-import { Badge, EmptyState, Icon, Meter, Stat } from "./components.js";
+import { Badge, EmptyState, Icon, Meter } from "./components.js";
+import { DataTable } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap" | "contention";
@@ -177,12 +178,20 @@ function ContributionBlock({ progress }: { progress: Directive }) {
   const employer = Number(progress.data.employer_annual_pence);
   return (
     <div className="stack-2">
-      <span className="card-label">Pension contributions / yr</span>
-      <div className="grid cols-3">
-        <Stat label="Annual" value={formatGbpk(annual)} />
-        <Stat label="Employee" value={formatGbpk(employee)} />
-        <Stat label="Employer" value={formatGbpk(employer)} />
-      </div>
+      <span className="card-label">Pension contributions</span>
+      <DataTable
+        inset={false}
+        groups={[
+          {
+            key: "contributions",
+            rows: [
+              { key: "employee", label: "Employee", valuePence: employee },
+              { key: "employer", label: "Employer", valuePence: employer },
+            ],
+          },
+        ]}
+        footer={{ label: "Annual / yr", valuePence: annual }}
+      />
     </div>
   );
 }
@@ -236,12 +245,18 @@ function DeadlineRow({ directive }: { directive: Directive }) {
   );
 }
 
+const PROGRESS_LAST = new Set(["contribution_gap"]);
+
 function GoalCard({ view }: { view: GoalView }) {
   const label = goalLabel(view.goal_type, view.progress[0] ?? null);
+  const progress = [...view.progress].sort(
+    (a, b) =>
+      (PROGRESS_LAST.has(a.sub_goal) ? 1 : 0) - (PROGRESS_LAST.has(b.sub_goal) ? 1 : 0),
+  );
 
   return (
     <div className="card stack-3">
-      {view.progress.map((d, i) => (
+      {progress.map((d, i) => (
         <ProgressBlock key={`p${i}`} directive={d} />
       ))}
       {view.data_gaps.map((d, i) => (
