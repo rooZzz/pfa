@@ -1,3 +1,4 @@
+import type { ClassFreshness } from "../freshness.js";
 import type { MonthCoverage } from "../net_worth/coverage.js";
 
 export type CategoryLine = {
@@ -55,4 +56,5 @@ export type CashflowResult = {
   net_cashflow_pence: number;
   trend: TrendPoint[];
   coverage: MonthCoverage[];
+  freshness: ClassFreshness[];
 };

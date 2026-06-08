@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { ensureFresh, type EnsureFreshDeps } from "../freshness_refresh.js";
-import { getBriefing } from "../goals/briefing.js";
+import { getNetWorth } from "../net_worth/index.js";
 
-export const getBriefingSchema = {
+export const getNetWorthSchema = {
   as_of: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
-    .optional()
-    .describe("Date to evaluate goals as of. Defaults to today."),
+    .describe("Date to compute net worth as of. Defaults to today.")
+    .optional(),
   auto_refresh: z
     .boolean()
     .optional()
@@ -16,12 +16,11 @@ export const getBriefingSchema = {
     ),
 };
 
-export async function getBriefingTool(
+export async function getNetWorthTool(
   input: { as_of?: string; auto_refresh?: boolean },
   deps?: EnsureFreshDeps,
 ): Promise<string> {
   if (input.auto_refresh !== false) await ensureFresh(undefined, deps);
-  const asOf = input.as_of ?? new Date().toISOString().split("T")[0]!;
-  const briefing = await getBriefing(asOf);
-  return JSON.stringify(briefing);
+  const date = input.as_of ?? new Date().toISOString().split("T")[0]!;
+  return JSON.stringify(await getNetWorth(date));
 }

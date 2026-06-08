@@ -202,6 +202,7 @@ describe("evaluate_scenario", () => {
     const live = await getBriefing(AS_OF);
     const scenario = JSON.parse(await evaluateScenario({ as_of: AS_OF, overlay: {} }));
     expect(scenario).toEqual(live);
+    expect(live).not.toHaveProperty("freshness");
   });
 
   it("an ISA bonus overlay shifts the metrics and leaves the live data untouched", async () => {
