@@ -34,10 +34,10 @@
   overflow: hidden;
 }
 .card-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: 500;
+  letter-spacing: 0;
   color: var(--ink-faint);
 }
 
@@ -118,7 +118,7 @@
 
 .result-ok .ok-title {
   font-family: var(--font-serif);
-  font-size: var(--text-lg);
+  font-size: var(--text-display);
   color: var(--ink-strong);
 }
 
@@ -157,8 +157,9 @@
   min-width: 0;
 }
 .connector-name {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--ink-strong);
 }
 .connector-sub {
@@ -201,7 +202,7 @@
   cursor: pointer;
 }
 .asset-row .ticker-chip,
-.asset-row .ticker-logo {
+.asset-row .ticker-mark {
   flex: 0 0 auto;
 }
 .asset-id {
@@ -228,10 +229,4 @@
   font-size: var(--text-sm);
   color: var(--ink);
   white-space: nowrap;
-}
-
-.connector-actions {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
 }

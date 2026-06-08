@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { Masthead } from "./branding.js";
-import { Badge, Btn, Icon, TickerChip } from "./components.js";
+import { ActionBar, Badge, Btn, Icon, TickerChip } from "./components.js";
 
 type App = NonNullable<ReturnType<typeof useApp>["app"]>;
 
@@ -128,25 +128,34 @@ function MonzoConnector({ app, onBack }: { app: App; onBack: () => void }) {
             </Badge>
           }
         />
-        <div className="card card-sunken" style={{ margin: "var(--space-4) 0" }}>
+        <div className="card card-sunken mt-4">
           <p className="note">{message}</p>
         </div>
-        <div className="row row-2">
-          <Btn variant="primary" icon="sync" onClick={() => void handleSync()}>
-            Sync now
-          </Btn>
-          <Btn
-            variant="ghost"
-            icon="plug"
-            onClick={() => {
-              setStatus("form");
-              setInput("");
-              setMessage(null);
-            }}
-          >
-            Reconnect
-          </Btn>
-        </div>
+        <ActionBar
+          secondary={
+            <>
+              <Btn variant="ghost" size="sm" onClick={onBack}>
+                All connectors
+              </Btn>
+              <Btn
+                variant="ghost"
+                icon="plug"
+                onClick={() => {
+                  setStatus("form");
+                  setInput("");
+                  setMessage(null);
+                }}
+              >
+                Reconnect
+              </Btn>
+            </>
+          }
+          primary={
+            <Btn variant="primary" icon="sync" onClick={() => void handleSync()}>
+              Sync now
+            </Btn>
+          }
+        />
       </div>
     );
   }
@@ -161,13 +170,8 @@ function MonzoConnector({ app, onBack }: { app: App; onBack: () => void }) {
         }
         title="Connect Monzo"
         titleSize="var(--text-md)"
-        action={
-          <Btn variant="ghost" size="sm" onClick={onBack}>
-            All connectors
-          </Btn>
-        }
       />
-      <p className="note" style={{ margin: "var(--space-3) 0 var(--space-4)" }}>
+      <p className="note mt-3 mb-4">
         Run <span className="mono">npm run monzo:auth</span> and paste the result below.
       </p>
       {status === "error" && errorMessage && <p className="note mb-4">{errorMessage}</p>}
@@ -182,19 +186,26 @@ function MonzoConnector({ app, onBack }: { app: App; onBack: () => void }) {
         value={input}
         onChange={(e) => setInput(e.target.value)}
       />
-      <div className="row-between mt-3">
-        <span className="eyebrow row-2" style={{ gap: "var(--space-1)" }}>
-          <Icon name="info" size={12} /> credentials stay local
-        </span>
-        <Btn
-          variant="primary"
-          icon="check"
-          onClick={() => void handleConnect()}
-          disabled={!canConnect}
-        >
-          Connect
-        </Btn>
-      </div>
+      <p className="caption row-2 mt-3" style={{ gap: "var(--space-1)" }}>
+        <Icon name="info" size={12} /> credentials stay local
+      </p>
+      <ActionBar
+        secondary={
+          <Btn variant="ghost" size="sm" onClick={onBack}>
+            All connectors
+          </Btn>
+        }
+        primary={
+          <Btn
+            variant="primary"
+            icon="check"
+            onClick={() => void handleConnect()}
+            disabled={!canConnect}
+          >
+            Connect
+          </Btn>
+        }
+      />
     </div>
   );
 }
@@ -344,7 +355,7 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
           titleSize="var(--text-md)"
         />
         {discovery.transfers_capped && (
-          <p className="note mb-4">
+          <p className="caption mb-4">
             Token list built from the most recent transfers; very old, untouched tokens
             may not appear.
           </p>
@@ -395,26 +406,31 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
             );
           })}
         </div>
-        <div className="row-between connector-actions">
-          <Btn
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setStatus("form");
-              setDiscovery(null);
-            }}
-          >
-            Back
-          </Btn>
-          <Btn
-            variant="primary"
-            icon="check"
-            disabled={selected.size === 0}
-            onClick={() => void handleConnect()}
-          >
-            Import {selected.size} asset{selected.size === 1 ? "" : "s"}
-          </Btn>
-        </div>
+        <ActionBar
+          step="Step 2 of 2"
+          secondary={
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setStatus("form");
+                setDiscovery(null);
+              }}
+            >
+              Back
+            </Btn>
+          }
+          primary={
+            <Btn
+              variant="primary"
+              icon="check"
+              disabled={selected.size === 0}
+              onClick={() => void handleConnect()}
+            >
+              Import {selected.size} asset{selected.size === 1 ? "" : "s"}
+            </Btn>
+          }
+        />
       </div>
     );
   }
@@ -437,30 +453,39 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
             </Badge>
           }
         />
-        <div className="card card-sunken" style={{ margin: "var(--space-4) 0" }}>
+        <div className="card card-sunken mt-4">
           <p className="note">{message}</p>
         </div>
-        <div className="row row-2">
-          <Btn variant="primary" icon="sync" onClick={() => void handleSync()}>
-            Sync now
-          </Btn>
-          <Btn variant="secondary" onClick={() => void handleDiscover(selected)}>
-            Edit selection
-          </Btn>
-          <Btn
-            variant="ghost"
-            icon="plug"
-            onClick={() => {
-              setStatus("form");
-              setAddress("");
-              setDiscovery(null);
-              setSelected(new Set());
-              setMessage(null);
-            }}
-          >
-            Reconnect
-          </Btn>
-        </div>
+        <ActionBar
+          secondary={
+            <>
+              <Btn variant="ghost" size="sm" onClick={onBack}>
+                All connectors
+              </Btn>
+              <Btn variant="secondary" onClick={() => void handleDiscover(selected)}>
+                Edit selection
+              </Btn>
+              <Btn
+                variant="ghost"
+                icon="plug"
+                onClick={() => {
+                  setStatus("form");
+                  setAddress("");
+                  setDiscovery(null);
+                  setSelected(new Set());
+                  setMessage(null);
+                }}
+              >
+                Reconnect
+              </Btn>
+            </>
+          }
+          primary={
+            <Btn variant="primary" icon="sync" onClick={() => void handleSync()}>
+              Sync now
+            </Btn>
+          }
+        />
       </div>
     );
   }
@@ -475,13 +500,8 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
         }
         title="Connect Ethereum wallet"
         titleSize="var(--text-md)"
-        action={
-          <Btn variant="ghost" size="sm" onClick={onBack}>
-            All connectors
-          </Btn>
-        }
       />
-      <p className="note" style={{ margin: "var(--space-3) 0 var(--space-4)" }}>
+      <p className="note mt-3 mb-4">
         Paste a public wallet address. The Etherscan key is read from server config.
       </p>
       {status === "error" && errorMessage && <p className="note mb-4">{errorMessage}</p>}
@@ -493,19 +513,27 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
         value={address}
         onChange={(e) => setAddress(e.target.value)}
       />
-      <div className="row-between mt-3">
-        <span className="eyebrow row-2" style={{ gap: "var(--space-1)" }}>
-          <Icon name="info" size={12} /> on-chain, read-only
-        </span>
-        <Btn
-          variant="primary"
-          icon="check"
-          onClick={() => void handleDiscover()}
-          disabled={!canDiscover}
-        >
-          Discover assets
-        </Btn>
-      </div>
+      <p className="caption row-2 mt-3" style={{ gap: "var(--space-1)" }}>
+        <Icon name="info" size={12} /> on-chain, read-only
+      </p>
+      <ActionBar
+        step="Step 1 of 2"
+        secondary={
+          <Btn variant="ghost" size="sm" onClick={onBack}>
+            All connectors
+          </Btn>
+        }
+        primary={
+          <Btn
+            variant="primary"
+            icon="check"
+            onClick={() => void handleDiscover()}
+            disabled={!canDiscover}
+          >
+            Discover assets
+          </Btn>
+        }
+      />
     </div>
   );
 }

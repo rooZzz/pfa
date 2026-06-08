@@ -13,6 +13,7 @@ export async function queryPensionLines(asOf: string): Promise<RealisedLine[]> {
   const rows = await runQuery(
     `SELECT
        COALESCE(a.name, 'Pension #' || CAST(p.account_id AS TEXT)) AS name,
+       a.provider,
        p.value_pence,
        p.valid_from,
        p.recorded_at,
@@ -25,6 +26,7 @@ export async function queryPensionLines(asOf: string): Promise<RealisedLine[]> {
   return rows.map((r) => ({
     kind: "pension" as const,
     name: toStr(r.name),
+    institution: r.provider == null ? null : toStr(r.provider),
     value_pence: toNum(r.value_pence),
     valid_from: toStr(r.valid_from),
     recorded_at: toStr(r.recorded_at),

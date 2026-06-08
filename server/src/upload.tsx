@@ -5,17 +5,13 @@ import { useCallback, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { IngestReviewResult } from "../tools/ingest_document.js";
 import { Masthead } from "./branding.js";
-import { Badge, Btn, Icon } from "./components.js";
-import { formatGbp } from "./format.js";
+import { ActionBar, Badge, Btn, Icon } from "./components.js";
+import { DataTable } from "./data_table.js";
+import type { DataRow } from "./data_table.js";
 
 type IngestResult = IngestReviewResult;
 
 type Status = "drop" | "parsing" | "review" | "confirming" | "confirmed" | "error";
-
-function gbpOrDash(pence: number | null | undefined): string {
-  if (pence == null) return "not shown";
-  return formatGbp(pence);
-}
 
 function UploadApp() {
   const [status, setStatus] = useState<Status>("drop");
@@ -134,9 +130,7 @@ function UploadApp() {
         </span>
         <div>
           <div className="ok-title">Saved to ledger</div>
-          <p className="muted mt-2" style={{ fontSize: "var(--text-sm)" }}>
-            {confirmMessage}
-          </p>
+          <p className="note mt-2">{confirmMessage}</p>
         </div>
         <Btn variant="secondary" size="sm" icon="upload" onClick={reset}>
           Upload another
@@ -160,17 +154,31 @@ function UploadApp() {
 
   if (status === "review" && ingestResult) {
     const { parsed, payload, filename } = ingestResult;
-    const rows: [string, string][] = [
-      ["Pay date", parsed.pay_date],
-      ["Tax year", parsed.tax_year ?? "not shown"],
-      ["Tax code", parsed.tax_code ?? "not shown"],
-      ["Gross pay", gbpOrDash(parsed.gross_pence)],
-      ["Taxable pay", gbpOrDash(parsed.taxable_pence)],
-      ["Net pay", gbpOrDash(parsed.net_pence)],
-      ["PAYE", gbpOrDash(parsed.paye_pence)],
-      ["NI (employee)", gbpOrDash(parsed.ni_employee_pence)],
-      ["Pension (employee)", gbpOrDash(parsed.pension_employee_pence)],
-      ["Pension (employer)", gbpOrDash(parsed.pension_employer_pence)],
+    const textRow = (key: string, label: string, value: string | null): DataRow => ({
+      key,
+      label,
+      labelTone: "muted",
+      display: value ?? undefined,
+      absence: "not_recorded",
+    });
+    const amountRow = (key: string, label: string, pence: number | null): DataRow => ({
+      key,
+      label,
+      labelTone: "muted",
+      valuePence: pence,
+      absence: "not_recorded",
+    });
+    const summaryRows: DataRow[] = [
+      textRow("pay_date", "Pay date", parsed.pay_date),
+      textRow("tax_year", "Tax year", parsed.tax_year ?? null),
+      textRow("tax_code", "Tax code", parsed.tax_code ?? null),
+      amountRow("gross", "Gross pay", parsed.gross_pence),
+      amountRow("taxable", "Taxable pay", parsed.taxable_pence),
+      amountRow("net", "Net pay", parsed.net_pence),
+      amountRow("paye", "PAYE", parsed.paye_pence),
+      amountRow("ni", "NI (employee)", parsed.ni_employee_pence),
+      amountRow("pension_ee", "Pension (employee)", parsed.pension_employee_pence),
+      amountRow("pension_er", "Pension (employer)", parsed.pension_employer_pence),
     ];
     return (
       <div className="screen rise">
@@ -196,16 +204,7 @@ function UploadApp() {
         <p className="note mb-4">Nothing is written until you confirm.</p>
 
         <div className="card card--flush">
-          <table className="t compact t--inset">
-            <tbody>
-              {rows.map(([k, v], i) => (
-                <tr key={i}>
-                  <td className="muted">{k}</td>
-                  <td className="col-num">{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable groups={[{ key: "summary", rows: summaryRows }]} />
         </div>
 
         {payload.line_items.length > 0 && (
@@ -213,28 +212,41 @@ function UploadApp() {
             <div className="lhead">
               <h4>Line items</h4>
             </div>
-            <table className="t compact">
-              <tbody>
-                {payload.line_items.map((item, i) => (
-                  <tr key={i}>
-                    <td>{item.description}</td>
-                    <td className="muted">{item.section}</td>
-                    <td className="col-num">{formatGbp(item.amount_pence)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              inset={false}
+              columns={[
+                { key: "section", align: "left" },
+                { key: "amount", align: "num" },
+              ]}
+              groups={[
+                {
+                  key: "line_items",
+                  rows: payload.line_items.map((item, i) => ({
+                    key: String(i),
+                    label: item.description,
+                    cells: [
+                      { valuePence: null, display: item.section, tone: "muted" },
+                      { valuePence: item.amount_pence },
+                    ],
+                  })),
+                },
+              ]}
+            />
           </>
         )}
 
-        <div className="row row-2 mt-5">
-          <Btn variant="primary" icon="check" onClick={() => void handleConfirm()}>
-            Confirm &amp; save
-          </Btn>
-          <Btn variant="ghost" onClick={reset}>
-            Cancel
-          </Btn>
-        </div>
+        <ActionBar
+          secondary={
+            <Btn variant="ghost" onClick={reset}>
+              Cancel
+            </Btn>
+          }
+          primary={
+            <Btn variant="primary" icon="check" onClick={() => void handleConfirm()}>
+              Confirm &amp; save
+            </Btn>
+          }
+        />
       </div>
     );
   }
@@ -281,7 +293,7 @@ function UploadApp() {
           }}
         />
       </div>
-      <p className="note mt-4">Parsed locally, staged for review.</p>
+      <p className="caption mt-4">Parsed locally, staged for review.</p>
     </div>
   );
 }

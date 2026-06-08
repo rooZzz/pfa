@@ -3,12 +3,6 @@ import type { ReactNode } from "react";
 const MARK_PATH =
   "M12 12 L52 12 A40 40 0 0 1 12 52 Z M20.3 25.5 a5.2 5.2 0 1 0 10.4 0 a5.2 5.2 0 1 0 -10.4 0 Z";
 
-const MARK_STYLE = `
-.pfa-mark-path { fill: #b8673e; }
-@media (prefers-color-scheme: dark) { .pfa-mark-path { fill: #de8c5d; } }
-:root[data-theme="dark"] .pfa-mark-path { fill: #de8c5d; }
-`;
-
 export function QuadrantMark({ size = 22 }: { size?: number }) {
   return (
     <svg
@@ -18,8 +12,7 @@ export function QuadrantMark({ size = 22 }: { size?: number }) {
       aria-hidden="true"
       style={{ flexShrink: 0, display: "block" }}
     >
-      <style>{MARK_STYLE}</style>
-      <path className="pfa-mark-path" fillRule="evenodd" d={MARK_PATH} />
+      <path fillRule="evenodd" d={MARK_PATH} style={{ fill: "var(--accent)" }} />
     </svg>
   );
 }

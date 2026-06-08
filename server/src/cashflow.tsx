@@ -2,64 +2,22 @@ import "./styles/index.css";
 import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
 import { Masthead } from "./branding.js";
 import {
-  Badge,
   Btn,
   CompositionBar,
   CoverageGrid,
-  Icon,
-  Meter,
+  EmptyState,
   MiniBars,
   Stat,
 } from "./components.js";
-import { DataTable, topN } from "./data_table.js";
+import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 type CashflowData = CashflowResult;
-
-function TruncatedMeterList<T>({
-  items,
-  limit,
-  getValuePence,
-  render,
-}: {
-  items: T[];
-  limit: number;
-  getValuePence: (item: T) => number;
-  render: (item: T, index: number) => ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const { visible, hidden, hiddenSumPence } = topN(items, getValuePence, {
-    limit,
-    expanded,
-  });
-  return (
-    <div className="stack-3">
-      {visible.map((item, i) => render(item, i))}
-      {items.length > limit && (
-        <button
-          className="btn btn-ghost btn-sm list-more"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <span
-            className="ico"
-            style={expanded ? { transform: "rotate(180deg)" } : undefined}
-          >
-            <Icon name="chevron" size={14} />
-          </span>
-          {expanded
-            ? "Show less"
-            : `Show ${hidden.length} more · ${formatGbp(hiddenSumPence)}`}
-        </button>
-      )}
-    </div>
-  );
-}
 
 function categoryLabel(cat: string): string {
   if (cat === "income") return "Income (other)";
@@ -96,7 +54,7 @@ function EarningsWaterfall({ income }: { income: IncomeTotal }) {
       : []),
     { label: "Net pay", value: income.net_pence, tone: "pos" as const },
   ];
-  return <CompositionBar rows={rows} />;
+  return <CompositionBar rows={rows} variant="tone" />;
 }
 
 function PayslipBreakdown({ income }: { income: IncomeTotal }) {
@@ -272,7 +230,7 @@ function CashflowApp() {
               onClick={() => void load(true)}
               disabled={busy}
             >
-              {busy ? "Syncing" : "Refresh"}
+              {busy ? "Refreshing" : "Refresh"}
             </Btn>
           </div>
         }
@@ -317,30 +275,35 @@ function CashflowApp() {
             </span>
           </div>
           <MiniBars rows={trendRows} height={72} />
-          <table className="t compact mt-4">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th className="col-num">In</th>
-                <th className="col-num">Out</th>
-                <th className="col-num">Net</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.trend.map((t, i) => (
-                <tr key={i}>
-                  <td>{monthLabel(t.month)}</td>
-                  <td className="col-num pos">{formatGbp(t.transaction_inflow_pence)}</td>
-                  <td className="col-num neg">
-                    {"−" + formatGbp(t.transaction_outflow_pence)}
-                  </td>
-                  <td className={"col-num " + (t.net_pence >= 0 ? "pos" : "neg")}>
-                    {formatGbp(t.net_pence)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="mt-4">
+            <DataTable
+              inset={false}
+              labelHeader="Month"
+              columns={[
+                { key: "in", header: "In", align: "num" },
+                { key: "out", header: "Out", align: "num" },
+                { key: "net", header: "Net", align: "num" },
+              ]}
+              groups={[
+                {
+                  key: "trend",
+                  rows: data.trend.map((t) => ({
+                    key: t.month,
+                    label: monthLabel(t.month),
+                    cells: [
+                      { valuePence: t.transaction_inflow_pence, tone: "pos" },
+                      {
+                        valuePence: t.transaction_outflow_pence,
+                        display: "−" + formatGbp(t.transaction_outflow_pence),
+                        tone: "neg",
+                      },
+                      { valuePence: t.net_pence, tone: t.net_pence >= 0 ? "pos" : "neg" },
+                    ],
+                  })),
+                },
+              ]}
+            />
+          </div>
         </div>
       )}
 
@@ -349,20 +312,22 @@ function CashflowApp() {
           <div className="card-label mb-3">
             Money out by category · {formatGbp(data.spending_total_pence)}
           </div>
-          <TruncatedMeterList
-            items={outflowCategories}
-            limit={5}
-            getValuePence={(line) => line.outflow_pence}
-            render={(line, i) => (
-              <Meter
-                key={i}
-                name={labelFor(line.category)}
-                sub={subFor(line)}
-                value={formatGbp(line.outflow_pence)}
-                pct={(line.outflow_pence / spendMax) * 100}
-                tone="neg"
-              />
-            )}
+          <DataTable
+            variant="bars"
+            groups={[
+              {
+                key: "spend",
+                truncate: 5,
+                sortByValue: true,
+                rows: outflowCategories.map((line) => ({
+                  key: line.category,
+                  label: labelFor(line.category),
+                  sub: subFor(line),
+                  valuePence: line.outflow_pence,
+                  bar: { pct: (line.outflow_pence / spendMax) * 100, tone: "neg" },
+                })),
+              },
+            ]}
           />
         </div>
       )}
@@ -372,39 +337,35 @@ function CashflowApp() {
           <div className="card-label mb-3">
             Money in by source · {formatGbp(data.income_total_pence)}
           </div>
-          <TruncatedMeterList
-            items={incomeSources}
-            limit={5}
-            getValuePence={(line) => line.inflow_pence}
-            render={(line, i) => (
-              <Meter
-                key={i}
-                name={line.source}
-                value={formatGbp(line.inflow_pence)}
-                pct={(line.inflow_pence / incomeMax) * 100}
-                tone="pos"
-              />
-            )}
+          <DataTable
+            variant="bars"
+            groups={[
+              {
+                key: "income",
+                truncate: 5,
+                sortByValue: true,
+                rows: incomeSources.map((line) => ({
+                  key: line.source,
+                  label: line.source,
+                  valuePence: line.inflow_pence,
+                  bar: { pct: (line.inflow_pence / incomeMax) * 100, tone: "pos" },
+                })),
+              },
+            ]}
           />
         </div>
       )}
 
       {hasIncome && (
         <div className="card">
-          <div
-            className="card-label mb-3"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "var(--space-3)",
-            }}
-          >
-            <span>
+          <div className="row-between mb-3">
+            <span className="card-label">
               Salary · gross to net · {data.income.payslip_count} payslip
               {data.income.payslip_count === 1 ? "" : "s"}
             </span>
-            {data.income.tax_code && <Badge tone="accent">{data.income.tax_code}</Badge>}
+            {data.income.tax_code && (
+              <span className="value-chip">{data.income.tax_code}</span>
+            )}
           </div>
           <div className="stack-3">
             <EarningsWaterfall income={data.income} />
@@ -431,7 +392,7 @@ function CashflowApp() {
         </div>
       )}
 
-      {!hasIncome && <div className="note">No payslips this period.</div>}
+      {!hasIncome && <EmptyState icon="file">No payslips this period.</EmptyState>}
     </div>
   );
 }

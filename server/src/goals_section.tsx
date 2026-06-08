@@ -1,4 +1,4 @@
-import { Badge, Icon, Meter } from "./components.js";
+import { Badge, EmptyState, Icon, Meter } from "./components.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap" | "contention";
@@ -122,30 +122,79 @@ function HouseDepositMeter({ progress }: { progress: Directive }) {
   );
 }
 
-function ProjectionMeter({ progress }: { progress: Directive }) {
+function ProjectionMeter({
+  progress,
+  contributionPence,
+}: {
+  progress: Directive;
+  contributionPence: number | null;
+}) {
   const projected = Number(progress.data.projected_pot_pence);
   const needed = Number(progress.data.pot_needed_pence);
   const percent = Number(progress.data.percent);
   const targetAge = Number(progress.data.target_age);
   const pct = Math.min(100, percent);
   const name = progress.goal_type === "fire" ? "FIRE number" : "Retirement pot";
+  const subParts = [`projected by age ${targetAge}`, `${percent}% funded`];
+  if (contributionPence != null && contributionPence > 0) {
+    subParts.push(`${formatGbpk(contributionPence)}/yr pension`);
+  }
   return (
     <Meter
       name={name}
       value={`${formatGbpk(projected)} / ${formatGbpk(needed)}`}
       pct={pct}
       tone={pct >= 100 ? "pos" : undefined}
-      sub={`projected by age ${targetAge} · ${percent}% funded`}
+      sub={subParts.join(" · ")}
     />
   );
 }
 
-function ProgressBlock({ directive }: { directive: Directive }) {
+function BridgeFundMeter({ progress }: { progress: Directive }) {
+  const bridgeYears = Number(progress.data.bridge_years);
+  const accessAge = Number(progress.data.pension_access_age);
+  if (bridgeYears === 0) {
+    return (
+      <Meter
+        name="Bridge fund"
+        value="Not needed"
+        pct={100}
+        tone="pos"
+        sub={`retiring at or after pension access (age ${accessAge})`}
+      />
+    );
+  }
+  const accessible = Number(progress.data.accessible_pence);
+  const need = Number(progress.data.bridge_need_pence);
+  const shortfall = Number(progress.data.bridge_shortfall_pence);
+  const pct = need > 0 ? Math.min(100, (accessible / need) * 100) : 100;
+  const subParts = [`${bridgeYears}y to age ${accessAge}`];
+  if (shortfall > 0) subParts.push(`${formatGbpk(shortfall)} short`);
+  return (
+    <Meter
+      name="Bridge fund"
+      value={`${formatGbpk(accessible)} / ${formatGbpk(need)}`}
+      pct={pct}
+      tone={accessible >= need ? "pos" : undefined}
+      sub={subParts.join(" · ")}
+    />
+  );
+}
+
+function ProgressBlock({
+  directive,
+  contributionPence,
+}: {
+  directive: Directive;
+  contributionPence: number | null;
+}) {
   const sub = directive.sub_goal;
   if (sub === "cover_progress") return <EmergencyFundMeter progress={directive} />;
   if (sub === "allowance_progress") return <IsaMeter progress={directive} />;
   if (sub === "deposit_progress") return <HouseDepositMeter progress={directive} />;
-  if (sub === "pot_progress") return <ProjectionMeter progress={directive} />;
+  if (sub === "pot_progress")
+    return <ProjectionMeter progress={directive} contributionPence={contributionPence} />;
+  if (sub === "bridge_fund") return <BridgeFundMeter progress={directive} />;
   return <p className="note">{directive.message}</p>;
 }
 
@@ -175,11 +224,11 @@ function DeadlineRow({ directive }: { directive: Directive }) {
         : "";
 
   return (
-    <div className="row-2">
-      <span style={{ color: "var(--ink-muted)", display: "flex", alignItems: "center" }}>
+    <div className="row-2 deadline">
+      <span className="deadline-ico">
         <Icon name="clock" size={13} />
       </span>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>
+      <span>
         {leftText}
         {dateStr ? ` · ${formatDate(dateStr)}` : ""}
       </span>
@@ -189,17 +238,24 @@ function DeadlineRow({ directive }: { directive: Directive }) {
 
 function GoalCard({ view }: { view: GoalView }) {
   const label = goalLabel(view.goal_type, view.progress[0] ?? null);
+  const contribution = view.progress.find((d) => d.sub_goal === "contribution_gap");
+  const contributionPence = contribution
+    ? Number(contribution.data.annual_contribution_pence)
+    : null;
+  const progress = view.progress.filter((d) => d.sub_goal !== "contribution_gap");
 
   return (
     <div className="card stack-3">
-      {view.progress.map((d, i) => (
-        <ProgressBlock key={`p${i}`} directive={d} />
+      {progress.map((d, i) => (
+        <ProgressBlock
+          key={`p${i}`}
+          directive={d}
+          contributionPence={contributionPence}
+        />
       ))}
       {view.data_gaps.map((d, i) => (
         <div key={`g${i}`} className="stack-3">
-          {view.progress.length === 0 && i === 0 && (
-            <span className="eyebrow">{label}</span>
-          )}
+          {progress.length === 0 && i === 0 && <span className="eyebrow">{label}</span>}
           <div>
             <Badge tone="warn" led>
               Data gap
@@ -228,11 +284,9 @@ export function GoalsSection({ directives }: { directives: Directive[] }) {
         <h4>Goals</h4>
       </div>
       {goals.length === 0 ? (
-        <div className="card">
-          <p className="note">
-            No active goals yet. Ask to set one with propose_goal then confirm_goal.
-          </p>
-        </div>
+        <EmptyState>
+          No active goals yet. Ask to set one with propose_goal then confirm_goal.
+        </EmptyState>
       ) : (
         <div className="goals-grid">
           {goals.map((view) => (

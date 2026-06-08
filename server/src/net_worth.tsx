@@ -18,15 +18,20 @@ import {
   CoverageGrid,
   Icon,
   Sparkline,
-  Stat,
   TickerChip,
 } from "./components.js";
 import { GoalsSection } from "./goals_section.js";
 import type { Directive } from "./goals_section.js";
-import { tickerToLogo } from "./logos.js";
+import { categoryGlyph, institutionToGlyph } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
-import { formatGbp, formatGbpk } from "./format.js";
+import { ABSENCE_LABEL, formatGbp, formatGbpk } from "./format.js";
+
+function monthYear(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleString("en-GB", { month: "short", year: "2-digit" });
+}
 
 type NetWorthData = NetWorthResult;
 
@@ -38,7 +43,7 @@ function daysSince(dateStr: string | undefined): number | null {
 }
 
 function ageLabel(days: number | null): string {
-  if (days === null) return "no date";
+  if (days === null) return ABSENCE_LABEL.no_date;
   if (days <= 0) return "today";
   if (days === 1) return "1 day ago";
   return `${days} days ago`;
@@ -64,52 +69,67 @@ function parseBriefingDirectives(
 }
 
 const staleBadge = (
-  <span className="badge warn" style={{ marginLeft: 6 }}>
+  <span className="badge warn ml-2">
     <span className="led" />
     stale
   </span>
 );
 
 function TickerLead({ ticker }: { ticker: string }) {
-  const hasLogo = tickerToLogo(ticker) != null;
   return (
     <>
-      <TickerChip ticker={ticker} />
-      {hasLogo ? ` ${ticker}` : ""}
+      <TickerChip ticker={ticker} /> {ticker}
     </>
   );
 }
 
 function assetLead(ticker: string | null, fallbackName: string | null): ReactNode {
   if (ticker) return <TickerLead ticker={ticker} />;
-  return fallbackName ?? "unlinked";
+  return fallbackName ?? ABSENCE_LABEL.not_recorded;
+}
+
+function GlyphMark({ svg, label }: { svg: string; label?: string }) {
+  return (
+    <span
+      className="ticker-mark"
+      role="img"
+      aria-label={label}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
+function LineMark({ line }: { line: RealisedLine }) {
+  if (line.kind === "asset") return <TickerChip ticker={line.ticker ?? null} />;
+  const brand = institutionToGlyph(line.institution);
+  const svg = brand ?? categoryGlyph(line.kind);
+  if (svg) return <GlyphMark svg={svg} label={line.institution ?? line.kind} />;
+  return <TickerChip ticker={line.ticker ?? null} />;
+}
+
+function realisedSub(line: RealisedLine): ReactNode {
+  if (line.kind === "asset" && line.quantity != null && line.unit_price_pence != null) {
+    const qty = (line.quantity / (line.quantity_scale ?? 1)).toLocaleString(undefined, {
+      maximumFractionDigits: 8,
+    });
+    return `${qty} × ${formatGbp(line.unit_price_pence)}`;
+  }
+  return null;
 }
 
 function realisedRowLabel(line: RealisedLine): ReactNode {
-  const hasPriceMeta = line.kind === "asset" || line.kind === "property";
-  const priceAge = hasPriceMeta ? daysSince(line.price_as_of) : null;
+  const priceAge = line.kind === "asset" ? daysSince(line.price_as_of) : null;
   const isStale = priceAge != null && priceAge > 30;
-  const age = hasPriceMeta ? ageLabel(priceAge) : ageLabel(daysSince(line.valid_from));
-  const showUnits =
-    line.kind === "asset" && line.quantity != null && line.unit_price_pence != null;
-  const lead =
-    line.kind === "asset" && line.ticker ? (
-      <TickerLead ticker={line.ticker} />
-    ) : (
-      line.name
-    );
+  const sub = realisedSub(line);
   return (
-    <>
-      {lead}
-      <span className="sub sub-inline">
-        {showUnits
-          ? `${(line.quantity! / (line.quantity_scale ?? 1)).toLocaleString(undefined, {
-              maximumFractionDigits: 8,
-            })} units · ${formatGbp(line.unit_price_pence!)}/unit · ${age}`
-          : age}
+    <span className="line-lead">
+      <LineMark line={line} />
+      <span className="line-name">
+        {line.name}
+        {sub && <span className="sub sub-inline">{sub}</span>}
       </span>
       {isStale && staleBadge}
-    </>
+    </span>
   );
 }
 
@@ -221,8 +241,53 @@ function unscheduledRowLabel(line: UnscheduledLine): ReactNode {
   );
 }
 
+function splitMortgageName(name: string): { lender: string; property: string } {
+  const idx = name.indexOf(" — ");
+  if (idx === -1) return { lender: "", property: name };
+  return { lender: name.slice(0, idx), property: name.slice(idx + 3) };
+}
+
+function propertyItemLabel(
+  name: string,
+  property: RealisedLine | undefined,
+  mortgage: RealisedLine | undefined,
+): ReactNode {
+  const split = splitMortgageName(name);
+  const parts: string[] = [];
+  if (split.lender) parts.push(split.lender);
+  if (property) parts.push(`${formatGbpk(property.value_pence)} value`);
+  if (mortgage) parts.push(`${formatGbpk(-mortgage.value_pence)} mortgage`);
+  return (
+    <span className="line-lead">
+      <GlyphMark svg={categoryGlyph("property") ?? ""} label="property" />
+      <span className="line-name">
+        {split.property}
+        <span className="sub sub-inline">{parts.join(" · ")}</span>
+      </span>
+    </span>
+  );
+}
+
+function buildPropertyGroup(realised: RealisedLine[]): DataGroup | null {
+  const byName = new Map<string, { property?: RealisedLine; mortgage?: RealisedLine }>();
+  for (const line of realised) {
+    if (line.kind !== "property" && line.kind !== "mortgage") continue;
+    const entry = byName.get(line.name) ?? {};
+    if (line.kind === "property") entry.property = line;
+    else entry.mortgage = line;
+    byName.set(line.name, entry);
+  }
+  if (byName.size === 0) return null;
+  const rows = [...byName.entries()].map(([name, entry], i) => ({
+    key: `property-${i}`,
+    label: propertyItemLabel(name, entry.property, entry.mortgage),
+    valuePence: (entry.property?.value_pence ?? 0) + (entry.mortgage?.value_pence ?? 0),
+  }));
+  return { key: "property", label: "Property", rows };
+}
+
 function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
-  return GROUP_ORDER.map((g) => ({
+  const groups: DataGroup[] = FLAT_GROUPS.map((g) => ({
     kind: g.kind,
     label: g.label,
     lines: realised.filter((l) => l.kind === g.kind),
@@ -239,6 +304,10 @@ function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
         valuePence: line.value_pence,
       })),
     }));
+
+  const propertyGroup = buildPropertyGroup(realised);
+  if (propertyGroup) groups.push(propertyGroup);
+  return groups;
 }
 
 function buildVestGroups(
@@ -273,8 +342,8 @@ function buildVestGroups(
         key: `unscheduled-${i}`,
         label: unscheduledRowLabel(line),
         valuePence: null,
-        display: "—",
-        tone: "muted",
+        absence: "na",
+        labelTone: "muted",
       })),
     });
   }
@@ -282,12 +351,10 @@ function buildVestGroups(
   return groups;
 }
 
-const GROUP_ORDER: { kind: RealisedLine["kind"]; label: string }[] = [
+const FLAT_GROUPS: { kind: RealisedLine["kind"]; label: string }[] = [
   { kind: "account", label: "Cash" },
   { kind: "asset", label: "Investments" },
   { kind: "pension", label: "Pension" },
-  { kind: "property", label: "Property" },
-  { kind: "mortgage", label: "Liabilities" },
 ];
 
 function NetWorthApp() {
@@ -384,13 +451,12 @@ function NetWorthApp() {
   const investments = sumKind(data.realised, "asset");
   const pension = sumKind(data.realised, "pension");
   const property = sumKind(data.realised, "property");
-  const accountCount = data.realised.filter((l) => l.kind === "account").length;
 
   const composition = [
-    { label: "Property", value: property, tone: "accent" as const },
-    { label: "Pension", value: pension, tone: "muted" as const },
-    { label: "Investments", value: investments, tone: "pos" as const },
-    { label: "Cash", value: cash, tone: "pos" as const },
+    { label: "Property", value: property },
+    { label: "Pension", value: pension },
+    { label: "Investments", value: investments },
+    { label: "Cash", value: cash },
   ];
 
   const realisedGroups = buildRealisedGroups(data.realised);
@@ -413,7 +479,7 @@ function NetWorthApp() {
               onClick={() => void load(true)}
               disabled={busy}
             >
-              {busy ? "Syncing" : "Refresh"}
+              {busy ? "Refreshing" : "Refresh"}
             </Btn>
           </div>
         }
@@ -425,7 +491,7 @@ function NetWorthApp() {
         </div>
         {change != null && (
           <div className={"stat-delta mt-2 " + (change >= 0 ? "pos" : "neg")}>
-            {(change >= 0 ? "+" : "") + formatGbp(change, { whole: true })}
+            {(change >= 0 ? "+" : "") + formatGbpk(change)}
             {changePct != null ? ` (${changePct}%)` : ""} over {trendVals.length} months
           </div>
         )}
@@ -433,26 +499,18 @@ function NetWorthApp() {
 
       {trendVals.length > 1 && (
         <div className="card card--chart">
-          <Sparkline data={trendVals} height={120} />
+          <Sparkline
+            data={trendVals}
+            height={120}
+            startLabel={monthYear(data.trend[0]!.date)}
+            endLabel={monthYear(data.trend[data.trend.length - 1]!.date)}
+          />
         </div>
       )}
 
       <div className="card">
         <div className="card-label mb-3">Composition</div>
         <CompositionBar rows={composition} />
-      </div>
-
-      <div className="grid cols-2">
-        <div className="card card-sunken">
-          <Stat
-            label="Liquid cash"
-            value={formatGbpk(cash)}
-            delta={`${accountCount} account${accountCount === 1 ? "" : "s"}`}
-          />
-        </div>
-        <div className="card card-sunken">
-          <Stat label="Investments" value={formatGbpk(investments)} delta="holdings" />
-        </div>
       </div>
 
       {goals !== null && <GoalsSection directives={goals} />}
