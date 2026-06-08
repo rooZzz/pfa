@@ -12,7 +12,7 @@ A local-first, AI-native personal finance app for a single user (UK tax context)
 2. **Cashflow and budgeting** — PAYE, NI, pension contributions, ISA allowances.
 3. **Insight and Q&A** — natural language queries answered from real data.
 
-**The app is a local stdio MCP server.** Claude Desktop is the harness — it provides chat, tool orchestration, and renders interactive UI resources (`ui://`) in sandboxed iframes via the MCP Apps extension. No web server. No public exposure. All data stays on disk.
+**The app is a local MCP server over Streamable HTTP, bound to localhost.** It is built as though it could be served remotely but only runs on `127.0.0.1`. Claude Desktop is the harness: it provides chat, tool orchestration, and renders interactive UI resources (`ui://`) in sandboxed iframes via the MCP Apps extension. Desktop connects through the `mcp-remote` stdio-to-HTTP bridge (it does not reliably accept a raw `url` entry). No public exposure (localhost-only bind). All data stays on disk.
 
 ---
 
@@ -44,7 +44,7 @@ Presentation across these surfaces follows a single design language — "Instrum
 
 | Component | Technology | Why |
 |---|---|---|
-| MCP server | Node.js + `@modelcontextprotocol/sdk` | Matches the ext-apps reference implementation; stdio transport; no extra process |
+| MCP server | Node.js + `@modelcontextprotocol/sdk` | Matches the ext-apps reference implementation; Streamable HTTP transport on localhost; Desktop bridges in via `mcp-remote` |
 | Write store | SQLite via `better-sqlite3` | Local-first, ACID, single file, zero ops. The only sensible choice. |
 | Analytical read | DuckDB via `duckdb` npm + SQLite extension | Reads the `.sqlite` file directly — no ETL, no sync. Columnar execution for window functions and complex joins. |
 | Document parsing | Haiku 4.5 (vision) | Fast, cheap, accurate enough on payslips and statements at ~£0.005–0.01/page. |
@@ -71,7 +71,7 @@ flowchart TD
         end
     end
 
-    subgraph MCP["MCP Server — stdio"]
+    subgraph MCP["MCP Server — Streamable HTTP (localhost)"]
         IT["ingest_document"]
         ME["record_* manual entry tools\nbalance · pension · mortgage · asset · grant · vesting"]
         SC["setup_connector"]
@@ -435,6 +435,7 @@ This table records **design fit** — whether the schema and architecture accomm
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-06-08 | Transport: stdio to Streamable HTTP on localhost; Desktop bridges via `mcp-remote` | Decouples the server from Desktop's lifecycle (restart without relaunching Desktop). Stateless transport, per-request `buildServer()`, `node:http` with a Host/Origin allowlist. UI `ui://` HTML re-read from disk per request so rebuilds need no restart. |
 | 2026-05-26 | Architecture: Claude Desktop + local stdio MCP server + MCP Apps | App is the MCP server. No web server, no OAuth, no public exposure. Data stays on disk. |
 | 2026-05-26 | Ingestion: human review non-negotiable for document uploads | Haiku vision can misparse. Silent writes to canonical store are not acceptable. |
 | 2026-05-26 | Recommendations: observations only | "ISA 60% funded, 47 days left." No buy/sell/overpay advice until trust is established. |
