@@ -35,7 +35,7 @@ export type DataColumn = {
 
 export type DataGroup = {
   key: string;
-  label?: string;
+  label?: ReactNode;
   rows: DataRow[];
   subtotalPence?: number | null;
   truncate?: number;

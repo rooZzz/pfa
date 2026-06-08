@@ -26,6 +26,7 @@ import { categoryGlyph, institutionToGlyph } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { ABSENCE_LABEL, formatGbp, formatGbpk } from "./format.js";
+import type { ClassOutcome, DataClass } from "../freshness.js";
 
 function monthYear(dateStr: string): string {
   const d = new Date(dateStr);
@@ -74,6 +75,38 @@ const staleBadge = (
     stale
   </span>
 );
+
+const outdatedBadge = (
+  <span className="badge warn ml-2">
+    <span className="led" />
+    outdated
+  </span>
+);
+
+function classesForGroupKey(key: string): DataClass[] {
+  if (key === "account") return ["monzo"];
+  if (key === "asset") return ["prices", "ethereum"];
+  return [];
+}
+
+function groupStatusLabel(
+  label: string,
+  key: string,
+  refreshing: Set<DataClass>,
+  failed: Set<DataClass>,
+): ReactNode {
+  const classes = classesForGroupKey(key);
+  const isRefreshing = classes.some((c) => refreshing.has(c));
+  const isFailed = classes.some((c) => failed.has(c));
+  if (!isRefreshing && !isFailed) return label;
+  return (
+    <>
+      {label}
+      {isRefreshing && <span className="spinner ml-2" />}
+      {isFailed && outdatedBadge}
+    </>
+  );
+}
 
 function TickerLead({ ticker }: { ticker: string }) {
   return (
@@ -286,7 +319,11 @@ function buildPropertyGroup(realised: RealisedLine[]): DataGroup | null {
   return { key: "property", label: "Property", rows };
 }
 
-function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
+function buildRealisedGroups(
+  realised: RealisedLine[],
+  refreshing: Set<DataClass>,
+  failed: Set<DataClass>,
+): DataGroup[] {
   const groups: DataGroup[] = FLAT_GROUPS.map((g) => ({
     kind: g.kind,
     label: g.label,
@@ -295,7 +332,7 @@ function buildRealisedGroups(realised: RealisedLine[]): DataGroup[] {
     .filter((g) => g.lines.length > 0)
     .map((g) => ({
       key: g.kind,
-      label: g.label,
+      label: groupStatusLabel(g.label, g.kind, refreshing, failed),
       truncate: 5,
       sortByValue: true,
       rows: g.lines.map((line, i) => ({
@@ -362,6 +399,8 @@ function NetWorthApp() {
   const [goals, setGoals] = useState<Directive[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState<Set<DataClass>>(new Set());
+  const [failed, setFailed] = useState<Set<DataClass>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { app, error } = useApp({
@@ -369,39 +408,94 @@ function NetWorthApp() {
     capabilities: {},
   });
 
-  const load = useCallback(
-    async (isRefresh: boolean) => {
-      if (!app) return;
-      if (isRefresh) setBusy(true);
-      else setLoading(true);
-      setErrorMessage(null);
+  const fetchData = useCallback(async (): Promise<NetWorthData | null> => {
+    if (!app) return null;
+    const today = new Date().toISOString().split("T")[0]!;
+    const [nwSettled, brSettled] = await Promise.allSettled([
+      app.callServerTool({
+        name: "get_net_worth",
+        arguments: { as_of: today, auto_refresh: false },
+      }),
+      app.callServerTool({
+        name: "get_briefing",
+        arguments: { as_of: today, auto_refresh: false },
+      }),
+    ]);
+
+    if (nwSettled.status === "rejected") throw nwSettled.reason;
+    const text = nwSettled.value.content?.find(
+      (c: { type: string }) => c.type === "text",
+    ) as { type: "text"; text: string } | undefined;
+    if (!text) throw new Error("No response from get_net_worth.");
+    const parsed = JSON.parse(text.text) as NetWorthData;
+    setData(parsed);
+    setGoals(parseBriefingDirectives(brSettled));
+    return parsed;
+  }, [app]);
+
+  const runRefresh = useCallback(
+    async (spinnerClasses: DataClass[], requestClasses: DataClass[] | null) => {
+      if (!app || spinnerClasses.length === 0) return;
+      setFailed(new Set());
+      setRefreshing(new Set(spinnerClasses));
       try {
-        const today = new Date().toISOString().split("T")[0]!;
-        const [nwSettled, brSettled] = await Promise.allSettled([
-          app.callServerTool({ name: "get_net_worth", arguments: { as_of: today } }),
-          app.callServerTool({ name: "get_briefing", arguments: { as_of: today } }),
-        ]);
-
-        if (nwSettled.status === "rejected") throw nwSettled.reason;
-        const text = nwSettled.value.content?.find(
-          (c: { type: string }) => c.type === "text",
-        ) as { type: "text"; text: string } | undefined;
-        if (!text) throw new Error("No response from get_net_worth.");
-        setData(JSON.parse(text.text) as NetWorthData);
-
-        setGoals(parseBriefingDirectives(brSettled));
-      } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
+        const result = await app.callServerTool({
+          name: "refresh_stale_data",
+          arguments: requestClasses ? { classes: requestClasses } : {},
+        });
+        const text = result.content?.find((c: { type: string }) => c.type === "text") as
+          | { type: "text"; text: string }
+          | undefined;
+        const outcomes = text ? (JSON.parse(text.text) as ClassOutcome[]) : [];
+        await fetchData();
+        setFailed(
+          new Set(outcomes.filter((o) => o.action === "failed").map((o) => o.class)),
+        );
+      } catch {
+        setFailed(new Set(spinnerClasses));
       } finally {
-        setLoading(false);
-        setBusy(false);
+        setRefreshing(new Set());
       }
     },
-    [app],
+    [app, fetchData],
   );
 
+  const load = useCallback(async () => {
+    if (!app) return;
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const parsed = await fetchData();
+      const stale =
+        parsed?.freshness.filter((f) => f.connected && f.is_stale).map((f) => f.class) ??
+        [];
+      if (stale.length > 0) void runRefresh(stale, stale);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  }, [app, fetchData, runRefresh]);
+
+  const manualRefresh = useCallback(async () => {
+    if (!app) return;
+    setBusy(true);
+    setErrorMessage(null);
+    setFailed(new Set());
+    try {
+      const parsed = await fetchData();
+      const connected =
+        parsed?.freshness.filter((f) => f.connected).map((f) => f.class) ?? [];
+      await runRefresh(connected, null);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setBusy(false);
+    }
+  }, [app, fetchData, runRefresh]);
+
   useEffect(() => {
-    if (app) void load(false);
+    if (app) void load();
   }, [app, load]);
 
   if (error) {
@@ -426,12 +520,7 @@ function NetWorthApp() {
       <div className="screen rise stack">
         <p className="note">{errorMessage}</p>
         <div>
-          <Btn
-            variant="secondary"
-            size="sm"
-            icon="refresh"
-            onClick={() => void load(false)}
-          >
+          <Btn variant="secondary" size="sm" icon="refresh" onClick={() => void load()}>
             Retry
           </Btn>
         </div>
@@ -459,7 +548,7 @@ function NetWorthApp() {
     { label: "Cash", value: cash },
   ];
 
-  const realisedGroups = buildRealisedGroups(data.realised);
+  const realisedGroups = buildRealisedGroups(data.realised, refreshing, failed);
   const vestGroups = buildVestGroups(data.contingent, data.contingent_unscheduled);
   const hasContingent = vestGroups.length > 0;
 
@@ -476,7 +565,7 @@ function NetWorthApp() {
               variant="secondary"
               size="sm"
               icon="refresh"
-              onClick={() => void load(true)}
+              onClick={() => void manualRefresh()}
               disabled={busy}
             >
               {busy ? "Refreshing" : "Refresh"}

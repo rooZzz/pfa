@@ -1,8 +1,6 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { resetDb } from "../db.js";
-import { getCashflow } from "../cashflow/index.js";
-import { getNetWorth } from "../net_worth/index.js";
 import { archiveGoal, archiveGoalSchema } from "./archive_goal.js";
 import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { updateGoal, updateGoalSchema } from "./update_goal.js";
@@ -20,6 +18,9 @@ import { syncEthereum } from "./sync_ethereum.js";
 import { syncPrices } from "./sync_prices.js";
 import { evaluateScenario, evaluateScenarioSchema } from "./evaluate_scenario.js";
 import { getBriefingTool, getBriefingSchema } from "./get_briefing.js";
+import { getCashflowTool, getCashflowSchema } from "./get_cashflow.js";
+import { getNetWorthTool, getNetWorthSchema } from "./get_net_worth.js";
+import { refreshStaleData, refreshStaleDataSchema } from "./refresh_stale_data.js";
 import { ingestDocument } from "./ingest_document.js";
 import { proposeGoal, proposeGoalSchema } from "./propose_goal.js";
 import { queryNaturalLanguage } from "./query_natural_language.js";
@@ -179,24 +180,10 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "get_cashflow",
     description:
-      "Display cashflow figures for a UK tax year: income, transactions by category, net cashflow, monthly trend. Use to show the user their numbers — not as a basis for recommendations. Defaults to today's tax year; supply tax_year (YYYY/YY) to target a specific year.",
+      "Display cashflow figures for a UK tax year: income, transactions by category, net cashflow, monthly trend. Use to show the user their numbers — not as a basis for recommendations. Defaults to today's tax year; supply tax_year (YYYY/YY) to target a specific year. Refreshes a stale bank feed before computing unless auto_refresh is false.",
     annotations: { readOnlyHint: true },
-    inputSchema: {
-      tax_year: z
-        .string()
-        .regex(/^\d{4}\/\d{2}$/, "Expected YYYY/YY e.g. 2025/26")
-        .optional()
-        .describe("UK tax year to query. Defaults to the year covering today."),
-      as_of: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
-        .optional()
-        .describe(
-          "Limit data to this date. Defaults to today (or period end if year is complete).",
-        ),
-    },
-    handler: async ({ tax_year, as_of }) =>
-      text(JSON.stringify(await getCashflow({ tax_year, as_of }))),
+    inputSchema: getCashflowSchema,
+    handler: async (input) => text(await getCashflowTool(input)),
   }),
   defineTool({
     name: "open_cashflow",
@@ -210,19 +197,10 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "get_net_worth",
     description:
-      "Display net worth at a given date: realised assets and liabilities (accounts, pension, property, mortgage) plus contingent unvested equity, each with its observation date. Use to show the user their numbers — not as a basis for recommendations. Also returns a 12-month realised trend.",
+      "Display net worth at a given date: realised assets and liabilities (accounts, pension, property, mortgage) plus contingent unvested equity, each with its observation date. Use to show the user their numbers — not as a basis for recommendations. Also returns a 12-month realised trend. Refreshes stale connector data (bank, prices, on-chain) before computing unless auto_refresh is false.",
     annotations: { readOnlyHint: true },
-    inputSchema: {
-      as_of: z
-        .string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
-        .describe("Date to compute net worth as of. Defaults to today.")
-        .optional(),
-    },
-    handler: async ({ as_of }) => {
-      const date = as_of ?? new Date().toISOString().split("T")[0]!;
-      return text(JSON.stringify(await getNetWorth(date)));
-    },
+    inputSchema: getNetWorthSchema,
+    handler: async (input) => text(await getNetWorthTool(input)),
   }),
   defineTool({
     name: "open_upload",
@@ -386,10 +364,17 @@ export const tools: ToolDescriptor[] = [
   defineTool({
     name: "get_briefing",
     description:
-      "Return the grounded basis for any 'how am I doing / what should I focus on' question: the complete set of observations across all active goals — progress, deadlines, and data gaps. Facts only, never ranked options or advice. Call this before synthesising any financial guidance. Defaults to today.",
+      "Return the grounded basis for any 'how am I doing / what should I focus on' question: the complete set of observations across all active goals — progress, deadlines, and data gaps. Facts only, never ranked options or advice. Call this before synthesising any financial guidance. Refreshes stale connector data (bank, prices, on-chain) before computing unless auto_refresh is false. Defaults to today.",
     inputSchema: getBriefingSchema,
     annotations: { readOnlyHint: true },
     handler: async (input) => text(await getBriefingTool(input)),
+  }),
+  defineTool({
+    name: "refresh_stale_data",
+    description:
+      "Refresh connector data that has aged past its freshness window: Monzo bank feed and Ethereum holdings (daily), automated asset prices (hourly). Fail-soft — a connector being down returns a 'failed' outcome rather than throwing. Returns a structured per-class outcome. The dashboards call this on load; call it directly only to force a freshness check.",
+    inputSchema: refreshStaleDataSchema,
+    handler: async (input) => text(await refreshStaleData(input)),
   }),
   defineTool({
     name: "evaluate_scenario",

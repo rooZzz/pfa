@@ -1,3 +1,4 @@
+import { computeFreshness } from "../freshness_read.js";
 import { runQuery } from "../query.js";
 import { latestPriceTick, latestRangeSnapshot } from "../snapshots.js";
 import { toNum, validateDate } from "../sql_util.js";
@@ -130,6 +131,8 @@ export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
     realised_total_pence: trendTotals[i]!,
   }));
 
+  const freshness = await computeFreshness();
+
   return {
     as_of: asOf,
     realised,
@@ -140,5 +143,6 @@ export async function getNetWorth(asOf: string): Promise<NetWorthResult> {
     unknown,
     trend,
     coverage,
+    freshness,
   };
 }

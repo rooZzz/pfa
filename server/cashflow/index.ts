@@ -1,3 +1,4 @@
+import { computeFreshness } from "../freshness_read.js";
 import { queryPayslipCoverage } from "../net_worth/coverage.js";
 import { runQuery } from "../query.js";
 import { toNum, toStr, validateDate } from "../sql_util.js";
@@ -116,6 +117,8 @@ export async function getCashflow(params: {
   const income_total_pence = transaction_inflow_total_pence;
   const net_cashflow_pence = income_total_pence - spending_total_pence;
 
+  const freshness = await computeFreshness(["monzo"]);
+
   return {
     tax_year,
     period_start,
@@ -131,5 +134,6 @@ export async function getCashflow(params: {
     net_cashflow_pence,
     trend,
     coverage,
+    freshness,
   };
 }

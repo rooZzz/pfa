@@ -2,8 +2,10 @@ import "./styles/index.css";
 import "./theme.js";
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
+import type { ClassOutcome } from "../freshness.js";
 import { Masthead } from "./branding.js";
 import {
   Btn,
@@ -101,10 +103,35 @@ function KV({ k, v, tone }: { k: string; v: string; tone?: "pos" | "neg" }) {
   );
 }
 
+const outdatedBadge = (
+  <span className="badge warn ml-2">
+    <span className="led" />
+    outdated
+  </span>
+);
+
+function MonzoStatus({
+  refreshing,
+  failed,
+}: {
+  refreshing: boolean;
+  failed: boolean;
+}): ReactNode {
+  if (!refreshing && !failed) return null;
+  return (
+    <>
+      {refreshing && <span className="spinner ml-2" />}
+      {failed && outdatedBadge}
+    </>
+  );
+}
+
 function CashflowApp() {
   const [data, setData] = useState<CashflowData | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { app, error } = useApp({
@@ -112,38 +139,81 @@ function CashflowApp() {
     capabilities: {},
   });
 
-  const load = useCallback(
-    async (isRefresh: boolean) => {
-      if (!app) return;
-      if (isRefresh) setBusy(true);
-      else setLoading(true);
-      setErrorMessage(null);
-      try {
-        const result = await app.callServerTool({
-          name: "get_cashflow",
-          arguments: {},
-        });
-        const text = result.content?.find((c: { type: string }) => c.type === "text") as
-          | { type: "text"; text: string }
-          | undefined;
-        if (!text) throw new Error("No response from get_cashflow.");
-        try {
-          setData(JSON.parse(text.text) as CashflowData);
-        } catch {
-          throw new Error(text.text);
-        }
-      } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
-      } finally {
-        setLoading(false);
-        setBusy(false);
-      }
-    },
-    [app],
-  );
+  const fetchData = useCallback(async (): Promise<CashflowData | null> => {
+    if (!app) return null;
+    const result = await app.callServerTool({
+      name: "get_cashflow",
+      arguments: { auto_refresh: false },
+    });
+    const text = result.content?.find((c: { type: string }) => c.type === "text") as
+      | { type: "text"; text: string }
+      | undefined;
+    if (!text) throw new Error("No response from get_cashflow.");
+    let parsed: CashflowData;
+    try {
+      parsed = JSON.parse(text.text) as CashflowData;
+    } catch {
+      throw new Error(text.text);
+    }
+    setData(parsed);
+    return parsed;
+  }, [app]);
+
+  const runRefresh = useCallback(async () => {
+    if (!app) return;
+    setFailed(false);
+    setRefreshing(true);
+    try {
+      const result = await app.callServerTool({
+        name: "refresh_stale_data",
+        arguments: { classes: ["monzo"] },
+      });
+      const text = result.content?.find((c: { type: string }) => c.type === "text") as
+        | { type: "text"; text: string }
+        | undefined;
+      const outcomes = text ? (JSON.parse(text.text) as ClassOutcome[]) : [];
+      await fetchData();
+      setFailed(outcomes.some((o) => o.class === "monzo" && o.action === "failed"));
+    } catch {
+      setFailed(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [app, fetchData]);
+
+  const load = useCallback(async () => {
+    if (!app) return;
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const parsed = await fetchData();
+      const stale = parsed?.freshness.some((f) => f.connected && f.is_stale) ?? false;
+      if (stale) void runRefresh();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setLoading(false);
+    }
+  }, [app, fetchData, runRefresh]);
+
+  const manualRefresh = useCallback(async () => {
+    if (!app) return;
+    setBusy(true);
+    setErrorMessage(null);
+    setFailed(false);
+    try {
+      const parsed = await fetchData();
+      const connected = parsed?.freshness.some((f) => f.connected) ?? false;
+      if (connected) await runRefresh();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to load.");
+    } finally {
+      setBusy(false);
+    }
+  }, [app, fetchData, runRefresh]);
 
   useEffect(() => {
-    if (app) void load(false);
+    if (app) void load();
   }, [app, load]);
 
   if (error) {
@@ -168,12 +238,7 @@ function CashflowApp() {
       <div className="screen rise stack">
         <p className="note">{errorMessage}</p>
         <div>
-          <Btn
-            variant="secondary"
-            size="sm"
-            icon="refresh"
-            onClick={() => void load(false)}
-          >
+          <Btn variant="secondary" size="sm" icon="refresh" onClick={() => void load()}>
             Retry
           </Btn>
         </div>
@@ -227,7 +292,7 @@ function CashflowApp() {
               variant="secondary"
               size="sm"
               icon="refresh"
-              onClick={() => void load(true)}
+              onClick={() => void manualRefresh()}
               disabled={busy}
             >
               {busy ? "Refreshing" : "Refresh"}
@@ -239,6 +304,7 @@ function CashflowApp() {
       <div>
         <div className="figure-hero">
           {(netPos ? "+" : "") + formatGbp(data.net_cashflow_pence, { whole: true })}
+          <MonzoStatus refreshing={refreshing} failed={failed} />
         </div>
         <div className={"stat-delta mt-2 " + (netPos ? "pos" : "neg")}>
           {netPos ? "surplus" : "deficit"} · tax year to date
@@ -311,6 +377,7 @@ function CashflowApp() {
         <div className="card">
           <div className="card-label mb-3">
             Money out by category · {formatGbp(data.spending_total_pence)}
+            <MonzoStatus refreshing={refreshing} failed={failed} />
           </div>
           <DataTable
             variant="bars"
@@ -336,6 +403,7 @@ function CashflowApp() {
         <div className="card">
           <div className="card-label mb-3">
             Money in by source · {formatGbp(data.income_total_pence)}
+            <MonzoStatus refreshing={refreshing} failed={failed} />
           </div>
           <DataTable
             variant="bars"
