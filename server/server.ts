@@ -7,15 +7,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PFA_ICONS } from "./icons.js";
-import { initDb } from "./db.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { resources, tools } from "./tools/registry.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 
-export function createServer(): McpServer {
-  initDb();
-
+export function buildServer(): McpServer {
   const server = new McpServer(
     { name: "pfa", version: "0.1.0", icons: PFA_ICONS },
     { instructions: SERVER_INSTRUCTIONS },
@@ -53,14 +50,9 @@ export function createServer(): McpServer {
     }
   }
 
-  const htmlCache = new Map<string, string>();
   for (const { uri, file } of resources) {
     registerAppResource(server, uri, uri, { mimeType: RESOURCE_MIME_TYPE }, async () => {
-      let html = htmlCache.get(uri);
-      if (html === undefined) {
-        html = await fs.readFile(path.join(DIST_DIR, file), "utf-8");
-        htmlCache.set(uri, html);
-      }
+      const html = await fs.readFile(path.join(DIST_DIR, file), "utf-8");
       return {
         contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: html }],
       };
