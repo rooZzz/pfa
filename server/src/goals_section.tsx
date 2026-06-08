@@ -1,5 +1,4 @@
 import { Badge, EmptyState, Icon, Meter } from "./components.js";
-import { DataTable } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
 
 export type DirectiveKind = "progress" | "deadline" | "data_gap" | "contention";
@@ -123,20 +122,30 @@ function HouseDepositMeter({ progress }: { progress: Directive }) {
   );
 }
 
-function ProjectionMeter({ progress }: { progress: Directive }) {
+function ProjectionMeter({
+  progress,
+  contributionPence,
+}: {
+  progress: Directive;
+  contributionPence: number | null;
+}) {
   const projected = Number(progress.data.projected_pot_pence);
   const needed = Number(progress.data.pot_needed_pence);
   const percent = Number(progress.data.percent);
   const targetAge = Number(progress.data.target_age);
   const pct = Math.min(100, percent);
   const name = progress.goal_type === "fire" ? "FIRE number" : "Retirement pot";
+  const subParts = [`projected by age ${targetAge}`, `${percent}% funded`];
+  if (contributionPence != null && contributionPence > 0) {
+    subParts.push(`${formatGbpk(contributionPence)}/yr pension`);
+  }
   return (
     <Meter
       name={name}
       value={`${formatGbpk(projected)} / ${formatGbpk(needed)}`}
       pct={pct}
       tone={pct >= 100 ? "pos" : undefined}
-      sub={`projected by age ${targetAge} · ${percent}% funded`}
+      sub={subParts.join(" · ")}
     />
   );
 }
@@ -172,38 +181,20 @@ function BridgeFundMeter({ progress }: { progress: Directive }) {
   );
 }
 
-function ContributionBlock({ progress }: { progress: Directive }) {
-  const annual = Number(progress.data.annual_contribution_pence);
-  const employee = Number(progress.data.employee_annual_pence);
-  const employer = Number(progress.data.employer_annual_pence);
-  return (
-    <div className="stack-2">
-      <span className="card-label">Pension contributions</span>
-      <DataTable
-        inset={false}
-        groups={[
-          {
-            key: "contributions",
-            rows: [
-              { key: "employee", label: "Employee", valuePence: employee },
-              { key: "employer", label: "Employer", valuePence: employer },
-            ],
-          },
-        ]}
-        footer={{ label: "Annual / yr", valuePence: annual }}
-      />
-    </div>
-  );
-}
-
-function ProgressBlock({ directive }: { directive: Directive }) {
+function ProgressBlock({
+  directive,
+  contributionPence,
+}: {
+  directive: Directive;
+  contributionPence: number | null;
+}) {
   const sub = directive.sub_goal;
   if (sub === "cover_progress") return <EmergencyFundMeter progress={directive} />;
   if (sub === "allowance_progress") return <IsaMeter progress={directive} />;
   if (sub === "deposit_progress") return <HouseDepositMeter progress={directive} />;
-  if (sub === "pot_progress") return <ProjectionMeter progress={directive} />;
+  if (sub === "pot_progress")
+    return <ProjectionMeter progress={directive} contributionPence={contributionPence} />;
   if (sub === "bridge_fund") return <BridgeFundMeter progress={directive} />;
-  if (sub === "contribution_gap") return <ContributionBlock progress={directive} />;
   return <p className="note">{directive.message}</p>;
 }
 
@@ -245,25 +236,26 @@ function DeadlineRow({ directive }: { directive: Directive }) {
   );
 }
 
-const PROGRESS_LAST = new Set(["contribution_gap"]);
-
 function GoalCard({ view }: { view: GoalView }) {
   const label = goalLabel(view.goal_type, view.progress[0] ?? null);
-  const progress = [...view.progress].sort(
-    (a, b) =>
-      (PROGRESS_LAST.has(a.sub_goal) ? 1 : 0) - (PROGRESS_LAST.has(b.sub_goal) ? 1 : 0),
-  );
+  const contribution = view.progress.find((d) => d.sub_goal === "contribution_gap");
+  const contributionPence = contribution
+    ? Number(contribution.data.annual_contribution_pence)
+    : null;
+  const progress = view.progress.filter((d) => d.sub_goal !== "contribution_gap");
 
   return (
     <div className="card stack-3">
       {progress.map((d, i) => (
-        <ProgressBlock key={`p${i}`} directive={d} />
+        <ProgressBlock
+          key={`p${i}`}
+          directive={d}
+          contributionPence={contributionPence}
+        />
       ))}
       {view.data_gaps.map((d, i) => (
         <div key={`g${i}`} className="stack-3">
-          {view.progress.length === 0 && i === 0 && (
-            <span className="eyebrow">{label}</span>
-          )}
+          {progress.length === 0 && i === 0 && <span className="eyebrow">{label}</span>}
           <div>
             <Badge tone="warn" led>
               Data gap
