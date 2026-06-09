@@ -500,11 +500,14 @@ the permanent fix that retired an earlier `--host-header` proof stopgap.
 
 ### Deferred
 
-Rate-limiting the auth endpoints; an auth audit log; Instrument styling of the auth pages; a
-dedicated broad integration suite; CORS/security headers and HSTS; signing-key rotation via the
-JWKS `kid`; validating the claude.ai hosted web connector (the flow is validated via MCP Inspector,
-the Claude Code CLI, and Claude Desktop over `mcp-remote`). Unattended cold-boot recovery is limited
-by FileVault — one manual unlock, which a UPS bridges for brief outages.
+Rate-limiting the auth endpoints; an auth audit log; a favicon on the served pages so connector use
+shows the PFA mark rather than ngrok's icon; Instrument styling of the login experience (the offline
+bootstrap page excepted — not worth the effort); making the `ui://pfa/*` surfaces mobile-friendly
+(they render legibly in the Claude mobile app but content is crushed and wrapped); a dedicated broad
+integration suite; CORS/security headers and HSTS; signing-key rotation via the JWKS `kid`;
+validating the claude.ai hosted web connector (the flow is validated via MCP Inspector, the Claude
+Code CLI, and Claude Desktop over `mcp-remote`). Unattended cold-boot recovery is limited by
+FileVault — one manual unlock, which a UPS bridges for brief outages.
 
 ---
 
