@@ -221,7 +221,13 @@ loopback-only and unauthenticated for the co-located Desktop). Bring-up on the m
    ```
    sudo ops/mac-mini/provision.sh auth
    ```
-3. Enrol a passkey, then open the printed single-use link **on your laptop at the public
+3. Enable the tunnel — writes `ngrok.yml` (authtoken + `domain: pfa.ngrok.app` + `addr: 4001`)
+   and loads the daemon. Your ngrok authtoken is the only secret you supply. Do this before
+   enrolling, since the enrol link is served through the tunnel:
+   ```
+   sudo PFA_NGROK_AUTHTOKEN=<your-ngrok-authtoken> ops/mac-mini/provision.sh ngrok
+   ```
+4. Enrol a passkey, then open the printed single-use link **on your laptop at the public
    domain** (so the credential binds to the RP ID `pfa.ngrok.app`):
    ```
    sudo ops/mac-mini/provision.sh enroll
@@ -229,11 +235,6 @@ loopback-only and unauthenticated for the co-located Desktop). Bring-up on the m
    This runs under node@22 (matching the native modules the server was built against — a bare
    `bash -l` would pick up Homebrew's node 23 and fail with an ABI mismatch). Enrol several
    passkeys (laptop, phone, hardware key) for redundancy — re-run for each.
-4. Enable the tunnel — writes `ngrok.yml` (authtoken + `domain: pfa.ngrok.app` + `addr: 4001`)
-   and loads the daemon. Your ngrok authtoken is the only secret you supply:
-   ```
-   sudo PFA_NGROK_AUTHTOKEN=<your-ngrok-authtoken> ops/mac-mini/provision.sh ngrok
-   ```
 5. Validate the full flow with MCP Inspector or the Claude Code CLI against
    `https://pfa.ngrok.app/mcp` before Claude Desktop.
 
