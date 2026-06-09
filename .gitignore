@@ -11,4 +11,3 @@ dist/
 bun.lockb
 yarn.lock
 server/tests/live/fixtures/
-ngrok-policy.yml
