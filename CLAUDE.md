@@ -50,6 +50,14 @@ This project uses four skills:
 - Be explicit about currency. Don't assume.
 - Dates and times: always explicit about timezone. UTC for storage.
 
+### Schema change and rollout
+The server is now deployed to a live environment with real data on disk. The dev-only conveniences
+of patching the database directly and making backwards-breaking changes are gone.
+- Schema changes ship as forward-only, additive migrations (`server/migrations/`) that run on
+  startup. Never edit an applied migration, never hand-edit the on-disk store, never a breaking
+  change to existing data.
+- Data is corrected through the `superseded_by`/tombstone path, never an in-place UPDATE/DELETE.
+
 ### Design
 The `ui://pfa/*` surfaces follow one design language — "Instrument" — captured in [docs/design-language.md](docs/design-language.md). Build new UI from the shared system, not bespoke styles.
 - The token system (`server/src/styles/`) is the single source: oklch colors, type scale, spacing, radii, motion. No hardcoded hex, no inline style objects for anything a token or class covers.
