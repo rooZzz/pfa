@@ -211,10 +211,12 @@ an HTML interstitial that breaks the MCP client).
 First-pass OAuth 2.1 + passkey auth gates the public path on port 4001 (the open 4000 stays
 loopback-only and unauthenticated for the co-located Desktop). Bring-up on the mini:
 
-1. Add the auth keys to `/Users/_pfa/pfa/server/.env` (see `server/.env.example`): `PUBLIC_ORIGIN`,
-   `RP_ID`, `RP_NAME`, `MCP_RESOURCE`, `AUTHORIZED_SUBJECT`, `AUTH_PORT`, the TTLs, and
-   `SIGNING_KEY_PATH`. For this host: `PUBLIC_ORIGIN=https://pfa.ngrok.app`, `RP_ID=pfa.ngrok.app`,
-   `MCP_RESOURCE=https://pfa.ngrok.app/mcp`, `SIGNING_KEY_PATH=/Users/_pfa/.pfa/oauth-ed25519.pem`.
+1. Write the auth keys into `/Users/_pfa/pfa/server/.env` (idempotent; appends, never clobbers
+   the existing API keys). Defaults to `PUBLIC_ORIGIN=https://pfa.ngrok.app` and
+   `AUTHORIZED_SUBJECT=matty`; override with `PFA_PUBLIC_ORIGIN` / `PFA_AUTHORIZED_SUBJECT`.
+   ```
+   sudo ops/mac-mini/provision.sh auth-env
+   ```
 2. Generate the signing key and restart the server (also starts the 4001 listener):
    ```
    sudo ops/mac-mini/provision.sh auth
@@ -225,7 +227,11 @@ loopback-only and unauthenticated for the co-located Desktop). Bring-up on the m
    sudo -H -u _pfa bash -lc "cd /Users/_pfa/pfa/server && /opt/homebrew/opt/node@22/bin/npm run enroll-passkey"
    ```
    Enrol several passkeys (laptop, phone, hardware key) for redundancy — re-run for each.
-4. Repoint ngrok at the authenticated port (see ngrok section below): `addr: 4001`.
+4. Enable the tunnel — writes `ngrok.yml` (authtoken + `domain: pfa.ngrok.app` + `addr: 4001`)
+   and loads the daemon. Your ngrok authtoken is the only secret you supply:
+   ```
+   sudo PFA_NGROK_AUTHTOKEN=<your-ngrok-authtoken> ops/mac-mini/provision.sh ngrok
+   ```
 5. Validate the full flow with MCP Inspector or the Claude Code CLI against
    `https://pfa.ngrok.app/mcp` before Claude Desktop.
 
@@ -236,17 +242,19 @@ Laptop connector (replaces the temporary Basic-Auth one): point Claude Desktop a
 `npx -y mcp-remote https://pfa.ngrok.app/mcp` with **no headers** — `mcp-remote` runs discovery,
 registration, the passkey browser flow, and token exchange itself.
 
-## ngrok (enable with app Phase 1)
+## ngrok (the tunnel is config, not a manual repoint)
+
+The tunnel is entirely described by `/Users/_pfa/Library/Application Support/ngrok/ngrok.yml`
+(authtoken, `domain`, `addr`). The `ngrok` subcommand writes that file and loads the daemon —
+the only thing you supply is your ngrok authtoken:
 
 ```
-sudo -H -u _pfa /opt/homebrew/bin/ngrok config add-authtoken <TOKEN>
+sudo PFA_NGROK_AUTHTOKEN=<your-ngrok-authtoken> ops/mac-mini/provision.sh ngrok
 ```
-The `-H` matters: without it the authtoken is written to the wrong home. Edit
-`/Users/_pfa/Library/Application Support/ngrok/ngrok.yml`, set the tunnel's `domain` to the
-reserved domain, confirm `addr` is the authenticated port. Then load the tunnel:
-```
-sudo launchctl bootstrap system /Library/LaunchDaemons/com.pfa.ngrok.plist
-```
+
+Override the domain with `PFA_NGROK_DOMAIN` (default `pfa.ngrok.app`). The daemon reads the
+config only at launch, so the subcommand reloads it. To change the tunnel later, re-run the
+subcommand (it rewrites `ngrok.yml` and restarts the daemon).
 Do not point the tunnel at the open port 4000; it is unauthenticated until Phase 1 gates 4001.
 
 ## Deploys

@@ -323,22 +323,82 @@ cmd_import() {
   say "Done. The mini is now the sole writer; stop the server on the source machine."
 }
 
+cmd_auth_env() {
+  need_root
+  local env_file="${APP_DIR}/server/.env"
+  [ -f "$env_file" ] || {
+    echo "no ${env_file}; run bootstrap first" >&2
+    exit 1
+  }
+  local origin="${PFA_PUBLIC_ORIGIN:-https://pfa.ngrok.app}"
+  local rp_id; rp_id="$(printf '%s' "$origin" | sed -E 's#^https?://##; s#/.*$##')"
+  local subject="${PFA_AUTHORIZED_SUBJECT:-matty}"
+  if grep -q '^PUBLIC_ORIGIN=' "$env_file"; then
+    say "Auth keys already present in ${env_file}; leaving them unchanged"
+    return 0
+  fi
+  say "Appending auth keys to ${env_file} (origin ${origin}, subject ${subject})"
+  cat >> "$env_file" <<EOF
+
+PUBLIC_ORIGIN=${origin}
+RP_ID=${rp_id}
+RP_NAME=pfa
+MCP_RESOURCE=${origin}/mcp
+AUTHORIZED_SUBJECT=${subject}
+AUTH_PORT=${AUTH_PORT}
+ACCESS_TOKEN_TTL=1800
+REFRESH_TOKEN_TTL=5184000
+SIGNING_KEY_PATH=${DATA_DIR}/oauth-ed25519.pem
+EOF
+  chown "$SERVICE_USER":staff "$env_file"
+  chmod 600 "$env_file"
+  say "Done. Run 'auth' next to generate the signing key and restart."
+}
+
 cmd_auth() {
   need_root
   [ -f "${APP_DIR}/server/.env" ] || {
-    echo "no ${APP_DIR}/server/.env; add the auth keys (PUBLIC_ORIGIN, RP_ID, MCP_RESOURCE, AUTHORIZED_SUBJECT, SIGNING_KEY_PATH) first" >&2
+    echo "no ${APP_DIR}/server/.env; run 'auth-env' first" >&2
+    exit 1
+  }
+  grep -q '^PUBLIC_ORIGIN=' "${APP_DIR}/server/.env" || {
+    echo "no PUBLIC_ORIGIN in .env; run 'auth-env' first" >&2
     exit 1
   }
   say "Generating the OAuth signing key (as ${SERVICE_USER}; skipped if it exists)"
   as_service env PATH="$RUNTIME_PATH" bash -c "cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run gen-signing-key"
-  say "Restarting the server to load the auth config and the 4001 listener"
+  say "Restarting the server to load the auth config and the ${AUTH_PORT} listener"
   load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
-  say "Next steps (not automated):"
-  echo "  1. Enrol a passkey, then open the printed link on your laptop at the public domain:"
+  say "Next: enrol a passkey, then open the printed link on your laptop at the public domain:"
   echo "     sudo -H -u ${SERVICE_USER} bash -lc \"cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run enroll-passkey\""
-  echo "  2. Repoint ngrok at ${AUTH_PORT}: set addr/domain in ${NGROK_DIR}/ngrok.yml,"
-  echo "     add the authtoken (sudo -H -u ${SERVICE_USER} ngrok config add-authtoken <token>),"
-  echo "     then: sudo launchctl bootstrap system ${DAEMON_DIR}/com.pfa.ngrok.plist"
+  echo "  then enable the tunnel: sudo PFA_NGROK_AUTHTOKEN=<token> $0 ngrok"
+}
+
+cmd_ngrok() {
+  need_root
+  local token="${PFA_NGROK_AUTHTOKEN:-${2:-}}"
+  local domain="${PFA_NGROK_DOMAIN:-pfa.ngrok.app}"
+  [ -n "$token" ] || {
+    echo "provide your ngrok authtoken: sudo PFA_NGROK_AUTHTOKEN=<token> $0 ngrok" >&2
+    exit 1
+  }
+  say "Writing ngrok config (${domain} -> 127.0.0.1:${AUTH_PORT})"
+  cat > "${NGROK_DIR}/ngrok.yml" <<EOF
+version: "2"
+authtoken: ${token}
+log: ${LOG_DIR}/ngrok.log
+log_level: info
+tunnels:
+  pfa:
+    proto: http
+    addr: ${AUTH_PORT}
+    domain: ${domain}
+EOF
+  chown "$SERVICE_USER":staff "${NGROK_DIR}/ngrok.yml"
+  chmod 600 "${NGROK_DIR}/ngrok.yml"
+  say "Loading the ngrok daemon"
+  load_daemon com.pfa.ngrok "${DAEMON_DIR}/com.pfa.ngrok.plist"
+  say "Done. Public URL: https://${domain} (tunnels to the authenticated port ${AUTH_PORT})."
 }
 
 CMD="${1:-}"
@@ -350,9 +410,11 @@ case "$CMD" in
   power) cmd_power ;;
   agents) cmd_agents ;;
   runner) cmd_runner ;;
+  auth-env) cmd_auth_env ;;
   auth) cmd_auth ;;
+  ngrok) cmd_ngrok ;;
   verify) cmd_verify ;;
   import) cmd_import ;;
   all) need_root; cmd_ssh; cmd_user; cmd_toolchain; cmd_bootstrap; cmd_power; cmd_agents; cmd_runner; cmd_verify ;;
-  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|auth|verify|import|all}" >&2; exit 2 ;;
+  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|auth-env|auth|ngrok|verify|import|all}" >&2; exit 2 ;;
 esac
