@@ -122,18 +122,30 @@ Run from a Terminal logged in as `matty`. Each privileged step needs your passwo
 
 ## Data migration (separate, from the other machine)
 
-The real database lives on another machine. Once SSH is up (step 1), with both servers
-stopped so the SQLite file is quiescent:
+The real database lives on another machine. No source downtime is needed: take a consistent
+SQLite snapshot with the online backup API (safe while the source server runs), stage it on the
+mini, then import with one command.
+
+On the source machine (stages a clean snapshot and the documents into the mini's `/tmp`):
 
 ```
-ssh matty@mac-mini.local sudo launchctl bootout system/com.pfa.server
-rsync -avz ~/.pfa/ matty@mac-mini.local:/tmp/pfa-import/
-ssh matty@mac-mini.local 'sudo rsync -a /tmp/pfa-import/ /Users/_pfa/.pfa/ && sudo chown -R _pfa:staff /Users/_pfa/.pfa'
-ssh matty@mac-mini.local sudo launchctl bootstrap system /Library/LaunchDaemons/com.pfa.server.plist
+sqlite3 ~/.pfa/data.sqlite ".backup '/tmp/pfa-data-snap.sqlite'"
+rsync -avz /tmp/pfa-data-snap.sqlite matty@mac-mini.local:/tmp/pfa-data.sqlite
+rsync -avz ~/.pfa/documents/ matty@mac-mini.local:/tmp/pfa-documents/
 ```
 
-Then on the mini confirm `PRAGMA integrity_check` is clean and a `get_net_worth` read matches
-the source. After cutover the mini is the sole writer; never run two writers against copies.
+On the mini (stops the server, backs up the current store, swaps in the import, restarts, and
+verifies):
+
+```
+sudo ops/mac-mini/provision.sh import
+```
+
+`import` reads the staged files at `/tmp/pfa-data.sqlite` and `/tmp/pfa-documents/` (override
+with `PFA_IMPORT_DB` / `PFA_IMPORT_DOCS`), backs up the current store to `~_pfa/backups/`, prints
+`integrity_check` and row counts, restarts the server (migrations run at startup), and removes the
+staged files. Confirm the counts and a `get_net_worth` read match the source. After cutover the
+mini is the sole writer; never run two writers against copies.
 
 ## ngrok (enable with app Phase 1)
 

@@ -261,6 +261,41 @@ cmd_verify() {
   say "Runner"; [ -f "${RUNNER_DIR}/.runner" ] && echo "registered" || echo "not registered"
 }
 
+cmd_import() {
+  need_root
+  local db="${PFA_IMPORT_DB:-/tmp/pfa-data.sqlite}"
+  local docs="${PFA_IMPORT_DOCS:-/tmp/pfa-documents}"
+  [ -f "$db" ] || { echo "staged database not found at ${db}; stage it from the source machine first (see runbook Data migration)" >&2; exit 1; }
+  if [ -f "${DATA_DIR}/data.sqlite" ]; then
+    local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+    install -d -o "$SERVICE_USER" -g staff -m 755 "$BACKUP_DIR"
+    say "Backing up current store to ${BACKUP_DIR}/preimport-${stamp}.sqlite"
+    /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/preimport-${stamp}.sqlite'"
+  fi
+  say "Stopping server"
+  "$LAUNCHCTL" bootout system/com.pfa.server 2>/dev/null || true
+  say "Installing imported database"
+  install -o "$SERVICE_USER" -g staff -m 644 "$db" "${DATA_DIR}/data.sqlite"
+  install -d -o "$SERVICE_USER" -g staff -m 755 "${DATA_DIR}/documents"
+  if [ -d "$docs" ]; then
+    say "Importing documents"
+    rsync -a "${docs}/" "${DATA_DIR}/documents/"
+  else
+    echo "WARNING: staged documents dir ${docs} not found; importing database only" >&2
+  fi
+  chown -R "$SERVICE_USER":staff "$DATA_DIR"
+  say "Integrity check (store quiescent, before start)"
+  /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" 'PRAGMA integrity_check;'
+  say "Row counts (compare with the source)"
+  /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" "select 'accounts='||count(*) from accounts; select 'transactions='||count(*) from transactions; select 'documents='||count(*) from documents;"
+  say "Starting server (migrations run at startup)"
+  "$LAUNCHCTL" bootstrap system "${DAEMON_DIR}/com.pfa.server.plist" || \
+    "$LAUNCHCTL" kickstart -k system/com.pfa.server
+  say "Cleaning up staged files"
+  rm -f "$db"; rm -rf "$docs"
+  say "Done. The mini is now the sole writer; stop the server on the source machine."
+}
+
 CMD="${1:-}"
 case "$CMD" in
   ssh) cmd_ssh ;;
@@ -271,6 +306,7 @@ case "$CMD" in
   agents) cmd_agents ;;
   runner) cmd_runner ;;
   verify) cmd_verify ;;
+  import) cmd_import ;;
   all) need_root; cmd_ssh; cmd_user; cmd_toolchain; cmd_bootstrap; cmd_power; cmd_agents; cmd_runner; cmd_verify ;;
-  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|verify|all}" >&2; exit 2 ;;
+  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|verify|import|all}" >&2; exit 2 ;;
 esac

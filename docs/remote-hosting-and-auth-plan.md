@@ -54,21 +54,21 @@ These bind several phases and are cheap to get wrong if deferred.
 - Public domain and Relying Party ID. The WebAuthn RP ID must equal the final public domain, and a passkey enrolled against one RP ID does not work on another. Choose the reserved ngrok domain (or a custom domain fronted by ngrok) before any passkey enrollment in Phase 3. Local enrollment on `localhost` would mint a credential unusable on the public domain.
 - Single-user identity claim. Pick the constant `sub` value the server treats as the one authorized principal. Stored in config, asserted at the Resource Server.
 - Token lifetimes. Short access token (suggest 10 to 60 minutes), longer rotating refresh token (suggest 30 to 90 days). Confirm before the token endpoint lands.
-- Signing key location. Ed25519 keypair, private key in macOS Keychain or a `0600` file outside the repo, never in the database or git. Public key published via JWKS with a stable `kid`.
+- Signing key location. Ed25519 keypair, private key in a `0600` file outside the repo (not the login Keychain: a system LaunchDaemon has no Keychain session), never in the database or git. Public key published via JWKS with a stable `kid`.
 - Resource indicator. The MCP endpoint URL, enforced so tokens carry a matching `aud`.
-- Secrets boundary. All runtime secrets stay on the mini, provisioned once: the OAuth signing key generated into Keychain, the third-party API keys in `.env`. They are never stored in GitHub or injected through the CI/CD path, because the deploy does not need them and the signing key must not leave the box.
-- App restart privilege. The app runs as a LaunchAgent under the deploy runner's user (or via one narrow sudoers entry) so deploys restart it without elevation.
+- Secrets boundary. All runtime secrets stay on the mini, provisioned once: the OAuth signing key generated into a `0600` key file, the third-party API keys in `.env`. They are never stored in GitHub or injected through the CI/CD path, because the deploy does not need them and the signing key must not leave the box.
+- App restart privilege. The app runs as a system LaunchDaemon (FileVault disables auto-login, so per-user LaunchAgents are not viable), and the deploy restarts it through one narrow sudoers entry scoped to `launchctl kickstart -k system/com.pfa.server`.
 
 ## Environment and config additions
 
-Read from `server/.env` (or Keychain for secrets), validated at startup, fail loud:
+Read from `server/.env` (and the `0600` signing-key file), validated at startup, fail loud:
 
 - `PUBLIC_ORIGIN` (for example `https://pfa.example.com`), also the OAuth issuer.
 - `RP_ID` and `RP_NAME` for WebAuthn.
 - `MCP_RESOURCE` (the `/mcp` URL), used as the audience and resource indicator.
 - `AUTHORIZED_SUBJECT`, the single-user identity.
 - Access and refresh token TTLs.
-- Signing key reference (Keychain item name or key file path).
+- Signing key reference (path to the `0600` key file).
 
 ngrok configuration (authtoken, reserved domain, traffic policy) lives in the ngrok config file, not the app.
 
@@ -79,10 +79,10 @@ Move the existing rich, real data from the current machine to the Mac mini, so e
 Scope:
 - Move the full `PFA_DIR` (default `~/.pfa`): the `data.sqlite` file and the `documents/` directory (ingested PDFs and screenshots the database references for audit). Copy `server/.env` (Anthropic and Etherscan keys) separately. Monzo OAuth tokens travel inside the database (`connector_state`) and need no special handling.
 - Consistency: stop the source server before copying so the single-writer SQLite file is quiescent and the copy is consistent. If WAL is enabled, checkpoint first or copy the `-wal` and `-shm` files alongside. The SQLite online backup (`.backup`) is the live-snapshot alternative if stopping is undesirable; for a one-time move, stopping is simplest and bulletproof.
-- Transport: rsync over SSH on the LAN, preferred for the `documents/` tree (resumable, preserves the structure). Enable Remote Login on the mini, use key-based auth, address it as `mini.local`. AirDrop or a USB drive are equivalent Mac-to-Mac options that need no SSH.
+- Transport: rsync over SSH on the LAN, preferred for the `documents/` tree (resumable, preserves the structure). Enable Remote Login on the mini, use key-based auth, address it as `mac-mini.local`. AirDrop or a USB drive are equivalent Mac-to-Mac options that need no SSH.
 - On arrival: set `PFA_DIR` on the mini, start the app on the open local port, and let the schema migrations bring the file current (idempotent via the migration-tracking table). Verify with `PRAGMA integrity_check`, and compare a few row counts and a `get_net_worth` read against the source.
 - Single-writer invariant: after cutover the mini is the sole writer. Stop running the server on the old machine and keep it as a cold backup only. Never run two writers against copies of the store.
-- Provision secrets once on the mini at this point: the signing key is generated locally into Keychain (Phase 1), and the `.env` API keys are placed once. Secrets never enter the CI/CD path (see Phase 7).
+- Provision secrets once on the mini at this point: the signing key is generated locally into a `0600` file (Phase 1), and the `.env` API keys are placed once. Secrets never enter the CI/CD path (see Phase 7).
 
 Validation: `PRAGMA integrity_check` passes; spot-checked figures match the source; the app serves reads on the mini.
 
@@ -217,8 +217,8 @@ Scope:
 - A self-hosted GitHub Actions runner on the mini, registered to the private repo, configured ephemeral (just-in-time: at most one job, then auto-deregistered). It runs as a dedicated low-privilege macOS user and holds only an outbound connection to GitHub, opening no inbound port.
 - A deploy workflow triggered on `release: published`, plus `workflow_dispatch` for manual reruns. No `pull_request` trigger feeds the runner. Correctness CI (`npm run verify`) stays on GitHub-hosted runners per PR, unchanged.
 - Deploy job on the mini, against the released tag: back up the SQLite store and `documents/` (the Phase 6 backup primitive), checkout the tag, `npm ci` (rebuilds the native modules for arm64), `npm run build:ui`, run schema migrations, restart the app service, health-check `/health`. On any failure, roll back to the previous tag and restore the backup, then surface the failure.
-- App restart boundary: run the app as a LaunchAgent under the runner's user so the deploy can restart it without elevation. The alternative is a single narrow sudoers entry for the exact `launchctl kickstart` command.
-- Secrets are not injected by the pipeline and the deploy needs none of them: build, migrate, and restart never read the signing key or API keys, which the running daemon reads at runtime from Keychain and `.env` (provisioned once in Phase 0). The runner authenticates to GitHub with its own just-in-time registration token, not a stored long-lived secret.
+- App restart boundary: the app runs as a system LaunchDaemon and the deploy restarts it through a single narrow sudoers entry for the exact `launchctl kickstart -k system/com.pfa.server` command (FileVault rules out a per-user LaunchAgent).
+- Secrets are not injected by the pipeline and the deploy needs none of them: build, migrate, and restart never read the signing key or API keys, which the running daemon reads at runtime from the `0600` key file and `.env` (provisioned once in Phase 0). The runner authenticates to GitHub with its own just-in-time registration token, not a stored long-lived secret.
 - Observability: the runner streams job logs to the GitHub Actions UI (the native observability that motivates choosing a runner over polling), and deploy failures also fire the Phase 6 alert channel, so each release has a visible deploy record and history.
 - Hardening: ephemeral runner, dedicated user, restricted triggers, keep the runner host patched (it auto-updates), and persist no secrets on the runner. Runner groups are an org-level feature and do not apply to a personal repo.
 
@@ -233,7 +233,7 @@ These are not a single phase. Fold each into the phase noted, and treat this as 
 - Brute-force and abuse protection (Phase 2 and 3): rate-limit the authorize, token, and WebAuthn endpoints. Even single-user, the endpoints are public.
 - Auth audit log (Phase 1 to 3): record auth events (login success and failure, token issuance, refresh, revocation, registration) to an append-only log or table for after-the-fact review. Do not log tokens or secrets.
 - CORS and security headers (Phase 3): the browser-facing auth pages need correct CORS and standard headers (HSTS, frame-ancestors, no-store on auth responses). The JSON-RPC `/mcp` path does not need CORS for non-browser clients.
-- Secret and key hygiene (Phase 1): signing key in Keychain or a `0600` file outside git; rotateable via the JWKS `kid`. WorkOS-style third-party secrets are not used in this design. Secrets stay on the mini and never enter GitHub or the CI/CD path (Phase 7); the deploy does not need them.
+- Secret and key hygiene (Phase 1): signing key in a `0600` file outside git (not the login Keychain, which a system LaunchDaemon cannot reach); rotateable via the JWKS `kid`. WorkOS-style third-party secrets are not used in this design. Secrets stay on the mini and never enter GitHub or the CI/CD path (Phase 7); the deploy does not need them.
 - Backups (Phase 6): the data is now both more valuable and reachable. Keep Time Machine plus a periodic SQLite backup (the `.backup` command or a copy while the writer is quiesced) to a second location. Confirm a restore.
 - Claude connector reliability is an external dependency (Phase 5): the claude.ai and Claude Desktop OAuth connector flow has shown breakage in 2026 independent of the server and authorization server. Mitigations: validate with MCP Inspector and Claude Code CLI first, keep the reserved domain stable, allow the broker IP range, and keep the Phase 1 static-token path documented as the break-glass fallback (`mcp-remote --header`).
 - Tool-list changes still need a Claude restart: unrelated to auth, but note that adding or renaming tools requires the client to re-read the tool list. UI resource changes are served fresh from disk on each open.
