@@ -221,12 +221,14 @@ loopback-only and unauthenticated for the co-located Desktop). Bring-up on the m
    ```
    sudo ops/mac-mini/provision.sh auth
    ```
-3. Enrol a passkey. Run the printed command, then open its single-use link **on your laptop at
-   the public domain** (so the credential binds to the RP ID `pfa.ngrok.app`):
+3. Enrol a passkey, then open the printed single-use link **on your laptop at the public
+   domain** (so the credential binds to the RP ID `pfa.ngrok.app`):
    ```
-   sudo -H -u _pfa bash -lc "cd /Users/_pfa/pfa/server && /opt/homebrew/opt/node@22/bin/npm run enroll-passkey"
+   sudo ops/mac-mini/provision.sh enroll
    ```
-   Enrol several passkeys (laptop, phone, hardware key) for redundancy — re-run for each.
+   This runs under node@22 (matching the native modules the server was built against — a bare
+   `bash -l` would pick up Homebrew's node 23 and fail with an ABI mismatch). Enrol several
+   passkeys (laptop, phone, hardware key) for redundancy — re-run for each.
 4. Enable the tunnel — writes `ngrok.yml` (authtoken + `domain: pfa.ngrok.app` + `addr: 4001`)
    and loads the daemon. Your ngrok authtoken is the only secret you supply:
    ```

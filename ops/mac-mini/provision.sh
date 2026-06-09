@@ -374,6 +374,12 @@ cmd_auth() {
   echo "  then enable the tunnel: sudo PFA_NGROK_AUTHTOKEN=<token> $0 ngrok"
 }
 
+cmd_enroll() {
+  need_root
+  say "Minting a passkey enrolment link (open it on your laptop at the public domain)"
+  as_service env PATH="$RUNTIME_PATH" bash -c "cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run enroll-passkey"
+}
+
 cmd_ngrok() {
   need_root
   local token="${PFA_NGROK_AUTHTOKEN:-${2:-}}"
@@ -412,9 +418,10 @@ case "$CMD" in
   runner) cmd_runner ;;
   auth-env) cmd_auth_env ;;
   auth) cmd_auth ;;
+  enroll) cmd_enroll ;;
   ngrok) cmd_ngrok ;;
   verify) cmd_verify ;;
   import) cmd_import ;;
   all) need_root; cmd_ssh; cmd_user; cmd_toolchain; cmd_bootstrap; cmd_power; cmd_agents; cmd_runner; cmd_verify ;;
-  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|auth-env|auth|ngrok|verify|import|all}" >&2; exit 2 ;;
+  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|auth-env|auth|enroll|ngrok|verify|import|all}" >&2; exit 2 ;;
 esac
