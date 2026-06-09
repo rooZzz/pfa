@@ -1,8 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import path from "node:path";
-import { getSchemaSql } from "../db.js";
-import { runQuery } from "../query.js";
+import { getProductSchemaSql, runProductQuery } from "../nlq_query.js";
 
 const CATALOG_PATH = path.join(
   import.meta.dirname,
@@ -31,7 +30,7 @@ function extractSql(text: string): string {
 
 export async function generateSql(question: string): Promise<string> {
   const catalog = readCatalog();
-  const ddl = getSchemaSql();
+  const ddl = getProductSchemaSql();
 
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
@@ -70,7 +69,7 @@ export async function queryNaturalLanguage(question: string): Promise<string> {
 
   let rows: Record<string, unknown>[];
   try {
-    rows = await runQuery(sql);
+    rows = await runProductQuery(sql);
   } catch (err) {
     return [
       `Generated SQL:\n${sql}`,

@@ -38,6 +38,7 @@ describe("migration runner", () => {
       "0010_saye_monthly_contribution",
       "0011_asset_quantity_scale_contract",
       "0012_oauth_and_webauthn",
+      "0013_move_secrets",
     ]);
   });
 
@@ -64,6 +65,7 @@ describe("migration runner", () => {
       "0010_saye_monthly_contribution",
       "0011_asset_quantity_scale_contract",
       "0012_oauth_and_webauthn",
+      "0013_move_secrets",
     ]);
   });
 
@@ -151,6 +153,7 @@ describe("migration runner", () => {
       "0010_saye_monthly_contribution",
       "0011_asset_quantity_scale_contract",
       "0012_oauth_and_webauthn",
+      "0013_move_secrets",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

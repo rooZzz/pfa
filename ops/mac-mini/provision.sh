@@ -165,8 +165,10 @@ cmd_agents() {
 set -euo pipefail
 stamp="\$(date +%Y%m%d-%H%M%S)"
 /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/data-\${stamp}.sqlite'"
+[ -f "${DATA_DIR}/secrets.sqlite" ] && /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/secrets-\${stamp}.sqlite'" || true
 /usr/bin/rsync -a --delete "${DATA_DIR}/documents/" "${BACKUP_DIR}/documents/"
 /usr/bin/find "${BACKUP_DIR}" -name 'data-*.sqlite' -mtime +14 -delete
+/usr/bin/find "${BACKUP_DIR}" -name 'secrets-*.sqlite' -mtime +14 -delete
 EOF
   chown "$SERVICE_USER":staff "${BIN_DIR}/pfa-backup.sh"
   chmod 744 "${BIN_DIR}/pfa-backup.sh"
@@ -282,13 +284,15 @@ cmd_import() {
   need_root
   local db="${PFA_IMPORT_DB:-/tmp/pfa-data.sqlite}"
   local docs="${PFA_IMPORT_DOCS:-/tmp/pfa-documents}"
+  local secrets="${PFA_IMPORT_SECRETS:-/tmp/pfa-secrets.sqlite}"
+  local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
   [ -f "$db" ] || { echo "staged database not found at ${db}; stage it from the source machine first (see runbook Data migration)" >&2; exit 1; }
+  install -d -o "$SERVICE_USER" -g staff -m 755 "$BACKUP_DIR"
   if [ -f "${DATA_DIR}/data.sqlite" ]; then
-    local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
-    install -d -o "$SERVICE_USER" -g staff -m 755 "$BACKUP_DIR"
     say "Backing up current store to ${BACKUP_DIR}/preimport-${stamp}.sqlite"
     /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/preimport-${stamp}.sqlite'"
   fi
+  [ -f "${DATA_DIR}/secrets.sqlite" ] && /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/preimport-secrets-${stamp}.sqlite'" || true
   say "Stopping server"
   unload_daemon com.pfa.server
   say "Installing imported database"
@@ -300,15 +304,22 @@ cmd_import() {
   else
     echo "WARNING: staged documents dir ${docs} not found; importing database only" >&2
   fi
+  if [ -f "$secrets" ]; then
+    say "Installing imported secrets store"
+    install -o "$SERVICE_USER" -g staff -m 600 "$secrets" "${DATA_DIR}/secrets.sqlite"
+  else
+    echo "NOTE: no staged secrets at ${secrets}; importing data only (the mini keeps its own secrets.sqlite)" >&2
+  fi
   chown -R "$SERVICE_USER":staff "$DATA_DIR"
   say "Integrity check (store quiescent, before start)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" 'PRAGMA integrity_check;'
+  [ -f "${DATA_DIR}/secrets.sqlite" ] && /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" 'PRAGMA integrity_check;' || true
   say "Row counts (compare with the source)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" "select 'accounts='||count(*) from accounts; select 'transactions='||count(*) from transactions; select 'documents='||count(*) from documents;"
   say "Starting server (migrations run at startup)"
   load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
   say "Cleaning up staged files"
-  rm -f "$db"; rm -rf "$docs"
+  rm -f "$db" "$secrets"; rm -rf "$docs"
   say "Done. The mini is now the sole writer; stop the server on the source machine."
 }
 

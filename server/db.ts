@@ -9,6 +9,7 @@ import { runMigrations, rollbackAll } from "./migrations/index.js";
 const PFA_DIR = process.env.PFA_DIR ?? path.join(os.homedir(), ".pfa");
 const DOCUMENTS_DIR = path.join(PFA_DIR, "documents");
 const DB_PATH = path.join(PFA_DIR, "data.sqlite");
+const SECRETS_PATH = path.join(PFA_DIR, "secrets.sqlite");
 
 let db: Database.Database | null = null;
 let kysely: Kysely<DatabaseSchema> | null = null;
@@ -25,6 +26,7 @@ export function initDb(): void {
 
   db = new Database(DB_PATH);
   db.pragma("foreign_keys = ON");
+  db.exec(`ATTACH '${SECRETS_PATH.replace(/'/g, "''")}' AS secrets`);
   runMigrations(db);
 }
 
@@ -44,24 +46,6 @@ export function getDb(): Database.Database {
   return db;
 }
 
-export function getSchemaSql(): string {
-  const rows = getDb()
-    .prepare(
-      `SELECT sql FROM sqlite_master
-       WHERE type = 'table'
-         AND name NOT LIKE 'sqlite_%'
-         AND name != 'schema_migrations'
-         AND name != 'connector_state'
-       ORDER BY name`,
-    )
-    .all() as { sql: string | null }[];
-  return rows
-    .map((r) => r.sql)
-    .filter((sql): sql is string => Boolean(sql))
-    .map((sql) => `${sql};`)
-    .join("\n\n");
-}
-
 export function getKysely(): Kysely<DatabaseSchema> {
   if (!db) {
     throw new Error("Database not initialised — call initDb() first");
@@ -74,4 +58,4 @@ export function getKysely(): Kysely<DatabaseSchema> {
   return kysely;
 }
 
-export { DOCUMENTS_DIR, DB_PATH };
+export { DOCUMENTS_DIR, DB_PATH, SECRETS_PATH };
