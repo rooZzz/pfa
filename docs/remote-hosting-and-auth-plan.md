@@ -6,6 +6,8 @@ Take the app from a localhost-only MCP server to a single-user, internet-reachab
 
 This document is the umbrella design. Each phase below is scoped to ship and unlock value on its own, so it can be lifted into a standalone targeted plan. Phases are ordered by dependency, but the value each delivers does not depend on the phases after it.
 
+> Implementation status: the host/ops layer (Phases 0, 5, 6, 7) is provisioned and verified on the Mac mini; see [mac-mini-runbook.md](mac-mini-runbook.md) for the live status and exact commands. One deliberate divergence from the text below: because FileVault is enabled (and disables auto-login), the services run as LaunchDaemons in the system domain rather than per-user LaunchAgents, and the deploy restarts the server via a single narrow `sudoers` entry instead of in-session `launchctl`. The auth layer (Phases 1-4) is not yet started.
+
 ## End-state architecture
 
 One process on the Mac mini plays three roles:
