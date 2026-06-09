@@ -72,4 +72,18 @@ describe("auth app surface", () => {
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body).keys).toHaveLength(1);
   });
+
+  it("serves a theme-aware SVG favicon at the origin root", async () => {
+    const res = await request("GET", "/favicon.svg");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/svg+xml");
+    expect(res.body).toContain("prefers-color-scheme: dark");
+  });
+
+  it("serves an ICO favicon fallback", async () => {
+    const res = await request("GET", "/favicon.ico");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/x-icon");
+    expect(res.body.length).toBeGreaterThan(0);
+  });
 });

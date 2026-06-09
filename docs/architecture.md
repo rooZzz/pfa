@@ -500,14 +500,20 @@ the permanent fix that retired an earlier `--host-header` proof stopgap.
 
 ### Deferred
 
-Rate-limiting the auth endpoints; an auth audit log; a favicon on the served pages so connector use
-shows the PFA mark rather than ngrok's icon; Instrument styling of the login experience (the offline
-bootstrap page excepted — not worth the effort); making the `ui://pfa/*` surfaces mobile-friendly
-(they render legibly in the Claude mobile app but content is crushed and wrapped); a dedicated broad
-integration suite; CORS/security headers and HSTS; signing-key rotation via the JWKS `kid`;
-validating the claude.ai hosted web connector (the flow is validated via MCP Inspector, the Claude
-Code CLI, and Claude Desktop over `mcp-remote`). Unattended cold-boot recovery is limited by
+Rate-limiting the auth endpoints; an auth audit log; Instrument styling of the login experience (the
+offline bootstrap page excepted — not worth the effort); making the `ui://pfa/*` surfaces
+mobile-friendly (they render legibly in the Claude mobile app but content is crushed and wrapped); a
+dedicated broad integration suite; CORS/security headers and HSTS; signing-key rotation via the JWKS
+`kid`; validating the claude.ai hosted web connector (the flow is validated via MCP Inspector, the
+Claude Code CLI, and Claude Desktop over `mcp-remote`). Unattended cold-boot recovery is limited by
 FileVault — one manual unlock, which a UPS bridges for brief outages.
+
+The served auth origin now carries a dark/light-aware PFA favicon (`server/auth/assets/` — a
+theme-aware SVG via `@media (prefers-color-scheme: dark)`, an ICO fallback, an apple-touch-icon),
+served at the origin root and linked from every auth page. This fixes the browser tab and any
+favicon probe of the public origin. The connector chip icon in Claude remains best-effort: Claude
+does not yet render the MCP `serverInfo.icons` field (already populated in `server/icons.ts`) for
+custom connectors, so the chip may stay generic until that lands upstream.
 
 ---
 

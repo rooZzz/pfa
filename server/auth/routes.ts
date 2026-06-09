@@ -28,11 +28,29 @@ const BROWSER_BUNDLE = readFileSync(
   "utf8",
 );
 
+const ASSETS_DIR = path.join(import.meta.dirname, "assets");
+const FAVICON_SVG = readFileSync(path.join(ASSETS_DIR, "favicon.svg"), "utf8");
+const FAVICON_ICO = readFileSync(path.join(ASSETS_DIR, "favicon.ico"));
+const APPLE_TOUCH_ICON = readFileSync(path.join(ASSETS_DIR, "apple-touch-icon.png"));
+const ICON_CACHE_CONTROL = "public, max-age=86400";
+
 export function authRoutes(): express.Router {
   const router = express.Router();
 
   router.get("/assets/webauthn.js", (_req: Request, res: Response) => {
     res.type("application/javascript").send(BROWSER_BUNDLE);
+  });
+
+  router.get("/favicon.svg", (_req: Request, res: Response) => {
+    res.type("image/svg+xml").set("Cache-Control", ICON_CACHE_CONTROL).send(FAVICON_SVG);
+  });
+
+  router.get("/favicon.ico", (_req: Request, res: Response) => {
+    res.type("image/x-icon").set("Cache-Control", ICON_CACHE_CONTROL).send(FAVICON_ICO);
+  });
+
+  router.get("/apple-touch-icon.png", (_req: Request, res: Response) => {
+    res.type("image/png").set("Cache-Control", ICON_CACHE_CONTROL).send(APPLE_TOUCH_ICON);
   });
 
   router.get("/health", (_req: Request, res: Response) => {
