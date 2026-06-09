@@ -431,10 +431,90 @@ This table records **design fit** — whether the schema and architecture accomm
 
 ---
 
+## Remote hosting, authentication, and operations
+
+The app runs as an always-on service on a Mac mini, reachable over the internet through ngrok and
+gated by passwordless passkey auth — while staying local-first (the SQLite stores and all secrets
+never leave the box). Provisioning is scripted in `ops/mac-mini/provision.sh`; the operational
+how-to is [mac-mini-runbook.md](mac-mini-runbook.md).
+
+### Two listeners, one process
+
+The server binds two loopback listeners. The open `127.0.0.1:4000` (`node:http`, unchanged) serves
+a co-located Claude Desktop with no auth. The authenticated `127.0.0.1:4001` (Express) is the only
+port ngrok forwards to; everything public goes through it. The same process is the MCP server, the
+OAuth 2.1 Authorization Server, and the Resource Server — it signs access tokens with an Ed25519
+key and verifies them in process. The per-request MCP handling is shared by both listeners
+(`server/mcp_request.ts`).
+
+### Authentication
+
+A client with no token gets `401` + `WWW-Authenticate` pointing at Protected Resource Metadata,
+then discovers the Authorization Server, self-registers (Dynamic Client Registration), and runs
+OAuth 2.1 auth-code + PKCE. The authorize step renders a plain server-rendered consent page that
+runs the WebAuthn passkey ceremony (`@simplewebauthn`, discoverable credential, user-verification
+required); the ceremony is bound to the specific authorization request and the page shows the
+destination, so a phished link is visible. On success the client exchanges a single-use code for a
+signed access JWT (short-lived) plus a rotating, revocable opaque refresh token. The gate is
+single-user: every token's `sub` must equal `AUTHORIZED_SUBJECT`. Code lives in `server/auth/`.
+Enrolment is a one-time local CLI that prints a single-use link opened at the public origin so the
+credential binds to the production RP ID; recovery is re-enrolment (machine access is the root of
+trust). The auth pages are intentionally unstyled — the Instrument design system applies to the
+`ui://` iframe surfaces, not these server-rendered pages.
+
+### Secrets isolation from the query path
+
+Sensitive tables — `connector_state` (Monzo/Ethereum tokens) and the OAuth/WebAuthn tables — live
+in a separate `secrets.sqlite` (`0600`), attached to the single better-sqlite3 writer as schema
+`secrets`; SQLite resolves the unqualified names there, so app code is unchanged. No DuckDB read
+engine attaches that file. The natural-language (text-to-SQL) path runs a dedicated DuckDB engine
+that materialises only an allow-listed set of product tables (`server/nlq_allowlist.ts`,
+`server/nlq_query.ts`) and detaches the source, so secrets and `tax_constants` are physically
+absent — a model-generated query against them returns a DuckDB Catalog Error, not a policy miss.
+Internal/admin reads keep the full read path. This is the enforceable analog of "two SQL users"
+given SQLite and embedded DuckDB have no roles/`GRANT`s.
+
+### Operations
+
+Services run as LaunchDaemons under a dedicated `_pfa` user in the system domain — FileVault is on
+(encrypting data and secrets at rest), which disables auto-login, so per-user LaunchAgents aren't
+viable; daemons start at boot after the one disk unlock. The host disables sleep, restarts after
+power loss, keeps NTP on (token expiry needs a correct clock), rotates logs, and snapshots both
+SQLite files nightly. Deploys are release-triggered: publishing a GitHub release runs a self-hosted
+runner (as `_pfa`) that backs up the data store, syncs the tag, builds, restarts the server daemon
+through a narrow `sudoers` entry, health-checks, and rolls back on failure. ngrok provides a stable
+reserved domain (also the WebAuthn RP ID) and TLS; auth is enforced in-band, so ngrok is ingress
+only. The DNS-rebinding guard in `http.ts` (a `Host` allowlist) accepts the public origin on 4001 —
+the permanent fix that retired an earlier `--host-header` proof stopgap.
+
+### Locked decisions
+
+- The public domain is the WebAuthn RP ID; a passkey binds to it, so the domain is fixed before
+  enrolment.
+- One authorized `sub`; any other identity is refused at the Resource Server.
+- The Ed25519 signing key is a `0600` file (not the login Keychain — a LaunchDaemon has no Keychain
+  session), generated once on the box, never in git or CI.
+- Short access-token TTL (~30 min) plus a longer rotating refresh token; tokens carry
+  `aud = MCP_RESOURCE`.
+- All runtime secrets stay on the mini; the deploy needs none, so none are injected through CI/CD.
+
+### Deferred
+
+Rate-limiting the auth endpoints; an auth audit log; Instrument styling of the auth pages; a
+dedicated broad integration suite; CORS/security headers and HSTS; signing-key rotation via the
+JWKS `kid`; validating the claude.ai hosted web connector (the flow is validated via MCP Inspector,
+the Claude Code CLI, and Claude Desktop over `mcp-remote`). Unattended cold-boot recovery is limited
+by FileVault — one manual unlock, which a UPS bridges for brief outages.
+
+---
+
 ## Decision log
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-06-09 | Remote hosting + deploy: always-on Mac mini, ngrok ingress, self-hosted runner, release-triggered deploy with backup/rollback | Local-first but internet-reachable; LaunchDaemons under `_pfa` (FileVault forces the system domain). See "Remote hosting, authentication, and operations" + the runbook. |
+| 2026-06-09 | Passkey auth: OAuth 2.1 + WebAuthn on a second loopback listener (4001), single-user | Passwordless, request-bound, single `sub`; Ed25519 in a `0600` file; open 4000 unchanged. See the hosting/auth section. |
+| 2026-06-09 | Secrets split from the NLQ path: `secrets.sqlite` + a restricted allow-list DuckDB engine | Sensitive tables physically absent from the text-to-SQL engine (Catalog Error, not a policy miss); the enforceable analog of two SQL users. |
 | 2026-06-08 | Transport: stdio to Streamable HTTP on localhost; Desktop bridges via `mcp-remote` | Decouples the server from Desktop's lifecycle (restart without relaunching Desktop). Stateless transport, per-request `buildServer()`, `node:http` with a Host/Origin allowlist. UI `ui://` HTML re-read from disk per request so rebuilds need no restart. |
 | 2026-05-26 | Architecture: Claude Desktop + local stdio MCP server + MCP Apps | App is the MCP server. No web server, no OAuth, no public exposure. Data stays on disk. |
 | 2026-05-26 | Ingestion: human review non-negotiable for document uploads | Haiku vision can misparse. Silent writes to canonical store are not acceptable. |

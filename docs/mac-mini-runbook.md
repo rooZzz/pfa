@@ -1,8 +1,9 @@
 # Mac mini operations runbook
 
-Host provisioning for the pfa MCP server. Implements the host/ops layer of
-[remote-hosting-and-auth-plan.md](remote-hosting-and-auth-plan.md) (Phases 0, 5, 6, 7). The
-app auth code (Phases 1-4) lands on top of this and is out of scope here.
+Host provisioning for the pfa MCP server — the operational how-to for the architecture in
+[architecture.md](architecture.md) ("Remote hosting, authentication, and operations"). Together
+with `ops/mac-mini/provision.sh` and `.github/workflows/deploy.yml`, this is the complete kit to
+re-provision the mini from scratch.
 
 All host setup is driven by `ops/mac-mini/provision.sh`, an idempotent script with one
 subcommand per concern. Run subcommands one at a time and check the result before moving on.
@@ -28,9 +29,9 @@ Done on the mini and verified:
 
 Live smoke checks (2026-06-09): GitHub reports runner `mini` online and idle; an MCP
 `initialize` POST to `127.0.0.1:4000/mcp` returns HTTP 200 with `serverInfo {name: pfa}`.
-Real data imported (34 accounts, 990 transactions, 60 documents) and served. Remote access
-proven end to end from a second machine over an ngrok tunnel (HTTP 200, ~0.25s), gated by
-temporary Basic Auth at the ngrok edge. The host layer is complete and verified.
+Real data imported (34 accounts, 990 transactions, 60 documents) and served. Remote passkey
+login works end to end from a second machine over `https://pfa.ngrok.app` (OAuth 2.1 +
+WebAuthn). The host, auth, and secrets-split layers are complete and verified.
 
 Remaining (intended for the second machine / later):
 
@@ -160,51 +161,6 @@ installs `secrets.sqlite` at `0600`, prints `integrity_check` (both files) and r
 the server (migrations run at startup), and removes the staged files. If no secrets are staged, the
 mini keeps its own `secrets.sqlite`. Confirm the counts and a `get_net_worth` read match the source. After cutover the
 mini is the sole writer; never run two writers against copies.
-
-## Remote access today (pre-auth proof, throwaway)
-
-Until the in-band auth lands, remote access is proven with a temporary tunnel gated by Basic
-Auth at the ngrok edge. This is a proof, not the end state - tear it down when done and rotate
-the credential.
-
-On the mini, with a local (gitignored, never committed) policy file `ngrok-policy.yml`:
-
-```
-on_http_request:
-  - actions:
-      - type: basic-auth
-        config:
-          realm: pfa
-          credentials:
-            - "pfa:<a-strong-password>"
-```
-
-```
-ngrok config add-authtoken <YOUR_AUTHTOKEN>
-ngrok http 4000 --host-header=localhost:4000 --traffic-policy-file ngrok-policy.yml
-```
-
-`--host-header=localhost:4000` is required: `server/http.ts` enforces a DNS-rebinding guard
-(`ALLOWED_HOSTS` = `127.0.0.1:4000` / `localhost:4000`) and returns `403` to any other `Host`,
-so ngrok's own domain is refused unless the upstream `Host` is rewritten. The permanent fix
-(Phase 1 / the auth slice) is to add the public origin to `ALLOWED_HOSTS`, not to keep the
-rewrite.
-
-On the laptop, a second, separate connector (the dev connector stays untouched):
-
-```json
-"pfa-prod": {
-  "command": "npx",
-  "args": [
-    "-y", "mcp-remote", "https://<your-ngrok-url>/mcp",
-    "--header", "Authorization: Basic <base64 of pfa:password>",
-    "--header", "ngrok-skip-browser-warning: true"
-  ]
-}
-```
-
-The `ngrok-skip-browser-warning` header is required on the ngrok free tier (it otherwise injects
-an HTML interstitial that breaks the MCP client).
 
 ## Authentication (passkey login)
 
