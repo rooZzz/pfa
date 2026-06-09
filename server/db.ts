@@ -27,6 +27,7 @@ export function initDb(): void {
   db = new Database(DB_PATH);
   db.pragma("foreign_keys = ON");
   db.exec(`ATTACH '${SECRETS_PATH.replace(/'/g, "''")}' AS secrets`);
+  fs.chmodSync(SECRETS_PATH, 0o600);
   runMigrations(db);
 }
 
