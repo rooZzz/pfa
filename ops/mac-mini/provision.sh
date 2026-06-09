@@ -31,6 +31,25 @@ need_root() { [ "$(id -u)" -eq 0 ] || { echo "this step needs sudo: sudo $0 $CMD
 as_invoker() { if [ "$(id -un)" = "$INVOKER" ]; then "$@"; else sudo -u "$INVOKER" "$@"; fi; }
 as_service() { sudo -H -u "$SERVICE_USER" "$@"; }
 
+unload_daemon() {
+  local label="$1" i
+  "$LAUNCHCTL" bootout "system/${label}" 2>/dev/null || true
+  for i in $(seq 1 20); do
+    "$LAUNCHCTL" print "system/${label}" >/dev/null 2>&1 || return 0
+    sleep 0.5
+  done
+}
+
+load_daemon() {
+  local label="$1" plist="$2" i
+  for i in 1 2 3 4 5 6; do
+    "$LAUNCHCTL" bootstrap system "$plist" 2>/dev/null && return 0
+    "$LAUNCHCTL" print "system/${label}" >/dev/null 2>&1 && { "$LAUNCHCTL" kickstart -k "system/${label}"; return 0; }
+    sleep 1
+  done
+  "$LAUNCHCTL" bootstrap system "$plist"
+}
+
 cmd_ssh() {
   need_root
   say "Enabling Remote Login"
@@ -198,9 +217,8 @@ EOF
   visudo -cf "$SUDOERS_FILE" >/dev/null
 
   say "Loading server and backup daemons (system domain)"
-  "$LAUNCHCTL" bootstrap system "${DAEMON_DIR}/com.pfa.server.plist" || \
-    "$LAUNCHCTL" kickstart -k system/com.pfa.server
-  "$LAUNCHCTL" bootstrap system "${DAEMON_DIR}/com.pfa.backup.plist" || true
+  load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
+  load_daemon com.pfa.backup "${DAEMON_DIR}/com.pfa.backup.plist"
   say "Done. Enable ngrok later with: sudo launchctl bootstrap system ${DAEMON_DIR}/com.pfa.ngrok.plist"
 }
 
@@ -226,8 +244,7 @@ cmd_runner() {
   PLIST_WORKDIR="${RUNNER_DIR}" PLIST_LOG="${LOG_DIR}/runner.log" PLIST_EXTRA_ENV="" \
     write_daemon com.pfa.runner "${DAEMON_DIR}/com.pfa.runner.plist" \
     "${RUNNER_DIR}/run.sh"
-  "$LAUNCHCTL" bootstrap system "${DAEMON_DIR}/com.pfa.runner.plist" || \
-    "$LAUNCHCTL" kickstart -k system/com.pfa.runner
+  load_daemon com.pfa.runner "${DAEMON_DIR}/com.pfa.runner.plist"
   say "Done"
 }
 
@@ -273,7 +290,7 @@ cmd_import() {
     /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/preimport-${stamp}.sqlite'"
   fi
   say "Stopping server"
-  "$LAUNCHCTL" bootout system/com.pfa.server 2>/dev/null || true
+  unload_daemon com.pfa.server
   say "Installing imported database"
   install -o "$SERVICE_USER" -g staff -m 644 "$db" "${DATA_DIR}/data.sqlite"
   install -d -o "$SERVICE_USER" -g staff -m 755 "${DATA_DIR}/documents"
@@ -289,8 +306,7 @@ cmd_import() {
   say "Row counts (compare with the source)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" "select 'accounts='||count(*) from accounts; select 'transactions='||count(*) from transactions; select 'documents='||count(*) from documents;"
   say "Starting server (migrations run at startup)"
-  "$LAUNCHCTL" bootstrap system "${DAEMON_DIR}/com.pfa.server.plist" || \
-    "$LAUNCHCTL" kickstart -k system/com.pfa.server
+  load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
   say "Cleaning up staged files"
   rm -f "$db"; rm -rf "$docs"
   say "Done. The mini is now the sole writer; stop the server on the source machine."
