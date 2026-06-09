@@ -6,7 +6,7 @@ Take the app from a localhost-only MCP server to a single-user, internet-reachab
 
 This document is the umbrella design. Each phase below is scoped to ship and unlock value on its own, so it can be lifted into a standalone targeted plan. Phases are ordered by dependency, but the value each delivers does not depend on the phases after it.
 
-> Implementation status: the host/ops layer (Phases 0, 5, 6, 7) is provisioned and verified on the Mac mini; see [mac-mini-runbook.md](mac-mini-runbook.md) for the live status and exact commands. One deliberate divergence from the text below: because FileVault is enabled (and disables auto-login), the services run as LaunchDaemons in the system domain rather than per-user LaunchAgents, and the deploy restarts the server via a single narrow `sudoers` entry instead of in-session `launchctl`. The auth layer (Phases 1-4) is not yet started.
+> Implementation status: the host/ops layer (Phases 0, 5, 6, 7) is provisioned and verified on the Mac mini; see [mac-mini-runbook.md](mac-mini-runbook.md) for the live status and exact commands. One deliberate divergence from the text below: because FileVault is enabled (and disables auto-login), the services run as LaunchDaemons in the system domain rather than per-user LaunchAgents, and the deploy restarts the server via a single narrow `sudoers` entry instead of in-session `launchctl`. Remote access has been proven end to end from a second machine over an ngrok tunnel, using a temporary Basic-Auth gate at the ngrok edge (the in-band auth layer is not built yet) and the `--host-header` workaround for the DNS-rebinding guard (see Phase 5 learning). The next stage is a thin vertical slice of the full passkey auth flow (see "Next stage" below); Phases 1-4 are otherwise not yet started.
 
 ## End-state architecture
 
@@ -71,6 +71,23 @@ Read from `server/.env` (and the `0600` signing-key file), validated at startup,
 - Signing key reference (path to the `0600` key file).
 
 ngrok configuration (authtoken, reserved domain, traffic policy) lives in the ngrok config file, not the app.
+
+## Next stage: thin-slice passkey auth (vertical cut, no design system)
+
+Before fleshing out Phases 1-4 individually, build one minimal vertical slice that exercises the entire intended passkey OAuth path end to end against the live mini and ngrok. The point is to prove the architecture - discovery, registration, the real WebAuthn ceremony, the real token shape, the gated endpoint - in one cut, deferring only presentation polish and the broader hardening. The per-phase sections below remain the reference for hardening each part afterward.
+
+In scope (kept thin):
+- Resource Server gate on the authenticated port (`4001`): verify the signed JWT (`iss`, `aud = MCP_RESOURCE`, `exp`, `sub = AUTHORIZED_SUBJECT`); `401` plus `WWW-Authenticate`; Protected Resource Metadata; `/health`. Add `PUBLIC_ORIGIN`'s host to `ALLOWED_HOSTS`/`ALLOWED_ORIGINS` - this is the real fix that retires the `--host-header` stopgap.
+- Authorization Server: `mcpAuthRouter` plus a custom `OAuthServerProvider` - AS metadata, Dynamic Client Registration, `authorize` (PKCE S256), `token` with refresh rotation, JWKS. Ed25519 signing key in a `0600` file (a LaunchDaemon has no Keychain session).
+- Passkey via `@simplewebauthn/server`: one-time local enrollment (a CLI-minted single-use link opened at the public origin so the credential binds to the ngrok RP ID), then assertion on the authorize page; discoverable credential, `userVerification: required`; a `webauthn_credential` migration. Auto-approve consent for the single user.
+- Browser pages as plain server-rendered HTML (login, error, interstitial) - no Instrument tokens, fonts, or React; functional markup only.
+
+Explicitly deferred to the fuller phases:
+- Instrument design-language styling of the auth pages (Phase 3 polish).
+- The dedicated end-to-end integration suite (Phase 4), beyond unit tests for the slice.
+- Rate-limiting, the auth audit log, and recovery-passkey niceties (minimal or stubbed for the slice).
+
+Done when, from the laptop, a fresh MCP client (MCP Inspector or the Claude Code CLI) discovers the server, self-registers, completes the passkey ceremony at the ngrok domain, exchanges a code for a token, and calls `/mcp` successfully - while an unauthenticated call still gets `401`. This is the proof that the auth design holds before investing in styling and breadth.
 
 ## Phase 0: Data migration and cutover
 
@@ -183,6 +200,7 @@ Scope:
 - Do not block Anthropic's connector broker. The claude.ai connector uses a server-side broker that calls the MCP endpoint; ensure its IP range (`160.79.104.0/21`) is not denied by any policy or upstream filtering, since this was a documented cause of connector failures.
 - Confirm the public origin and RP ID match exactly what Phase 3 enrolled against. A domain change invalidates existing passkeys and requires re-enrollment.
 - Verify TLS, the metadata documents, and the `401` challenge are all correct through the public URL.
+- DNS-rebinding guard (learned in the pre-auth proof): `server/http.ts` rejects any request whose `Host` is not in `ALLOWED_HOSTS` (`127.0.0.1:PORT`, `localhost:PORT`), returning `403`. ngrok forwards its own domain as the `Host`, so it is refused. The throwaway proof worked around this with the agent flag `--host-header=localhost:4000` (rewrites the upstream `Host`), but the real fix on the authenticated port is to add `PUBLIC_ORIGIN`'s host to `ALLOWED_HOSTS`/`ALLOWED_ORIGINS` (already in Phase 1 scope). Do not ship the host-header rewrite as the permanent answer.
 
 Files: an ngrok config file in the repo or a documented location, a short runbook section.
 

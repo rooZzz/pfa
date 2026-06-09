@@ -28,7 +28,9 @@ Done on the mini and verified:
 
 Live smoke checks (2026-06-09): GitHub reports runner `mini` online and idle; an MCP
 `initialize` POST to `127.0.0.1:4000/mcp` returns HTTP 200 with `serverInfo {name: pfa}`.
-The host layer is complete and verified - safe to continue from the second machine.
+Real data imported (34 accounts, 990 transactions, 60 documents) and served. Remote access
+proven end to end from a second machine over an ngrok tunnel (HTTP 200, ~0.25s), gated by
+temporary Basic Auth at the ngrok edge. The host layer is complete and verified.
 
 Remaining (intended for the second machine / later):
 
@@ -146,6 +148,51 @@ with `PFA_IMPORT_DB` / `PFA_IMPORT_DOCS`), backs up the current store to `~_pfa/
 `integrity_check` and row counts, restarts the server (migrations run at startup), and removes the
 staged files. Confirm the counts and a `get_net_worth` read match the source. After cutover the
 mini is the sole writer; never run two writers against copies.
+
+## Remote access today (pre-auth proof, throwaway)
+
+Until the in-band auth lands, remote access is proven with a temporary tunnel gated by Basic
+Auth at the ngrok edge. This is a proof, not the end state - tear it down when done and rotate
+the credential.
+
+On the mini, with a local (gitignored, never committed) policy file `ngrok-policy.yml`:
+
+```
+on_http_request:
+  - actions:
+      - type: basic-auth
+        config:
+          realm: pfa
+          credentials:
+            - "pfa:<a-strong-password>"
+```
+
+```
+ngrok config add-authtoken <YOUR_AUTHTOKEN>
+ngrok http 4000 --host-header=localhost:4000 --traffic-policy-file ngrok-policy.yml
+```
+
+`--host-header=localhost:4000` is required: `server/http.ts` enforces a DNS-rebinding guard
+(`ALLOWED_HOSTS` = `127.0.0.1:4000` / `localhost:4000`) and returns `403` to any other `Host`,
+so ngrok's own domain is refused unless the upstream `Host` is rewritten. The permanent fix
+(Phase 1 / the auth slice) is to add the public origin to `ALLOWED_HOSTS`, not to keep the
+rewrite.
+
+On the laptop, a second, separate connector (the dev connector stays untouched):
+
+```json
+"pfa-prod": {
+  "command": "npx",
+  "args": [
+    "-y", "mcp-remote", "https://<your-ngrok-url>/mcp",
+    "--header", "Authorization: Basic <base64 of pfa:password>",
+    "--header", "ngrok-skip-browser-warning: true"
+  ]
+}
+```
+
+The `ngrok-skip-browser-warning` header is required on the ngrok free tier (it otherwise injects
+an HTML interstitial that breaks the MCP client).
 
 ## ngrok (enable with app Phase 1)
 
