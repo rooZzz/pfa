@@ -12,6 +12,7 @@ import * as m0010 from "./0010_saye_monthly_contribution.js";
 import * as m0011 from "./0011_asset_quantity_scale_contract.js";
 import * as m0012 from "./0012_oauth_and_webauthn.js";
 import * as m0013 from "./0013_move_secrets.js";
+import * as m0014 from "./0014_webauthn_challenge_req.js";
 
 type Migration = {
   name: string;
@@ -33,6 +34,7 @@ const MIGRATIONS: Migration[] = [
   { name: "0011_asset_quantity_scale_contract", ...m0011 },
   { name: "0012_oauth_and_webauthn", ...m0012 },
   { name: "0013_move_secrets", ...m0013 },
+  { name: "0014_webauthn_challenge_req", ...m0014 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {

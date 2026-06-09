@@ -4,6 +4,7 @@ import { getDb, initDb } from "../db.js";
 import {
   registrationOptions,
   authenticationOptions,
+  verifyAuthentication,
   hasCredential,
 } from "../auth/webauthn.js";
 import { nowSec } from "../auth/util.js";
@@ -38,12 +39,24 @@ describe("webauthn options", () => {
     expect(row?.kind).toBe("register");
   });
 
-  it("generates authentication options and stores a challenge", async () => {
-    const { options, challengeId } = await authenticationOptions();
+  it("generates authentication options bound to the request id", async () => {
+    const { options, challengeId } = await authenticationOptions("req-123");
     expect(options.challenge).toBeTruthy();
     const row = getDb()
-      .prepare("SELECT kind FROM webauthn_challenge WHERE id = ?")
-      .get(challengeId) as { kind: string } | undefined;
+      .prepare("SELECT kind, req FROM webauthn_challenge WHERE id = ?")
+      .get(challengeId) as { kind: string; req: string } | undefined;
     expect(row?.kind).toBe("authenticate");
+    expect(row?.req).toBe("req-123");
+  });
+
+  it("rejects an assertion whose challenge is bound to a different request", async () => {
+    const { challengeId } = await authenticationOptions("reqA");
+    await expect(
+      verifyAuthentication(
+        challengeId,
+        { id: "x" } as unknown as Parameters<typeof verifyAuthentication>[1],
+        "reqB",
+      ),
+    ).rejects.toThrow();
   });
 });

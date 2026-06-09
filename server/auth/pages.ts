@@ -1,3 +1,23 @@
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
+function hostOf(uri: string): string {
+  try {
+    return new URL(uri).host || uri;
+  } catch {
+    return uri;
+  }
+}
+
 function shell(title: string, body: string, script: string): string {
   return `<!doctype html>
 <html lang="en">
@@ -29,16 +49,23 @@ ${script}
 </html>`;
 }
 
-export function loginPage(reqId: string): string {
-  const body = `<h1>pfa — sign in</h1>
-<p>Verify your passkey to continue.</p>
-<button id="go">Sign in with passkey</button>`;
+export function loginPage(
+  reqId: string,
+  consent: { clientName?: string; redirectUri: string },
+): string {
+  const host = escapeHtml(hostOf(consent.redirectUri));
+  const named = consent.clientName ? ` (${escapeHtml(consent.clientName)})` : "";
+  const body = `<h1>pfa — authorize access</h1>
+<p>A client is asking to sign in to your finances. The result will be sent to:</p>
+<p><strong>${host}</strong>${named}</p>
+<p>Only approve if you started this and recognise that destination. Otherwise close this page.</p>
+<button id="go">Approve with passkey</button>`;
   const script = `
 var REQ = ${JSON.stringify(reqId)};
 async function signIn() {
   try {
     setStatus("Waiting for your passkey…");
-    var optRes = await fetch("/webauthn/authenticate/options", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    var optRes = await fetch("/webauthn/authenticate/options", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ req: REQ }) });
     var opt = await optRes.json();
     var assertion = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: opt.options });
     var verifyRes = await fetch("/webauthn/authenticate/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ req: REQ, challengeId: opt.challengeId, response: assertion }) });
@@ -51,7 +78,7 @@ async function signIn() {
   }
 }
 document.getElementById("go").addEventListener("click", signIn);`;
-  return shell("pfa — sign in", body, script);
+  return shell("pfa — authorize access", body, script);
 }
 
 export function enrollPage(token: string): string {

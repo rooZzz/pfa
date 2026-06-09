@@ -19,26 +19,37 @@ type CredentialRow = {
   transports: string | null;
 };
 
-function storeChallenge(kind: "register" | "authenticate", challenge: string): string {
+function storeChallenge(
+  kind: "register" | "authenticate",
+  challenge: string,
+  req: string | null,
+): string {
   const id = randomId();
   getDb()
     .prepare(
-      "INSERT INTO webauthn_challenge (id, kind, challenge, expires_at) VALUES (?, ?, ?, ?)",
+      "INSERT INTO webauthn_challenge (id, kind, challenge, req, expires_at) VALUES (?, ?, ?, ?, ?)",
     )
-    .run(id, kind, challenge, nowSec() + CHALLENGE_TTL);
+    .run(id, kind, challenge, req, nowSec() + CHALLENGE_TTL);
   return id;
 }
 
-function takeChallenge(id: string, kind: "register" | "authenticate"): string {
+function takeChallenge(
+  id: string,
+  kind: "register" | "authenticate",
+): { challenge: string; req: string | null } {
   const db = getDb();
   const row = db
-    .prepare("SELECT kind, challenge, expires_at FROM webauthn_challenge WHERE id = ?")
-    .get(id) as { kind: string; challenge: string; expires_at: number } | undefined;
+    .prepare(
+      "SELECT kind, challenge, req, expires_at FROM webauthn_challenge WHERE id = ?",
+    )
+    .get(id) as
+    | { kind: string; challenge: string; req: string | null; expires_at: number }
+    | undefined;
   db.prepare("DELETE FROM webauthn_challenge WHERE id = ?").run(id);
   if (!row || row.kind !== kind || row.expires_at < nowSec()) {
     throw new Error("challenge not found or expired");
   }
-  return row.challenge;
+  return { challenge: row.challenge, req: row.req ?? null };
 }
 
 function listCredentials(): CredentialRow[] {
@@ -72,7 +83,7 @@ export async function registrationOptions(): Promise<{
     },
     excludeCredentials: listCredentials().map((c) => ({ id: c.credential_id })),
   });
-  return { options, challengeId: storeChallenge("register", options.challenge) };
+  return { options, challengeId: storeChallenge("register", options.challenge, null) };
 }
 
 export async function verifyRegistration(
@@ -80,7 +91,7 @@ export async function verifyRegistration(
   response: RegistrationResponseJSON,
   label: string | undefined,
 ): Promise<void> {
-  const expectedChallenge = takeChallenge(challengeId, "register");
+  const { challenge: expectedChallenge } = takeChallenge(challengeId, "register");
   const verification = await verifyRegistrationResponse({
     response,
     expectedChallenge,
@@ -107,7 +118,7 @@ export async function verifyRegistration(
     );
 }
 
-export async function authenticationOptions(): Promise<{
+export async function authenticationOptions(req: string): Promise<{
   options: Awaited<ReturnType<typeof generateAuthenticationOptions>>;
   challengeId: string;
 }> {
@@ -115,14 +126,24 @@ export async function authenticationOptions(): Promise<{
     rpID: rpId(),
     userVerification: "required",
   });
-  return { options, challengeId: storeChallenge("authenticate", options.challenge) };
+  return {
+    options,
+    challengeId: storeChallenge("authenticate", options.challenge, req),
+  };
 }
 
 export async function verifyAuthentication(
   challengeId: string,
   response: AuthenticationResponseJSON,
+  expectedReq: string,
 ): Promise<void> {
-  const expectedChallenge = takeChallenge(challengeId, "authenticate");
+  const { challenge: expectedChallenge, req } = takeChallenge(
+    challengeId,
+    "authenticate",
+  );
+  if (req !== expectedReq) {
+    throw new Error("challenge is not bound to this authorization request");
+  }
   const row = getDb()
     .prepare("SELECT * FROM webauthn_credential WHERE credential_id = ?")
     .get(response.id) as CredentialRow | undefined;

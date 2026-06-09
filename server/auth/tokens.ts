@@ -24,7 +24,6 @@ type RefreshRow = {
 export async function mintAccessToken(
   clientId: string,
   scope: string | undefined,
-  resource: string | undefined,
 ): Promise<{ token: string; expiresIn: number }> {
   const { privateKey, kid } = await getKeys();
   const ttl = accessTokenTtl();
@@ -32,7 +31,7 @@ export async function mintAccessToken(
     .setProtectedHeader({ alg: "EdDSA", kid })
     .setIssuedAt()
     .setIssuer(publicOrigin())
-    .setAudience(resource ?? mcpResource())
+    .setAudience(mcpResource())
     .setSubject(authorizedSubject())
     .setExpirationTime(`${ttl}s`)
     .sign(privateKey);

@@ -39,7 +39,7 @@ function sign(opts: {
 
 describe("access token verification", () => {
   it("mints and verifies a valid token", async () => {
-    const { token } = await mintAccessToken("client-1", "mcp", undefined);
+    const { token } = await mintAccessToken("client-1", "mcp");
     const info = await verifyAccessToken(token);
     expect(info.clientId).toBe("client-1");
     expect(info.scopes).toContain("mcp");
@@ -67,7 +67,7 @@ describe("access token verification", () => {
   });
 
   it("rejects a tampered or garbage token", async () => {
-    const { token } = await mintAccessToken("c", undefined, undefined);
+    const { token } = await mintAccessToken("c", undefined);
     const tampered = token.slice(0, -2) + (token.endsWith("a") ? "bb" : "aa");
     await expect(verifyAccessToken(tampered)).rejects.toThrow();
     await expect(verifyAccessToken("not.a.jwt")).rejects.toThrow();

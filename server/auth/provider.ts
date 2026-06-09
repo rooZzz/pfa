@@ -146,7 +146,6 @@ export const provider: OAuthServerProvider = {
     authorizationCode: string,
     _codeVerifier?: string,
     redirectUri?: string,
-    resource?: URL,
   ): Promise<OAuthTokens> {
     const db = getDb();
     const row = db
@@ -166,10 +165,14 @@ export const provider: OAuthServerProvider = {
     db.prepare("UPDATE oauth_authorization_code SET used = 1 WHERE code_hash = ?").run(
       sha256(authorizationCode),
     );
-    const res = resource?.href ?? row.resource ?? undefined;
     const scope = row.scope ?? undefined;
-    const { token, expiresIn } = await mintAccessToken(client.client_id, scope, res);
-    const refresh = issueRefreshToken(client.client_id, row.subject, scope, res);
+    const { token, expiresIn } = await mintAccessToken(client.client_id, scope);
+    const refresh = issueRefreshToken(
+      client.client_id,
+      row.subject,
+      scope,
+      row.resource ?? undefined,
+    );
     return {
       access_token: token,
       token_type: "Bearer",
@@ -182,13 +185,10 @@ export const provider: OAuthServerProvider = {
   async exchangeRefreshToken(
     client: OAuthClientInformationFull,
     refreshToken: string,
-    scopes?: string[],
-    resource?: URL,
   ): Promise<OAuthTokens> {
     const rotated = rotateRefreshToken(refreshToken, client.client_id);
-    const res = resource?.href ?? rotated.resource;
-    const scope = scopes?.join(" ") ?? rotated.scope;
-    const { token, expiresIn } = await mintAccessToken(client.client_id, scope, res);
+    const scope = rotated.scope;
+    const { token, expiresIn } = await mintAccessToken(client.client_id, scope);
     return {
       access_token: token,
       token_type: "Bearer",

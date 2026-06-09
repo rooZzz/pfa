@@ -165,7 +165,7 @@ cmd_agents() {
 set -euo pipefail
 stamp="\$(date +%Y%m%d-%H%M%S)"
 /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/data-\${stamp}.sqlite'"
-[ -f "${DATA_DIR}/secrets.sqlite" ] && /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/secrets-\${stamp}.sqlite'" || true
+if [ -f "${DATA_DIR}/secrets.sqlite" ]; then /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/secrets-\${stamp}.sqlite'"; fi
 /usr/bin/rsync -a --delete "${DATA_DIR}/documents/" "${BACKUP_DIR}/documents/"
 /usr/bin/find "${BACKUP_DIR}" -name 'data-*.sqlite' -mtime +14 -delete
 /usr/bin/find "${BACKUP_DIR}" -name 'secrets-*.sqlite' -mtime +14 -delete
@@ -292,7 +292,7 @@ cmd_import() {
     say "Backing up current store to ${BACKUP_DIR}/preimport-${stamp}.sqlite"
     /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/preimport-${stamp}.sqlite'"
   fi
-  [ -f "${DATA_DIR}/secrets.sqlite" ] && /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/preimport-secrets-${stamp}.sqlite'" || true
+  if [ -f "${DATA_DIR}/secrets.sqlite" ]; then /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/preimport-secrets-${stamp}.sqlite'"; fi
   say "Stopping server"
   unload_daemon com.pfa.server
   say "Installing imported database"
@@ -313,7 +313,7 @@ cmd_import() {
   chown -R "$SERVICE_USER":staff "$DATA_DIR"
   say "Integrity check (store quiescent, before start)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" 'PRAGMA integrity_check;'
-  [ -f "${DATA_DIR}/secrets.sqlite" ] && /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" 'PRAGMA integrity_check;' || true
+  if [ -f "${DATA_DIR}/secrets.sqlite" ]; then /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" 'PRAGMA integrity_check;'; fi
   say "Row counts (compare with the source)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" "select 'accounts='||count(*) from accounts; select 'transactions='||count(*) from transactions; select 'documents='||count(*) from documents;"
   say "Starting server (migrations run at startup)"
@@ -330,7 +330,7 @@ cmd_auth() {
     exit 1
   }
   say "Generating the OAuth signing key (as ${SERVICE_USER}; skipped if it exists)"
-  as_service env PATH="$RUNTIME_PATH" bash -c "cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run gen-signing-key" || true
+  as_service env PATH="$RUNTIME_PATH" bash -c "cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run gen-signing-key"
   say "Restarting the server to load the auth config and the 4001 listener"
   load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
   say "Next steps (not automated):"

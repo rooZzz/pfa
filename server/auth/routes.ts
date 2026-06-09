@@ -12,6 +12,7 @@ import {
   hasCredential,
 } from "./webauthn.js";
 import { isEnrollmentTokenValid, consumeEnrollmentToken } from "./enrollment.js";
+import { clientsStore } from "./clients_store.js";
 
 const BROWSER_BUNDLE = readFileSync(
   path.join(
@@ -42,7 +43,7 @@ export function authRoutes(): express.Router {
     res.json(await jwks());
   });
 
-  router.get("/login", (req: Request, res: Response) => {
+  router.get("/login", async (req: Request, res: Response) => {
     const reqId = String(req.query.req ?? "");
     const pending = reqId ? getPendingAuthorization(reqId) : undefined;
     if (!pending) {
@@ -63,14 +64,26 @@ export function authRoutes(): express.Router {
         );
       return;
     }
-    res.type("html").send(loginPage(reqId));
+    const client = await clientsStore.getClient(pending.client_id);
+    res.type("html").send(
+      loginPage(reqId, {
+        clientName: client?.client_name,
+        redirectUri: pending.redirect_uri,
+      }),
+    );
   });
 
   router.post(
     "/webauthn/authenticate/options",
     express.json(),
-    async (_req: Request, res: Response) => {
-      const { options, challengeId } = await authenticationOptions();
+    async (req: Request, res: Response) => {
+      const reqId = String(req.body?.req ?? "");
+      const pending = reqId ? getPendingAuthorization(reqId) : undefined;
+      if (!pending) {
+        res.status(400).json({ error: "invalid_request" });
+        return;
+      }
+      const { options, challengeId } = await authenticationOptions(reqId);
       res.json({ options, challengeId });
     },
   );
@@ -81,7 +94,7 @@ export function authRoutes(): express.Router {
     async (req: Request, res: Response) => {
       try {
         const { req: reqId, challengeId, response } = req.body;
-        await verifyAuthentication(challengeId, response);
+        await verifyAuthentication(challengeId, response, reqId);
         const fin = finalizePendingAuthorization(reqId);
         const url = new URL(fin.redirectUri);
         url.searchParams.set("code", fin.code);
@@ -111,10 +124,12 @@ export function authRoutes(): express.Router {
     "/webauthn/register/options",
     express.json(),
     async (req: Request, res: Response) => {
-      if (!isEnrollmentTokenValid(req.body?.token)) {
+      const token = req.body?.token;
+      if (!isEnrollmentTokenValid(token)) {
         res.status(400).json({ error: "invalid_token" });
         return;
       }
+      consumeEnrollmentToken(token);
       const { options, challengeId } = await registrationOptions();
       res.json({ options, challengeId });
     },
@@ -125,13 +140,8 @@ export function authRoutes(): express.Router {
     express.json(),
     async (req: Request, res: Response) => {
       try {
-        const { token, challengeId, response, label } = req.body;
-        if (!isEnrollmentTokenValid(token)) {
-          res.status(400).json({ error: "invalid_token" });
-          return;
-        }
+        const { challengeId, response, label } = req.body;
         await verifyRegistration(challengeId, response, label);
-        consumeEnrollmentToken(token);
         res.json({ ok: true });
       } catch {
         res.status(400).json({ error: "registration_failed" });
