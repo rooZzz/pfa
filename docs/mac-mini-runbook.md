@@ -48,7 +48,10 @@ Remaining (intended for the second machine / later):
 - Service account `_pfa` owns the app, the data, and the runner. The server, ngrok, runner,
   and nightly backup run as LaunchDaemons (system domain) under `UserName = _pfa`, so they
   start at boot with no login. FileVault is on, so auto-login is neither used nor possible.
-- App tree: `/Users/_pfa/pfa`. Data: `/Users/_pfa/.pfa` (`data.sqlite` + `documents/`).
+- App tree: `/Users/_pfa/pfa`. Data: `/Users/_pfa/.pfa` — `data.sqlite` (product) + `documents/`,
+  and `secrets.sqlite` (`0600`: Monzo/Ethereum tokens, OAuth clients/tokens, passkeys). The
+  better-sqlite3 writer `ATTACH`es both; no DuckDB read engine ever attaches `secrets.sqlite`,
+  so the NLQ path cannot reach it.
 - Server binds `127.0.0.1:4000` (open local port, today's behaviour, unchanged). The
   authenticated port `4001` and `/health` arrive with app Phase 1; ngrok forwards to `4001`.
 - Logs: `/Users/_pfa/Library/Logs/pfa/`.
@@ -136,6 +139,13 @@ rsync -avz /tmp/pfa-data-snap.sqlite matty@mac-mini.local:/tmp/pfa-data.sqlite
 rsync -avz ~/.pfa/documents/ matty@mac-mini.local:/tmp/pfa-documents/
 ```
 
+If the source already has a post-split `secrets.sqlite` (Monzo/OAuth/passkey state), stage it too:
+
+```
+sqlite3 ~/.pfa/secrets.sqlite ".backup '/tmp/pfa-secrets-snap.sqlite'"
+rsync -avz /tmp/pfa-secrets-snap.sqlite matty@mac-mini.local:/tmp/pfa-secrets.sqlite
+```
+
 On the mini (stops the server, backs up the current store, swaps in the import, restarts, and
 verifies):
 
@@ -143,10 +153,12 @@ verifies):
 sudo ops/mac-mini/provision.sh import
 ```
 
-`import` reads the staged files at `/tmp/pfa-data.sqlite` and `/tmp/pfa-documents/` (override
-with `PFA_IMPORT_DB` / `PFA_IMPORT_DOCS`), backs up the current store to `~_pfa/backups/`, prints
-`integrity_check` and row counts, restarts the server (migrations run at startup), and removes the
-staged files. Confirm the counts and a `get_net_worth` read match the source. After cutover the
+`import` reads the staged files at `/tmp/pfa-data.sqlite`, `/tmp/pfa-documents/`, and (if present)
+`/tmp/pfa-secrets.sqlite` (override with `PFA_IMPORT_DB` / `PFA_IMPORT_DOCS` /
+`PFA_IMPORT_SECRETS`), backs up the current `data.sqlite` and `secrets.sqlite` to `~_pfa/backups/`,
+installs `secrets.sqlite` at `0600`, prints `integrity_check` (both files) and row counts, restarts
+the server (migrations run at startup), and removes the staged files. If no secrets are staged, the
+mini keeps its own `secrets.sqlite`. Confirm the counts and a `get_net_worth` read match the source. After cutover the
 mini is the sole writer; never run two writers against copies.
 
 ## Remote access today (pre-auth proof, throwaway)
@@ -194,6 +206,36 @@ On the laptop, a second, separate connector (the dev connector stays untouched):
 The `ngrok-skip-browser-warning` header is required on the ngrok free tier (it otherwise injects
 an HTML interstitial that breaks the MCP client).
 
+## Authentication (passkey login)
+
+First-pass OAuth 2.1 + passkey auth gates the public path on port 4001 (the open 4000 stays
+loopback-only and unauthenticated for the co-located Desktop). Bring-up on the mini:
+
+1. Add the auth keys to `/Users/_pfa/pfa/server/.env` (see `server/.env.example`): `PUBLIC_ORIGIN`,
+   `RP_ID`, `RP_NAME`, `MCP_RESOURCE`, `AUTHORIZED_SUBJECT`, `AUTH_PORT`, the TTLs, and
+   `SIGNING_KEY_PATH`. For this host: `PUBLIC_ORIGIN=https://pfa.ngrok.app`, `RP_ID=pfa.ngrok.app`,
+   `MCP_RESOURCE=https://pfa.ngrok.app/mcp`, `SIGNING_KEY_PATH=/Users/_pfa/.pfa/oauth-ed25519.pem`.
+2. Generate the signing key and restart the server (also starts the 4001 listener):
+   ```
+   sudo ops/mac-mini/provision.sh auth
+   ```
+3. Enrol a passkey. Run the printed command, then open its single-use link **on your laptop at
+   the public domain** (so the credential binds to the RP ID `pfa.ngrok.app`):
+   ```
+   sudo -H -u _pfa bash -lc "cd /Users/_pfa/pfa/server && /opt/homebrew/opt/node@22/bin/npm run enroll-passkey"
+   ```
+   Enrol several passkeys (laptop, phone, hardware key) for redundancy — re-run for each.
+4. Repoint ngrok at the authenticated port (see ngrok section below): `addr: 4001`.
+5. Validate the full flow with MCP Inspector or the Claude Code CLI against
+   `https://pfa.ngrok.app/mcp` before Claude Desktop.
+
+Break-glass: `npm run mint-token` prints a short-lived bearer token; a client can reach `/mcp`
+with `mcp-remote --header "Authorization: Bearer <token>"` if the interactive flow is unavailable.
+
+Laptop connector (replaces the temporary Basic-Auth one): point Claude Desktop at
+`npx -y mcp-remote https://pfa.ngrok.app/mcp` with **no headers** — `mcp-remote` runs discovery,
+registration, the passkey browser flow, and token exchange itself.
+
 ## ngrok (enable with app Phase 1)
 
 ```
@@ -229,7 +271,9 @@ command).
   `sudo launchctl bootout system/com.pfa.ngrok`
 - Stop the server: `sudo launchctl bootout system/com.pfa.server`
 - Restore data: stop the server, copy a `predeploy-*.sqlite` or `data-*.sqlite` from
-  `/Users/_pfa/backups/` over `/Users/_pfa/.pfa/data.sqlite`, restart.
+  `/Users/_pfa/backups/` over `/Users/_pfa/.pfa/data.sqlite` (and the matching `secrets-*.sqlite`
+  over `secrets.sqlite` if restoring tokens/passkeys), restart. The nightly backup snapshots both
+  files; a restore that omits `secrets.sqlite` loses all connector tokens and passkeys.
 - Re-register the runner: `sudo ops/mac-mini/provision.sh runner` (uses `--replace`).
 
 ## FileVault and unattended recovery

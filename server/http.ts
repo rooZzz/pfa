@@ -1,9 +1,10 @@
 import { config } from "dotenv";
 import http from "node:http";
 import path from "node:path";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { initDb } from "./db.js";
-import { buildServer } from "./server.js";
+import { handleMcpRequest } from "./mcp_request.js";
+import { authConfigured } from "./auth/config.js";
+import { startAuthServer } from "./auth/app.js";
 
 config({ override: true, path: path.join(import.meta.dirname, ".env") });
 
@@ -67,18 +68,8 @@ const httpServer = http.createServer(async (req, res) => {
     return;
   }
 
-  const server = buildServer();
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
-  res.on("close", () => {
-    void transport.close().catch(() => {});
-    void server.close().catch(() => {});
-  });
   try {
-    await server.connect(transport);
-    await transport.handleRequest(req, res);
+    await handleMcpRequest(req, res);
   } catch (error) {
     const detail =
       error instanceof Error ? (error.stack ?? error.message) : String(error);
@@ -90,6 +81,14 @@ const httpServer = http.createServer(async (req, res) => {
 httpServer.listen(PORT, HOST, () => {
   process.stderr.write(`pfa MCP HTTP server on http://${HOST}:${PORT}/mcp\n`);
 });
+
+if (authConfigured()) {
+  startAuthServer();
+} else {
+  process.stderr.write(
+    "pfa auth server not started (PUBLIC_ORIGIN unset); open port only\n",
+  );
+}
 
 function shutdown(): void {
   httpServer.close(() => process.exit(0));

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getDb, initDb } from "../db.js";
+import { NLQ_TABLES } from "../nlq_allowlist.js";
 
 const CATALOG_PATH = path.join(
   import.meta.dirname,
@@ -11,20 +12,14 @@ const CATALOG_PATH = path.join(
   "schema_catalog.md",
 );
 
-function userTables(): string[] {
-  return (
-    getDb()
-      .prepare(
-        `SELECT name FROM sqlite_master
-         WHERE type = 'table'
-           AND name NOT LIKE 'sqlite_%'
-           AND name != 'schema_migrations'
-           AND name != 'connector_state'
-           AND name != 'tax_constants'
-         ORDER BY name`,
-      )
-      .all() as { name: string }[]
-  ).map((r) => r.name);
+function catalogTables(catalog: string): string[] {
+  const re = /^## Table: `pfa\.([a-z_]+)`/gm;
+  const names: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(catalog)) !== null) {
+    names.push(match[1]);
+  }
+  return names.sort();
 }
 
 function columnsOf(table: string): string[] {
@@ -42,25 +37,25 @@ function sectionFor(catalog: string, table: string): string | null {
 }
 
 let catalog: string;
-let tables: string[];
 
 beforeAll(() => {
   initDb();
   catalog = fs.readFileSync(CATALOG_PATH, "utf-8");
-  tables = userTables();
 });
 
-describe("schema_catalog coverage", () => {
-  it("documents every table in the live schema", () => {
-    const undocumented = tables.filter((t) => sectionFor(catalog, t) === null);
-    expect(undocumented).toEqual([]);
+describe("schema_catalog is the NLQ allow-list", () => {
+  it("documents exactly the allow-listed tables (no secrets, no extras)", () => {
+    expect(catalogTables(catalog)).toEqual([...NLQ_TABLES].sort());
   });
 
-  it("documents every column of every table", () => {
+  it("documents every column of every allow-listed table", () => {
     const missing: string[] = [];
-    for (const table of tables) {
+    for (const table of NLQ_TABLES) {
       const section = sectionFor(catalog, table);
-      if (section === null) continue;
+      if (section === null) {
+        missing.push(`${table} (no section)`);
+        continue;
+      }
       for (const col of columnsOf(table)) {
         if (!section.includes("`" + col + "`")) {
           missing.push(`${table}.${col}`);

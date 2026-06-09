@@ -37,6 +37,9 @@ describe("migration runner", () => {
       "0009_superseded_by",
       "0010_saye_monthly_contribution",
       "0011_asset_quantity_scale_contract",
+      "0012_oauth_and_webauthn",
+      "0013_move_secrets",
+      "0014_webauthn_challenge_req",
     ]);
   });
 
@@ -62,11 +65,41 @@ describe("migration runner", () => {
       "0009_superseded_by",
       "0010_saye_monthly_contribution",
       "0011_asset_quantity_scale_contract",
+      "0012_oauth_and_webauthn",
+      "0013_move_secrets",
+      "0014_webauthn_challenge_req",
     ]);
   });
 
   it("does not recreate the dead asset_values table", () => {
     expect(tableNames()).not.toContain("asset_values");
+  });
+
+  it("keeps every sensitive table out of main and only in secrets", () => {
+    const secret = [
+      "connector_state",
+      "oauth_client",
+      "oauth_authorization_code",
+      "oauth_refresh_token",
+      "webauthn_credential",
+      "webauthn_challenge",
+      "enrollment_token",
+      "pending_authorization",
+    ];
+    const inMain = (
+      getDb()
+        .prepare("SELECT name FROM main.sqlite_master WHERE type = 'table'")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    const inSecrets = (
+      getDb()
+        .prepare("SELECT name FROM secrets.sqlite_master WHERE type = 'table'")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    for (const name of secret) {
+      expect(inMain).not.toContain(name);
+      expect(inSecrets).toContain(name);
+    }
   });
 
   it("populates tax_periods on fresh init", () => {
@@ -148,6 +181,9 @@ describe("migration runner", () => {
       "0009_superseded_by",
       "0010_saye_monthly_contribution",
       "0011_asset_quantity_scale_contract",
+      "0012_oauth_and_webauthn",
+      "0013_move_secrets",
+      "0014_webauthn_challenge_req",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

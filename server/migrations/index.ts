@@ -10,6 +10,9 @@ import * as m0008 from "./0008_asset_ticker.js";
 import * as m0009 from "./0009_superseded_by.js";
 import * as m0010 from "./0010_saye_monthly_contribution.js";
 import * as m0011 from "./0011_asset_quantity_scale_contract.js";
+import * as m0012 from "./0012_oauth_and_webauthn.js";
+import * as m0013 from "./0013_move_secrets.js";
+import * as m0014 from "./0014_webauthn_challenge_req.js";
 
 type Migration = {
   name: string;
@@ -29,6 +32,9 @@ const MIGRATIONS: Migration[] = [
   { name: "0009_superseded_by", ...m0009 },
   { name: "0010_saye_monthly_contribution", ...m0010 },
   { name: "0011_asset_quantity_scale_contract", ...m0011 },
+  { name: "0012_oauth_and_webauthn", ...m0012 },
+  { name: "0013_move_secrets", ...m0013 },
+  { name: "0014_webauthn_challenge_req", ...m0014 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {

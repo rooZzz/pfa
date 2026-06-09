@@ -1,0 +1,18 @@
+export const NLQ_TABLES = [
+  "accounts",
+  "account_balances",
+  "transactions",
+  "assets",
+  "asset_prices",
+  "holdings",
+  "mortgages",
+  "mortgage_balance",
+  "pension_values",
+  "income_events",
+  "equity_grant",
+  "equity_vesting_event",
+  "person_profile",
+  "goals",
+  "documents",
+  "tax_periods",
+] as const;

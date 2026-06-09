@@ -74,6 +74,12 @@ ngrok configuration (authtoken, reserved domain, traffic policy) lives in the ng
 
 ## Next stage: thin-slice passkey auth (vertical cut, no design system)
 
+> Status: implemented. Code in `server/auth/` (config, keys, tokens, clients_store, provider,
+> webauthn, pages, routes, app), migration `0012_oauth_and_webauthn`, CLIs `gen-signing-key` /
+> `enroll-passkey` / `mint-token`, and the 4001 listener in `http.ts`. Express on the auth port;
+> the open 4000 path is unchanged. Bring-up and the laptop connector are in
+> [mac-mini-runbook.md](mac-mini-runbook.md) (Authentication).
+
 Before fleshing out Phases 1-4 individually, build one minimal vertical slice that exercises the entire intended passkey OAuth path end to end against the live mini and ngrok. The point is to prove the architecture - discovery, registration, the real WebAuthn ceremony, the real token shape, the gated endpoint - in one cut, deferring only presentation polish and the broader hardening. The per-phase sections below remain the reference for hardening each part afterward.
 
 In scope (kept thin):

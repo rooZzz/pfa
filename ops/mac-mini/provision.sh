@@ -165,8 +165,10 @@ cmd_agents() {
 set -euo pipefail
 stamp="\$(date +%Y%m%d-%H%M%S)"
 /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/data-\${stamp}.sqlite'"
+if [ -f "${DATA_DIR}/secrets.sqlite" ]; then /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/secrets-\${stamp}.sqlite'"; fi
 /usr/bin/rsync -a --delete "${DATA_DIR}/documents/" "${BACKUP_DIR}/documents/"
 /usr/bin/find "${BACKUP_DIR}" -name 'data-*.sqlite' -mtime +14 -delete
+/usr/bin/find "${BACKUP_DIR}" -name 'secrets-*.sqlite' -mtime +14 -delete
 EOF
   chown "$SERVICE_USER":staff "${BIN_DIR}/pfa-backup.sh"
   chmod 744 "${BIN_DIR}/pfa-backup.sh"
@@ -282,13 +284,15 @@ cmd_import() {
   need_root
   local db="${PFA_IMPORT_DB:-/tmp/pfa-data.sqlite}"
   local docs="${PFA_IMPORT_DOCS:-/tmp/pfa-documents}"
+  local secrets="${PFA_IMPORT_SECRETS:-/tmp/pfa-secrets.sqlite}"
+  local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
   [ -f "$db" ] || { echo "staged database not found at ${db}; stage it from the source machine first (see runbook Data migration)" >&2; exit 1; }
+  install -d -o "$SERVICE_USER" -g staff -m 755 "$BACKUP_DIR"
   if [ -f "${DATA_DIR}/data.sqlite" ]; then
-    local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
-    install -d -o "$SERVICE_USER" -g staff -m 755 "$BACKUP_DIR"
     say "Backing up current store to ${BACKUP_DIR}/preimport-${stamp}.sqlite"
     /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" ".backup '${BACKUP_DIR}/preimport-${stamp}.sqlite'"
   fi
+  if [ -f "${DATA_DIR}/secrets.sqlite" ]; then /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" ".backup '${BACKUP_DIR}/preimport-secrets-${stamp}.sqlite'"; fi
   say "Stopping server"
   unload_daemon com.pfa.server
   say "Installing imported database"
@@ -300,16 +304,41 @@ cmd_import() {
   else
     echo "WARNING: staged documents dir ${docs} not found; importing database only" >&2
   fi
+  if [ -f "$secrets" ]; then
+    say "Installing imported secrets store"
+    install -o "$SERVICE_USER" -g staff -m 600 "$secrets" "${DATA_DIR}/secrets.sqlite"
+  else
+    echo "NOTE: no staged secrets at ${secrets}; importing data only (the mini keeps its own secrets.sqlite)" >&2
+  fi
   chown -R "$SERVICE_USER":staff "$DATA_DIR"
   say "Integrity check (store quiescent, before start)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" 'PRAGMA integrity_check;'
+  if [ -f "${DATA_DIR}/secrets.sqlite" ]; then /usr/bin/sqlite3 "${DATA_DIR}/secrets.sqlite" 'PRAGMA integrity_check;'; fi
   say "Row counts (compare with the source)"
   /usr/bin/sqlite3 "${DATA_DIR}/data.sqlite" "select 'accounts='||count(*) from accounts; select 'transactions='||count(*) from transactions; select 'documents='||count(*) from documents;"
   say "Starting server (migrations run at startup)"
   load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
   say "Cleaning up staged files"
-  rm -f "$db"; rm -rf "$docs"
+  rm -f "$db" "$secrets"; rm -rf "$docs"
   say "Done. The mini is now the sole writer; stop the server on the source machine."
+}
+
+cmd_auth() {
+  need_root
+  [ -f "${APP_DIR}/server/.env" ] || {
+    echo "no ${APP_DIR}/server/.env; add the auth keys (PUBLIC_ORIGIN, RP_ID, MCP_RESOURCE, AUTHORIZED_SUBJECT, SIGNING_KEY_PATH) first" >&2
+    exit 1
+  }
+  say "Generating the OAuth signing key (as ${SERVICE_USER}; skipped if it exists)"
+  as_service env PATH="$RUNTIME_PATH" bash -c "cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run gen-signing-key"
+  say "Restarting the server to load the auth config and the 4001 listener"
+  load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
+  say "Next steps (not automated):"
+  echo "  1. Enrol a passkey, then open the printed link on your laptop at the public domain:"
+  echo "     sudo -H -u ${SERVICE_USER} bash -lc \"cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run enroll-passkey\""
+  echo "  2. Repoint ngrok at ${AUTH_PORT}: set addr/domain in ${NGROK_DIR}/ngrok.yml,"
+  echo "     add the authtoken (sudo -H -u ${SERVICE_USER} ngrok config add-authtoken <token>),"
+  echo "     then: sudo launchctl bootstrap system ${DAEMON_DIR}/com.pfa.ngrok.plist"
 }
 
 CMD="${1:-}"
@@ -321,8 +350,9 @@ case "$CMD" in
   power) cmd_power ;;
   agents) cmd_agents ;;
   runner) cmd_runner ;;
+  auth) cmd_auth ;;
   verify) cmd_verify ;;
   import) cmd_import ;;
   all) need_root; cmd_ssh; cmd_user; cmd_toolchain; cmd_bootstrap; cmd_power; cmd_agents; cmd_runner; cmd_verify ;;
-  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|verify|import|all}" >&2; exit 2 ;;
+  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|auth|verify|import|all}" >&2; exit 2 ;;
 esac
