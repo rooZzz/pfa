@@ -26,6 +26,10 @@ Done on the mini and verified:
 - `runner` - self-hosted runner registered to `rooZzz/pfa` (labels `self-hosted,mini,deploy`)
   and running as a daemon; shows Idle in repo Settings > Actions > Runners.
 
+Live smoke checks (2026-06-09): GitHub reports runner `mini` online and idle; an MCP
+`initialize` POST to `127.0.0.1:4000/mcp` returns HTTP 200 with `serverInfo {name: pfa}`.
+The host layer is complete and verified - safe to continue from the second machine.
+
 Remaining (intended for the second machine / later):
 
 - Merge this branch (or cherry-pick `deploy.yml`) to the default branch so `release: published`
