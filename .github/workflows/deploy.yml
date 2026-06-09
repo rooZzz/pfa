@@ -48,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -d "$APP_DIR" ]; then
-            /usr/bin/rsync -a --delete --exclude node_modules --exclude server/dist "$APP_DIR/" "$PREV_DIR/"
+            /usr/bin/rsync -a --delete --exclude node_modules --exclude server/dist --exclude server/.env "$APP_DIR/" "$PREV_DIR/"
           fi
 
       - name: Sync release into app dir
@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$APP_DIR"
           /usr/bin/rsync -a --delete \
-            --exclude .git --exclude node_modules --exclude server/dist \
+            --exclude .git --exclude node_modules --exclude server/dist --exclude server/.env \
             "$GITHUB_WORKSPACE/source/" "$APP_DIR/"
 
       - name: Install, build, migrate, restart
@@ -84,7 +84,7 @@ jobs:
           set -euo pipefail
           echo "deploy failed, rolling back"
           if [ -d "$PREV_DIR" ]; then
-            /usr/bin/rsync -a --delete --exclude node_modules --exclude server/dist "$PREV_DIR/" "$APP_DIR/"
+            /usr/bin/rsync -a --delete --exclude node_modules --exclude server/dist --exclude server/.env "$PREV_DIR/" "$APP_DIR/"
             cd "$APP_DIR/server" && "$NPM" ci && "$NPM" run build
           fi
           if [ -n "${BACKUP:-}" ] && [ -f "${BACKUP:-}" ]; then
