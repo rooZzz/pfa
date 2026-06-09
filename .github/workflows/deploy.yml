@@ -1,0 +1,94 @@
+name: Deploy to mini
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to deploy
+        required: true
+
+concurrency:
+  group: deploy-mini
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, mini, deploy]
+    env:
+      APP_DIR: /Users/_pfa/pfa
+      DATA_DIR: /Users/_pfa/.pfa
+      BACKUP_DIR: /Users/_pfa/backups
+      PREV_DIR: /Users/_pfa/pfa.prev
+      NPM: /opt/homebrew/opt/node@22/bin/npm
+      PORT: "4000"
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: echo "ref=${{ github.event.release.tag_name || github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.ref }}
+          path: source
+
+      - name: Back up data store
+        run: |
+          set -euo pipefail
+          stamp="$(date +%Y%m%d-%H%M%S)"
+          mkdir -p "$BACKUP_DIR"
+          if [ -f "$DATA_DIR/data.sqlite" ]; then
+            /usr/bin/sqlite3 "$DATA_DIR/data.sqlite" ".backup '$BACKUP_DIR/predeploy-$stamp.sqlite'"
+            echo "BACKUP=$BACKUP_DIR/predeploy-$stamp.sqlite" >> "$GITHUB_ENV"
+          fi
+
+      - name: Snapshot current source for rollback
+        run: |
+          set -euo pipefail
+          if [ -d "$APP_DIR" ]; then
+            /usr/bin/rsync -a --delete --exclude node_modules --exclude server/dist --exclude server/.env "$APP_DIR/" "$PREV_DIR/"
+          fi
+
+      - name: Sync release into app dir
+        run: |
+          set -euo pipefail
+          mkdir -p "$APP_DIR"
+          /usr/bin/rsync -a --delete \
+            --exclude .git --exclude node_modules --exclude server/dist --exclude server/.env \
+            "$GITHUB_WORKSPACE/source/" "$APP_DIR/"
+
+      - name: Install, build, migrate, restart
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR/server"
+          "$NPM" ci
+          "$NPM" run build
+          sudo /bin/launchctl kickstart -k system/com.pfa.server
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 20); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:${PORT}/mcp" -H 'content-type: application/json' -d '{}' || true)"
+            case "$code" in 2??|4??) echo "server up (http $code)"; exit 0 ;; esac
+            sleep 2
+          done
+          echo "server did not respond on :${PORT}" >&2
+          exit 1
+
+      - name: Roll back on failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          echo "deploy failed, rolling back"
+          if [ -d "$PREV_DIR" ]; then
+            /usr/bin/rsync -a --delete --exclude node_modules --exclude server/dist --exclude server/.env "$PREV_DIR/" "$APP_DIR/"
+            cd "$APP_DIR/server" && "$NPM" ci && "$NPM" run build
+          fi
+          if [ -n "${BACKUP:-}" ] && [ -f "${BACKUP:-}" ]; then
+            cp "$BACKUP" "$DATA_DIR/data.sqlite"
+          fi
+          sudo /bin/launchctl kickstart -k system/com.pfa.server
+          exit 1
