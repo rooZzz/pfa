@@ -1,5 +1,6 @@
+import fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb, SECRETS_PATH } from "../db.js";
 import { runProductQuery } from "../nlq_query.js";
 import { runQuery, resetDuck } from "../query.js";
 
@@ -34,6 +35,10 @@ describe("NLQ engine boundary", () => {
 
   it("cannot reach non-allow-listed reference data (tax_constants)", async () => {
     await expect(runProductQuery("SELECT * FROM pfa.tax_constants")).rejects.toThrow();
+  });
+
+  it("creates the secrets file owner-only (0600)", () => {
+    expect(fs.statSync(SECRETS_PATH).mode & 0o777).toBe(0o600);
   });
 
   it("keeps secret tables reachable by the app handle, resolved to the secrets file", () => {
