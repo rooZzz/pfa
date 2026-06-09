@@ -73,6 +73,13 @@ describe("auth app surface", () => {
     expect(JSON.parse(res.body).keys).toHaveLength(1);
   });
 
+  it("serves a 200 landing page at the root that links the favicon", async () => {
+    const res = await request("GET", "/");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.body).toContain('rel="icon"');
+  });
+
   it("serves a theme-aware SVG favicon at the origin root", async () => {
     const res = await request("GET", "/favicon.svg");
     expect(res.status).toBe(200);

@@ -510,10 +510,12 @@ FileVault — one manual unlock, which a UPS bridges for brief outages.
 
 The served auth origin now carries a dark/light-aware PFA favicon (`server/auth/assets/` — a
 theme-aware SVG via `@media (prefers-color-scheme: dark)`, an ICO fallback, an apple-touch-icon),
-served at the origin root and linked from every auth page. This fixes the browser tab and any
-favicon probe of the public origin. The connector chip icon in Claude remains best-effort: Claude
-does not yet render the MCP `serverInfo.icons` field (already populated in `server/icons.ts`) for
-custom connectors, so the chip may stay generic until that lands upstream.
+served at the origin root and linked from every auth page, including a minimal `200` landing page at
+`/` (the root previously 404'd). The connector chip icon in Claude is sourced from Google's S2
+favicon service (`google.com/s2/favicons?domain=…`), which crawls the public domain rather than
+reading the MCP `serverInfo.icons` field (already populated in `server/icons.ts`); the landing page
+exists so that crawl finds the favicon. Cache refresh there is on Google's own cadence (often a day
+or more) and cannot be forced.
 
 ---
 

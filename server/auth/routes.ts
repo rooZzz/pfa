@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import express, { type Request, type Response } from "express";
-import { loginPage, enrollPage, errorPage } from "./pages.js";
+import { loginPage, enrollPage, errorPage, landingPage } from "./pages.js";
 import { jwks } from "./keys.js";
 import { finalizePendingAuthorization, getPendingAuthorization } from "./provider.js";
 import {
@@ -39,6 +39,10 @@ export function authRoutes(): express.Router {
 
   router.get("/assets/webauthn.js", (_req: Request, res: Response) => {
     res.type("application/javascript").send(BROWSER_BUNDLE);
+  });
+
+  router.get("/", (_req: Request, res: Response) => {
+    res.type("html").send(landingPage());
   });
 
   router.get("/favicon.svg", (_req: Request, res: Response) => {

@@ -113,3 +113,12 @@ document.getElementById("go").addEventListener("click", enrol);`;
 export function errorPage(message: string): string {
   return shell("pfa — error", `<h1>pfa</h1><p class="error">${message}</p>`, "");
 }
+
+export function landingPage(): string {
+  return shell(
+    "pfa",
+    `<h1>pfa</h1>
+<p>Personal finance assistant. Access is by authorized client only.</p>`,
+    "",
+  );
+}
