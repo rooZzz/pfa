@@ -194,6 +194,36 @@ On the laptop, a second, separate connector (the dev connector stays untouched):
 The `ngrok-skip-browser-warning` header is required on the ngrok free tier (it otherwise injects
 an HTML interstitial that breaks the MCP client).
 
+## Authentication (passkey login)
+
+First-pass OAuth 2.1 + passkey auth gates the public path on port 4001 (the open 4000 stays
+loopback-only and unauthenticated for the co-located Desktop). Bring-up on the mini:
+
+1. Add the auth keys to `/Users/_pfa/pfa/server/.env` (see `server/.env.example`): `PUBLIC_ORIGIN`,
+   `RP_ID`, `RP_NAME`, `MCP_RESOURCE`, `AUTHORIZED_SUBJECT`, `AUTH_PORT`, the TTLs, and
+   `SIGNING_KEY_PATH`. For this host: `PUBLIC_ORIGIN=https://pfa.ngrok.app`, `RP_ID=pfa.ngrok.app`,
+   `MCP_RESOURCE=https://pfa.ngrok.app/mcp`, `SIGNING_KEY_PATH=/Users/_pfa/.pfa/oauth-ed25519.pem`.
+2. Generate the signing key and restart the server (also starts the 4001 listener):
+   ```
+   sudo ops/mac-mini/provision.sh auth
+   ```
+3. Enrol a passkey. Run the printed command, then open its single-use link **on your laptop at
+   the public domain** (so the credential binds to the RP ID `pfa.ngrok.app`):
+   ```
+   sudo -H -u _pfa bash -lc "cd /Users/_pfa/pfa/server && /opt/homebrew/opt/node@22/bin/npm run enroll-passkey"
+   ```
+   Enrol several passkeys (laptop, phone, hardware key) for redundancy — re-run for each.
+4. Repoint ngrok at the authenticated port (see ngrok section below): `addr: 4001`.
+5. Validate the full flow with MCP Inspector or the Claude Code CLI against
+   `https://pfa.ngrok.app/mcp` before Claude Desktop.
+
+Break-glass: `npm run mint-token` prints a short-lived bearer token; a client can reach `/mcp`
+with `mcp-remote --header "Authorization: Bearer <token>"` if the interactive flow is unavailable.
+
+Laptop connector (replaces the temporary Basic-Auth one): point Claude Desktop at
+`npx -y mcp-remote https://pfa.ngrok.app/mcp` with **no headers** — `mcp-remote` runs discovery,
+registration, the passkey browser flow, and token exchange itself.
+
 ## ngrok (enable with app Phase 1)
 
 ```

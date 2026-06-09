@@ -21,6 +21,10 @@ function userTables(): string[] {
            AND name != 'schema_migrations'
            AND name != 'connector_state'
            AND name != 'tax_constants'
+           AND name NOT LIKE 'oauth_%'
+           AND name NOT LIKE 'webauthn_%'
+           AND name != 'enrollment_token'
+           AND name != 'pending_authorization'
          ORDER BY name`,
       )
       .all() as { name: string }[]

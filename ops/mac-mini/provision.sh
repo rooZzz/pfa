@@ -312,6 +312,24 @@ cmd_import() {
   say "Done. The mini is now the sole writer; stop the server on the source machine."
 }
 
+cmd_auth() {
+  need_root
+  [ -f "${APP_DIR}/server/.env" ] || {
+    echo "no ${APP_DIR}/server/.env; add the auth keys (PUBLIC_ORIGIN, RP_ID, MCP_RESOURCE, AUTHORIZED_SUBJECT, SIGNING_KEY_PATH) first" >&2
+    exit 1
+  }
+  say "Generating the OAuth signing key (as ${SERVICE_USER}; skipped if it exists)"
+  as_service env PATH="$RUNTIME_PATH" bash -c "cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run gen-signing-key" || true
+  say "Restarting the server to load the auth config and the 4001 listener"
+  load_daemon com.pfa.server "${DAEMON_DIR}/com.pfa.server.plist"
+  say "Next steps (not automated):"
+  echo "  1. Enrol a passkey, then open the printed link on your laptop at the public domain:"
+  echo "     sudo -H -u ${SERVICE_USER} bash -lc \"cd '${APP_DIR}/server' && '${NODE_BIN}/npm' run enroll-passkey\""
+  echo "  2. Repoint ngrok at ${AUTH_PORT}: set addr/domain in ${NGROK_DIR}/ngrok.yml,"
+  echo "     add the authtoken (sudo -H -u ${SERVICE_USER} ngrok config add-authtoken <token>),"
+  echo "     then: sudo launchctl bootstrap system ${DAEMON_DIR}/com.pfa.ngrok.plist"
+}
+
 CMD="${1:-}"
 case "$CMD" in
   ssh) cmd_ssh ;;
@@ -321,8 +339,9 @@ case "$CMD" in
   power) cmd_power ;;
   agents) cmd_agents ;;
   runner) cmd_runner ;;
+  auth) cmd_auth ;;
   verify) cmd_verify ;;
   import) cmd_import ;;
   all) need_root; cmd_ssh; cmd_user; cmd_toolchain; cmd_bootstrap; cmd_power; cmd_agents; cmd_runner; cmd_verify ;;
-  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|verify|import|all}" >&2; exit 2 ;;
+  *) echo "usage: sudo $0 {ssh|user|toolchain|bootstrap|power|agents|runner|auth|verify|import|all}" >&2; exit 2 ;;
 esac
