@@ -7,6 +7,7 @@ import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middlew
 import { provider } from "./provider.js";
 import { authRoutes } from "./routes.js";
 import { handleMcpRequest } from "../mcp/mcp_request.js";
+import { serveWidgetAsset } from "../mcp/widget_assets.js";
 import { publicOrigin, mcpResource, authPort, publicOriginHost } from "./config.js";
 
 export function buildAuthApp(): express.Express {
@@ -26,6 +27,10 @@ export function buildAuthApp(): express.Express {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "no-referrer");
     next();
+  });
+
+  app.use("/widgets", (req, res) => {
+    serveWidgetAsset(`/widgets${req.path}`, res);
   });
 
   app.use(

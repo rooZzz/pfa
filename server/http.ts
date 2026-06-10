@@ -2,6 +2,7 @@ import http from "node:http";
 import { loadEnv } from "./core/env.js";
 import { initDb } from "./core/db.js";
 import { handleMcpRequest } from "./mcp/mcp_request.js";
+import { serveWidgetAsset } from "./mcp/widget_assets.js";
 import { authConfigured } from "./auth/config.js";
 import { startAuthServer } from "./auth/app.js";
 
@@ -45,6 +46,10 @@ function sendJsonRpcError(
 
 const httpServer = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
+  if (url.pathname.startsWith("/widgets/")) {
+    serveWidgetAsset(url.pathname, res);
+    return;
+  }
   if (url.pathname !== "/mcp") {
     res.writeHead(404, { "content-type": "text/plain" }).end("Not found");
     return;

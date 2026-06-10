@@ -4,25 +4,26 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { PFA_ICONS } from "./icons.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
+import { widgetAssetOrigin, widgetHtml } from "./widget_assets.js";
 import { resources, tools } from "../tools/registry.js";
-
-const DIST_DIR = path.join(import.meta.dirname, "..", "dist");
-
-const RESOURCE_META = {
-  ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: true },
-  "openai/widgetCSP": { connect_domains: [], resource_domains: [] },
-  "openai/widgetPrefersBorder": true,
-};
 
 export function buildServer(): McpServer {
   const server = new McpServer(
     { name: "pfa", version: "0.1.0", icons: PFA_ICONS },
     { instructions: SERVER_INSTRUCTIONS },
   );
+
+  const assetOrigin = widgetAssetOrigin();
+  const resourceMeta = {
+    ui: {
+      csp: { connectDomains: [], resourceDomains: [assetOrigin] },
+      prefersBorder: true,
+    },
+    "openai/widgetCSP": { connect_domains: [], resource_domains: [assetOrigin] },
+    "openai/widgetPrefersBorder": true,
+  };
 
   for (const tool of tools) {
     if (tool.app || tool.widgetAccessible) {
@@ -63,24 +64,22 @@ export function buildServer(): McpServer {
   }
 
   for (const { uri, file } of resources) {
+    const screen = file.replace(/\.html$/, "");
     registerAppResource(
       server,
       uri,
       uri,
-      { mimeType: RESOURCE_MIME_TYPE, _meta: RESOURCE_META },
-      async () => {
-        const html = await fs.readFile(path.join(DIST_DIR, file), "utf-8");
-        return {
-          contents: [
-            {
-              uri,
-              mimeType: RESOURCE_MIME_TYPE,
-              text: html,
-              _meta: RESOURCE_META,
-            },
-          ],
-        };
-      },
+      { mimeType: RESOURCE_MIME_TYPE, _meta: resourceMeta },
+      async () => ({
+        contents: [
+          {
+            uri,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: widgetHtml(screen, assetOrigin),
+            _meta: resourceMeta,
+          },
+        ],
+      }),
     );
   }
 

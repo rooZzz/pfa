@@ -3,42 +3,51 @@ import path from "node:path";
 import process from "node:process";
 import { build } from "vite";
 import react from "@vitejs/plugin-react";
-import { viteSingleFile } from "vite-plugin-singlefile";
 
 const watch = process.argv.includes("--watch");
 const isDevelopment = process.env.NODE_ENV === "development";
 
-const entries = globSync("*.html", { cwd: import.meta.dirname }).map((file) =>
-  path.join(import.meta.dirname, file),
+const screens = globSync("*.html", { cwd: import.meta.dirname }).map((file) =>
+  path.basename(file, ".html"),
 );
 
-if (entries.length === 0) {
+if (screens.length === 0) {
   throw new Error(
     "No screen entry HTML files found in server/ — add <screen>.html to build a UI screen",
   );
 }
 
-function buildScreen(input) {
+function buildScreen(name) {
   return build({
     configFile: false,
-    plugins: [react(), viteSingleFile()],
+    base: "./",
+    plugins: [react()],
     build: {
       sourcemap: isDevelopment ? "inline" : undefined,
+      cssCodeSplit: false,
       cssMinify: !isDevelopment,
       minify: !isDevelopment,
       assetsInlineLimit: 1024 * 1024,
-      outDir: "dist",
-      emptyOutDir: false,
-      rollupOptions: { input },
+      outDir: path.join(import.meta.dirname, "dist", "widgets", name),
+      emptyOutDir: true,
+      rollupOptions: {
+        input: path.join(import.meta.dirname, "ui", `${name}.tsx`),
+        output: {
+          format: "es",
+          entryFileNames: "app-[hash].js",
+          assetFileNames: "app-[hash][extname]",
+          inlineDynamicImports: true,
+        },
+      },
       watch: watch ? {} : null,
     },
   });
 }
 
-for (const input of entries) {
+for (const name of screens) {
   if (watch) {
-    void buildScreen(input);
+    void buildScreen(name);
   } else {
-    await buildScreen(input);
+    await buildScreen(name);
   }
 }
