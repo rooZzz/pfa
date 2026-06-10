@@ -399,9 +399,29 @@ export const tools: ToolDescriptor[] = [
   }),
 ];
 
-export const resources: { uri: string; file: string }[] = [
-  { uri: UPLOAD_URI, file: "upload.html" },
-  { uri: NET_WORTH_URI, file: "net_worth.html" },
-  { uri: CASHFLOW_URI, file: "cashflow.html" },
-  { uri: CONNECTORS_URI, file: "connectors.html" },
+export const resources: { uri: string; file: string; description: string }[] = [
+  {
+    uri: UPLOAD_URI,
+    file: "upload.html",
+    description:
+      "Document upload widget. The user drops a payslip (PDF or image) to start the ingestion and review flow.",
+  },
+  {
+    uri: NET_WORTH_URI,
+    file: "net_worth.html",
+    description:
+      "Net worth dashboard showing realised and contingent totals, per-line staleness and provenance, and a 12-month realised trend.",
+  },
+  {
+    uri: CASHFLOW_URI,
+    file: "cashflow.html",
+    description:
+      "Cashflow dashboard showing payslip income, spending by category, net cashflow, and a monthly trend for the current UK tax year.",
+  },
+  {
+    uri: CONNECTORS_URI,
+    file: "connectors.html",
+    description:
+      "Connector setup widget for linking Monzo or an Ethereum wallet with credentials entered directly in the widget.",
+  },
 ];

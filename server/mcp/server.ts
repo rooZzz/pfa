@@ -9,23 +9,19 @@ import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { widgetAssetOrigin, widgetHtml } from "./widget_assets.js";
 import { resources, tools } from "../tools/registry.js";
 
-export function buildServer(options: { skybridge?: boolean } = {}): McpServer {
+export function buildServer(): McpServer {
   const server = new McpServer(
     { name: "pfa", version: "0.1.0", icons: PFA_ICONS },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
-  const resourceMimeType = options.skybridge ? "text/html+skybridge" : RESOURCE_MIME_TYPE;
   const assetOrigin = widgetAssetOrigin();
-  const assetHost = new URL(assetOrigin).host;
-  const resourceMeta = {
+  const sharedResourceMeta = {
     ui: {
-      domain: assetHost,
-      csp: { connectDomains: [], resourceDomains: [assetHost] },
+      csp: { connectDomains: [], resourceDomains: [assetOrigin] },
       prefersBorder: true,
     },
-    "openai/widgetDomain": assetHost,
-    "openai/widgetCSP": { connect_domains: [], resource_domains: [assetHost] },
+    "openai/widgetCSP": { connect_domains: [], resource_domains: [assetOrigin] },
     "openai/widgetPrefersBorder": true,
   };
 
@@ -67,18 +63,22 @@ export function buildServer(options: { skybridge?: boolean } = {}): McpServer {
     }
   }
 
-  for (const { uri, file } of resources) {
+  for (const { uri, file, description } of resources) {
     const screen = file.replace(/\.html$/, "");
+    const resourceMeta = {
+      ...sharedResourceMeta,
+      "openai/widgetDescription": description,
+    };
     registerAppResource(
       server,
       uri,
       uri,
-      { mimeType: resourceMimeType, _meta: resourceMeta },
+      { mimeType: RESOURCE_MIME_TYPE, _meta: resourceMeta },
       async () => ({
         contents: [
           {
             uri,
-            mimeType: resourceMimeType,
+            mimeType: RESOURCE_MIME_TYPE,
             text: widgetHtml(screen, assetOrigin),
             _meta: resourceMeta,
           },

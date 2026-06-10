@@ -30,7 +30,7 @@ export function buildAuthApp(): express.Express {
   });
 
   app.use("/widgets", (req, res) => {
-    serveWidgetAsset(`/widgets${req.path}`, res);
+    serveWidgetAsset(`/widgets${req.path}`, req, res);
   });
 
   app.use(
@@ -53,7 +53,7 @@ export function buildAuthApp(): express.Express {
     requireBearerAuth({ verifier: provider, resourceMetadataUrl }),
     async (req, res) => {
       try {
-        await handleMcpRequest(req, res, { skybridge: true });
+        await handleMcpRequest(req, res);
       } catch (error) {
         const detail =
           error instanceof Error ? (error.stack ?? error.message) : String(error);

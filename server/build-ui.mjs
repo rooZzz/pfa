@@ -34,8 +34,8 @@ function buildScreen(name) {
         input: path.join(import.meta.dirname, "ui", `${name}.tsx`),
         output: {
           format: "es",
-          entryFileNames: "app-[hash].js",
-          assetFileNames: "app-[hash][extname]",
+          entryFileNames: "app.js",
+          assetFileNames: "app[extname]",
           inlineDynamicImports: true,
         },
       },

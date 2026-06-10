@@ -47,7 +47,7 @@ function sendJsonRpcError(
 const httpServer = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
   if (url.pathname.startsWith("/widgets/")) {
-    serveWidgetAsset(url.pathname, res);
+    serveWidgetAsset(url.pathname, req, res);
     return;
   }
   if (url.pathname !== "/mcp") {
