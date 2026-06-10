@@ -1,3 +1,5 @@
+import { authCssVersion } from "./asset_version.js";
+
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -49,7 +51,7 @@ function shell(title: string, body: string, script: string): string {
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/assets/auth.css">
+<link rel="stylesheet" href="/assets/auth.css?v=${authCssVersion}">
 <script>(function(){try{if(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches){document.documentElement.setAttribute("data-theme","light");}}catch(e){}})();</script>
 </head>
 <body>

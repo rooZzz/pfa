@@ -113,7 +113,9 @@ p {
 }
 @media (max-width: 480px) {
   .auth-stage {
-    padding: 1.5rem 1rem;
+    min-height: auto;
+    align-items: flex-start;
+    padding: 2rem 1rem;
   }
   .auth-card {
     padding: var(--space-6);
