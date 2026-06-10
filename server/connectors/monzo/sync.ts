@@ -1,6 +1,6 @@
 import type { Transaction } from "kysely";
-import { getKysely } from "../../db.js";
-import type { DatabaseSchema } from "../../schema.js";
+import { getKysely } from "../../core/db.js";
+import type { DatabaseSchema } from "../../core/schema.js";
 import { ensureConnectorAccount, writeConnectorDocument } from "../references.js";
 import { readConnectorState, saveSyncState } from "../state.js";
 import { classifyInternal, classifyPotType, normalizeCategory } from "./classify.js";

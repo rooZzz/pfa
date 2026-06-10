@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getCashflow } from "../cashflow/index.js";
-import { ensureFresh, type EnsureFreshDeps } from "../freshness.js";
+import { ensureFresh, type EnsureFreshDeps } from "../core/freshness.js";
 
 export const getCashflowSchema = {
   tax_year: z

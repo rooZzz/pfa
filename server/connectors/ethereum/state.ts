@@ -1,4 +1,4 @@
-import { getKysely } from "../../db.js";
+import { getKysely } from "../../core/db.js";
 import { saveConnectorCredentials } from "../state.js";
 
 export const ETHEREUM_PROVIDER = "ethereum";

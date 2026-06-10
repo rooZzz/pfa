@@ -12,9 +12,9 @@ import {
   saveEthereumWallet,
 } from "../connectors/ethereum/state.js";
 import { runEthereumSync } from "../connectors/ethereum/sync.js";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { getNetWorth } from "../net_worth/index.js";
-import { resetDuck } from "../query.js";
+import { resetDuck } from "../query/query.js";
 import { connectEthereum } from "../tools/connect_ethereum.js";
 import { correctRecordTool } from "../tools/correct_record.js";
 

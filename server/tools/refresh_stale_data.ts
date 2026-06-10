@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ensureFresh, type DataClass } from "../freshness.js";
+import { ensureFresh, type DataClass } from "../core/freshness.js";
 
 export const refreshStaleDataSchema = {
   classes: z

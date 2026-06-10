@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ensureFresh, type EnsureFreshDeps } from "../freshness.js";
+import { ensureFresh, type EnsureFreshDeps } from "../core/freshness.js";
 import { getBriefing } from "../goals/briefing.js";
 
 export const getBriefingSchema = {

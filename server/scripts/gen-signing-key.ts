@@ -1,7 +1,7 @@
 import path from "node:path";
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { generateKeyPair, exportPKCS8 } from "jose";
-import { loadEnv } from "../env.js";
+import { loadEnv } from "../core/env.js";
 
 loadEnv();
 

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { Kysely, SqliteDialect } from "kysely";
 import type { DatabaseSchema } from "./schema.js";
-import { runMigrations, rollbackAll } from "./migrations/index.js";
+import { runMigrations, rollbackAll } from "../migrations/index.js";
 
 const PFA_DIR = process.env.PFA_DIR ?? path.join(os.homedir(), ".pfa");
 const DOCUMENTS_DIR = path.join(PFA_DIR, "documents");

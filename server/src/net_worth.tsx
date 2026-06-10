@@ -26,7 +26,7 @@ import { categoryGlyph, institutionToGlyph } from "./logos.js";
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { ABSENCE_LABEL, formatGbp, formatGbpk } from "./format.js";
-import type { ClassOutcome, DataClass } from "../freshness.js";
+import type { ClassOutcome, DataClass } from "../core/freshness.js";
 
 function monthYear(dateStr: string): string {
   const d = new Date(dateStr);

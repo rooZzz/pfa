@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
-import { resetDuck, runQuery } from "../query.js";
+import { getDb, initDb } from "../core/db.js";
+import { resetDuck, runQuery } from "../query/query.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 
 afterEach(() => {

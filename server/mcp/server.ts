@@ -8,7 +8,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { PFA_ICONS } from "./icons.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
-import { resources, tools } from "./tools/registry.js";
+import { resources, tools } from "../tools/registry.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "dist");
 

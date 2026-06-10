@@ -1,6 +1,6 @@
 import type { Transaction } from "kysely";
-import { getKysely } from "../db.js";
-import type { DatabaseSchema } from "../schema.js";
+import { getKysely } from "../core/db.js";
+import type { DatabaseSchema } from "../core/schema.js";
 
 export type ConnectorCredentials = {
   client_id: string;

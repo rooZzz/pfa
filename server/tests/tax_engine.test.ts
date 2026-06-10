@@ -6,10 +6,10 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-import { getDb, getKysely, initDb } from "../db.js";
+import { getDb, getKysely, initDb } from "../core/db.js";
 import { getBriefing } from "../goals/briefing.js";
-import { resetDuck } from "../query.js";
-import { writeManualDocument } from "../references.js";
+import { resetDuck } from "../query/query.js";
+import { writeManualDocument } from "../core/references.js";
 import { taxPosition } from "../tax/engine.js";
 import { evaluateScenario } from "../tools/evaluate_scenario.js";
 import { recordPersonProfile } from "../tools/record_person_profile.js";

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { saveConnectorCredentials } from "../connectors/state.js";
-import { getDb, initDb } from "../db.js";
-import { computeFreshness } from "../freshness.js";
+import { getDb, initDb } from "../core/db.js";
+import { computeFreshness } from "../core/freshness.js";
 
 beforeEach(() => {
   initDb();

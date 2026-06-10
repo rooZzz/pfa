@@ -1,5 +1,5 @@
 import duckdb from "duckdb";
-import { DB_PATH, getDb } from "./db.js";
+import { DB_PATH, getDb } from "../core/db.js";
 import { NLQ_TABLES } from "./nlq_allowlist.js";
 
 type Row = Record<string, unknown>;

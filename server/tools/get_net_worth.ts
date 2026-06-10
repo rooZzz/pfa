@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ensureFresh, type EnsureFreshDeps } from "../freshness.js";
+import { ensureFresh, type EnsureFreshDeps } from "../core/freshness.js";
 import { getNetWorth } from "../net_worth/index.js";
 
 export const getNetWorthSchema = {

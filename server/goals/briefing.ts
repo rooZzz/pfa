@@ -1,4 +1,4 @@
-import { getKysely } from "../db.js";
+import { getKysely } from "../core/db.js";
 import {
   bridgeFund,
   cashSavings,
@@ -12,7 +12,7 @@ import {
   projectedInvestedAssets,
   projectedPensionPot,
 } from "../metrics/index.js";
-import { LIVE_CONTEXT, type ReadContext } from "../query.js";
+import { LIVE_CONTEXT, type ReadContext } from "../query/query.js";
 import { type TaxPositionContext, taxPosition } from "../tax/engine.js";
 import { type EarningsContext, earningsContext } from "./earnings.js";
 import {

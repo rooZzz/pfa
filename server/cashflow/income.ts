@@ -1,5 +1,5 @@
-import { runQuery } from "../query.js";
-import { toNum } from "../sql_util.js";
+import { runQuery } from "../query/query.js";
+import { toNum } from "../core/sql_util.js";
 import type { IncomeTotal, LineItem } from "./types.js";
 
 function isLineItem(value: unknown): value is LineItem {

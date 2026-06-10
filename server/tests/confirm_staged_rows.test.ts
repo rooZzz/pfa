@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
-import { stageReview } from "../staging.js";
+import { getDb, initDb } from "../core/db.js";
+import { stageReview } from "../core/staging.js";
 import { confirmStagedRows } from "../tools/confirm_staged_rows.js";
 
 const FILE_BYTES = Buffer.from("mock-pdf-content");
@@ -117,7 +117,7 @@ describe("confirmStagedRows", () => {
   });
 
   it("clears the staging buffer after confirmation", async () => {
-    const { getReview } = await import("../staging.js");
+    const { getReview } = await import("../core/staging.js");
 
     const reviewId = stageReview(
       makeStagedEntry({ content_hash: "test-hash-003", gross_pence: 500000 }),

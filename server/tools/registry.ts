@@ -1,6 +1,6 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { resetDb } from "../db.js";
+import { resetDb } from "../core/db.js";
 import { archiveGoal, archiveGoalSchema } from "./archive_goal.js";
 import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { updateGoal, updateGoalSchema } from "./update_goal.js";

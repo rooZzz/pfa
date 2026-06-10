@@ -6,7 +6,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-import { getDb, getKysely, initDb } from "../db.js";
+import { getDb, getKysely, initDb } from "../core/db.js";
 import { type Directive, getBriefing } from "../goals/briefing.js";
 import {
   bridgeFund,
@@ -15,8 +15,8 @@ import {
   investedAssets,
   projectedPensionPot,
 } from "../metrics/index.js";
-import { resetDuck } from "../query.js";
-import { writeManualDocument } from "../references.js";
+import { resetDuck } from "../query/query.js";
+import { writeManualDocument } from "../core/references.js";
 import { confirmGoal } from "../tools/confirm_goal.js";
 import { evaluateScenario } from "../tools/evaluate_scenario.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";

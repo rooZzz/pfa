@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
+import { getKysely } from "../core/db.js";
 import { tryPriceOnCapture } from "../connectors/prices/sync.js";
-import { ensureAsset, writeManualDocument } from "../references.js";
+import { ensureAsset, writeManualDocument } from "../core/references.js";
 
 export const recordEquityGrantSchema = {
   scheme_type: z

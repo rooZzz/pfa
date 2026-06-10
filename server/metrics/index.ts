@@ -1,9 +1,9 @@
 import { resolvePeriod } from "../cashflow/index.js";
 import { queryIncome } from "../cashflow/income.js";
 import { REAL_RETURN_RATE_BPS } from "../goals/assumptions.js";
-import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
-import { latestPriceTick, latestRangeSnapshot } from "../snapshots.js";
-import { toNum } from "../sql_util.js";
+import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query/query.js";
+import { latestPriceTick, latestRangeSnapshot } from "../core/snapshots.js";
+import { toNum } from "../core/sql_util.js";
 import { resolveConstant } from "../tax/constants.js";
 
 export type MetricValue = {

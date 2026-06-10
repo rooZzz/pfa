@@ -1,7 +1,7 @@
-import { runEthereumSync } from "./connectors/ethereum/sync.js";
-import { runMonzoSync } from "./connectors/monzo/sync.js";
-import { runPriceSync, type PriceSyncRow } from "./connectors/prices/sync.js";
-import { readConnectorState } from "./connectors/state.js";
+import { runEthereumSync } from "../connectors/ethereum/sync.js";
+import { runMonzoSync } from "../connectors/monzo/sync.js";
+import { runPriceSync, type PriceSyncRow } from "../connectors/prices/sync.js";
+import { readConnectorState } from "../connectors/state.js";
 import { getKysely } from "./db.js";
 
 export type DataClass = "monzo" | "prices" | "ethereum";

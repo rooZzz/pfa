@@ -1,6 +1,6 @@
 import type { Transaction } from "kysely";
-import { writeManualDocument } from "../references.js";
-import type { DatabaseSchema } from "../schema.js";
+import { writeManualDocument } from "../core/references.js";
+import type { DatabaseSchema } from "../core/schema.js";
 
 export type ArchivedGoal = {
   goal_type: string;

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
-import type { ClassOutcome } from "../freshness.js";
+import type { ClassOutcome } from "../core/freshness.js";
 import { Masthead } from "./branding.js";
 import {
   Btn,

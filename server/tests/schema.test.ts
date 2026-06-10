@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 
 beforeEach(() => {
   initDb();

@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { getBriefing } from "../goals/briefing.js";
-import { type Overlay, runQuery, setupScenario, teardownScenario } from "../query.js";
-import { toNum } from "../sql_util.js";
+import {
+  type Overlay,
+  runQuery,
+  setupScenario,
+  teardownScenario,
+} from "../query/query.js";
+import { toNum } from "../core/sql_util.js";
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
 

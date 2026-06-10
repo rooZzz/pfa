@@ -1,4 +1,4 @@
-import { getKysely } from "../../db.js";
+import { getKysely } from "../../core/db.js";
 import { fetchCoinGeckoQuote, fetchCoinGeckoTokenQuote } from "./coingecko.js";
 import { fetchYahooQuote } from "./yahoo.js";
 import type { PriceQuote } from "./types.js";

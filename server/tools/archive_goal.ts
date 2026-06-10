@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
+import { getKysely } from "../core/db.js";
 import { archiveGoalRow } from "../goals/lifecycle.js";
-import { writeManualDocument } from "../references.js";
+import { writeManualDocument } from "../core/references.js";
 
 export const archiveGoalSchema = {
   goal_id: z

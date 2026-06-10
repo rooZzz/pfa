@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { getDb } from "../db.js";
+import { getDb } from "../core/db.js";
 import { getKeys } from "./keys.js";
 import {
   publicOrigin,

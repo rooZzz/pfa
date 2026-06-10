@@ -1,4 +1,4 @@
-import { CRYPTO_QUANTITY_SCALE } from "../../references.js";
+import { CRYPTO_QUANTITY_SCALE } from "../../core/references.js";
 import { EthereumConnectorError } from "./errors.js";
 
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;

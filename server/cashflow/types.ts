@@ -1,4 +1,4 @@
-import type { ClassFreshness } from "../freshness.js";
+import type { ClassFreshness } from "../core/freshness.js";
 import type { MonthCoverage } from "../net_worth/coverage.js";
 
 export type CategoryLine = {

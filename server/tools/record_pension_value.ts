@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
-import { ensureAccount, writeManualDocument } from "../references.js";
+import { getKysely } from "../core/db.js";
+import { ensureAccount, writeManualDocument } from "../core/references.js";
 
 export const recordPensionValueSchema = {
   account_name: z.string().describe("Name of the pension pot, e.g. 'Nest Pension'."),

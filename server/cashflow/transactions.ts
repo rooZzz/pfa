@@ -1,5 +1,5 @@
-import { runQuery } from "../query.js";
-import { toNum, toStr } from "../sql_util.js";
+import { runQuery } from "../query/query.js";
+import { toNum, toStr } from "../core/sql_util.js";
 import type { CategoryLine, SourceLine } from "./types.js";
 
 export async function queryTransactionsByCategory(

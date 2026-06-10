@@ -1,6 +1,6 @@
 import { resolvePeriod } from "../cashflow/index.js";
 import { queryIncome } from "../cashflow/income.js";
-import { LIVE_CONTEXT, type ReadContext } from "../query.js";
+import { LIVE_CONTEXT, type ReadContext } from "../query/query.js";
 
 export type EarningsContext = {
   resolved: boolean;

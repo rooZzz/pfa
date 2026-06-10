@@ -8,9 +8,9 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { getBriefing } from "../goals/briefing.js";
-import { resetDuck } from "../query.js";
+import { resetDuck } from "../query/query.js";
 import { confirmGoal } from "../tools/confirm_goal.js";
 import { proposeGoal } from "../tools/propose_goal.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";

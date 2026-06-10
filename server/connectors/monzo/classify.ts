@@ -1,4 +1,4 @@
-import type { AccountType } from "../../schema.js";
+import type { AccountType } from "../../core/schema.js";
 import type { MonzoPot, MonzoTransaction } from "./client.js";
 
 export function classifyInternal(

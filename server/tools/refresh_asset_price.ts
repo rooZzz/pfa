@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
+import { getKysely } from "../core/db.js";
 import { fetchAssetQuote, recordPriceTick } from "../connectors/prices/sync.js";
 
 export const refreshAssetPriceSchema = {

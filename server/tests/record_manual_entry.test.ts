@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 import { recordAssetHolding } from "../tools/record_asset_holding.js";
 import { recordAssetPrice } from "../tools/record_asset_price.js";

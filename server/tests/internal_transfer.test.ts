@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getDb, getKysely, initDb } from "../db.js";
+import { getDb, getKysely, initDb } from "../core/db.js";
 import { averageMonthlyOutgoings, isaAllowanceRemaining } from "../metrics/index.js";
-import { resetDuck } from "../query.js";
+import { resetDuck } from "../query/query.js";
 import { recordTransaction } from "../tools/record_transaction.js";
 
 const AS_OF = "2026-03-01";

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import fs from "node:fs";
 import path from "node:path";
-import { getProductSchemaSql, runProductQuery } from "../nlq_query.js";
+import { getProductSchemaSql, runProductQuery } from "../query/nlq_query.js";
 
 const CATALOG_PATH = path.join(
   import.meta.dirname,
