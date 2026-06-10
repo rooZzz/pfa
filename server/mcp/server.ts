@@ -12,9 +12,10 @@ import { resources, tools } from "../tools/registry.js";
 
 const DIST_DIR = path.join(import.meta.dirname, "..", "dist");
 
-const RESOURCE_UI_META = {
-  csp: { connectDomains: [], resourceDomains: [] },
-  prefersBorder: true,
+const RESOURCE_META = {
+  ui: { csp: { connectDomains: [], resourceDomains: [] }, prefersBorder: true },
+  "openai/widgetCSP": { connect_domains: [], resource_domains: [] },
+  "openai/widgetPrefersBorder": true,
 };
 
 export function buildServer(): McpServer {
@@ -66,7 +67,7 @@ export function buildServer(): McpServer {
       server,
       uri,
       uri,
-      { mimeType: RESOURCE_MIME_TYPE, _meta: { ui: RESOURCE_UI_META } },
+      { mimeType: RESOURCE_MIME_TYPE, _meta: RESOURCE_META },
       async () => {
         const html = await fs.readFile(path.join(DIST_DIR, file), "utf-8");
         return {
@@ -75,7 +76,7 @@ export function buildServer(): McpServer {
               uri,
               mimeType: RESOURCE_MIME_TYPE,
               text: html,
-              _meta: { ui: RESOURCE_UI_META },
+              _meta: RESOURCE_META,
             },
           ],
         };
