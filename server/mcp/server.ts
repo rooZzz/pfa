@@ -9,12 +9,13 @@ import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { widgetAssetOrigin, widgetHtml } from "./widget_assets.js";
 import { resources, tools } from "../tools/registry.js";
 
-export function buildServer(): McpServer {
+export function buildServer(options: { skybridge?: boolean } = {}): McpServer {
   const server = new McpServer(
     { name: "pfa", version: "0.1.0", icons: PFA_ICONS },
     { instructions: SERVER_INSTRUCTIONS },
   );
 
+  const resourceMimeType = options.skybridge ? "text/html+skybridge" : RESOURCE_MIME_TYPE;
   const assetOrigin = widgetAssetOrigin();
   const assetHost = new URL(assetOrigin).host;
   const resourceMeta = {
@@ -72,12 +73,12 @@ export function buildServer(): McpServer {
       server,
       uri,
       uri,
-      { mimeType: RESOURCE_MIME_TYPE, _meta: resourceMeta },
+      { mimeType: resourceMimeType, _meta: resourceMeta },
       async () => ({
         contents: [
           {
             uri,
-            mimeType: RESOURCE_MIME_TYPE,
+            mimeType: resourceMimeType,
             text: widgetHtml(screen, assetOrigin),
             _meta: resourceMeta,
           },

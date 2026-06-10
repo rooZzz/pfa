@@ -5,8 +5,9 @@ import { buildServer } from "./server.js";
 export async function handleMcpRequest(
   req: IncomingMessage,
   res: ServerResponse,
+  options: { skybridge?: boolean } = {},
 ): Promise<void> {
-  const server = buildServer();
+  const server = buildServer(options);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

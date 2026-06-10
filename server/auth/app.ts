@@ -53,7 +53,7 @@ export function buildAuthApp(): express.Express {
     requireBearerAuth({ verifier: provider, resourceMetadataUrl }),
     async (req, res) => {
       try {
-        await handleMcpRequest(req, res);
+        await handleMcpRequest(req, res, { skybridge: true });
       } catch (error) {
         const detail =
           error instanceof Error ? (error.stack ?? error.message) : String(error);
