@@ -1,9 +1,5 @@
-import "./styles/index.css";
-import "./theme.js";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { createRoot } from "react-dom/client";
 import type { CashflowResult, IncomeTotal } from "../cashflow/types.js";
 import type { ClassOutcome } from "../core/freshness.js";
 import { Masthead } from "./branding.js";
@@ -18,6 +14,14 @@ import {
 import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { formatGbp, formatGbpk } from "./format.js";
+import {
+  ConnectionError,
+  ErrorScreen,
+  LoadingScreen,
+  mountScreen,
+  toolText,
+  usePfaApp,
+} from "./screen.js";
 
 type CashflowData = CashflowResult;
 
@@ -134,10 +138,7 @@ function CashflowApp() {
   const [failed, setFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { app, error } = useApp({
-    appInfo: { name: "pfa", version: "0.1.0" },
-    capabilities: {},
-  });
+  const { app, error } = usePfaApp();
 
   const fetchData = useCallback(async (): Promise<CashflowData | null> => {
     if (!app) return null;
@@ -145,15 +146,13 @@ function CashflowApp() {
       name: "get_cashflow",
       arguments: { auto_refresh: false },
     });
-    const text = result.content?.find((c: { type: string }) => c.type === "text") as
-      | { type: "text"; text: string }
-      | undefined;
-    if (!text) throw new Error("No response from get_cashflow.");
+    const text = toolText(result);
+    if (text == null) throw new Error("No response from get_cashflow.");
     let parsed: CashflowData;
     try {
-      parsed = JSON.parse(text.text) as CashflowData;
+      parsed = JSON.parse(text) as CashflowData;
     } catch {
-      throw new Error(text.text);
+      throw new Error(text);
     }
     setData(parsed);
     return parsed;
@@ -168,10 +167,8 @@ function CashflowApp() {
         name: "refresh_stale_data",
         arguments: { classes: ["monzo"] },
       });
-      const text = result.content?.find((c: { type: string }) => c.type === "text") as
-        | { type: "text"; text: string }
-        | undefined;
-      const outcomes = text ? (JSON.parse(text.text) as ClassOutcome[]) : [];
+      const text = toolText(result);
+      const outcomes = text ? (JSON.parse(text) as ClassOutcome[]) : [];
       await fetchData();
       setFailed(outcomes.some((o) => o.class === "monzo" && o.action === "failed"));
     } catch {
@@ -216,33 +213,20 @@ function CashflowApp() {
     if (app) void load();
   }, [app, load]);
 
-  if (error) {
-    return (
-      <div className="screen rise">
-        <p className="note">Connection error: {error.message}</p>
-      </div>
-    );
-  }
+  if (error) return <ConnectionError message={error.message} />;
   if (!app || loading) {
-    return (
-      <div className="screen center-min">
-        <div className="loading-row">
-          <span className="spinner" />
-          {app ? "Loading cashflow" : "Connecting"}
-        </div>
-      </div>
-    );
+    return <LoadingScreen label={app ? "Loading cashflow" : "Connecting"} />;
   }
   if (errorMessage) {
     return (
-      <div className="screen rise stack">
-        <p className="note">{errorMessage}</p>
-        <div>
+      <ErrorScreen
+        message={errorMessage}
+        action={
           <Btn variant="secondary" size="sm" icon="refresh" onClick={() => void load()}>
             Retry
           </Btn>
-        </div>
-      </div>
+        }
+      />
     );
   }
   if (!data) return null;
@@ -465,4 +449,4 @@ function CashflowApp() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<CashflowApp />);
+mountScreen(<CashflowApp />);

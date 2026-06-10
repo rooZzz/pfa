@@ -1,13 +1,18 @@
-import "./styles/index.css";
-import "./theme.js";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
 import type { IngestReviewResult } from "../tools/ingest_document.js";
 import { Masthead } from "./branding.js";
 import { ActionBar, Badge, Btn, Icon } from "./components.js";
 import { DataTable } from "./data_table.js";
 import type { DataRow } from "./data_table.js";
+import {
+  ConnectionError,
+  ErrorScreen,
+  LoadingScreen,
+  mountScreen,
+  parseToolJson,
+  toolText,
+  usePfaApp,
+} from "./screen.js";
 
 type IngestResult = IngestReviewResult;
 
@@ -21,10 +26,7 @@ function UploadApp() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { app, error } = useApp({
-    appInfo: { name: "pfa", version: "0.1.0" },
-    capabilities: {},
-  });
+  const { app, error } = usePfaApp();
 
   const processFile = useCallback(
     (file: File) => {
@@ -47,12 +49,7 @@ function UploadApp() {
             },
           });
 
-          const text = result.content?.find(
-            (c: { type: string }) => c.type === "text",
-          ) as { type: "text"; text: string } | undefined;
-          if (!text) throw new Error("No response from ingest_document.");
-
-          setIngestResult(JSON.parse(text.text) as IngestResult);
+          setIngestResult(parseToolJson<IngestResult>(result, "ingest_document"));
           setStatus("review");
         } catch (err) {
           setStatus("error");
@@ -76,10 +73,7 @@ function UploadApp() {
         name: "confirm_staged_rows",
         arguments: { review_id: ingestResult.review_id },
       });
-      const text = result.content?.find((c: { type: string }) => c.type === "text") as
-        | { type: "text"; text: string }
-        | undefined;
-      setConfirmMessage(text?.text ?? "Saved.");
+      setConfirmMessage(toolText(result) ?? "Saved.");
       setStatus("confirmed");
     } catch (err) {
       setStatus("error");
@@ -93,32 +87,17 @@ function UploadApp() {
     setErrorMessage(null);
   }
 
-  if (error) {
-    return (
-      <div className="screen rise">
-        <p className="note">Connection error: {error.message}</p>
-      </div>
-    );
-  }
-  if (!app) {
-    return (
-      <div className="screen center-min">
-        <div className="loading-row">
-          <span className="spinner" />
-          Connecting
-        </div>
-      </div>
-    );
-  }
+  if (error) return <ConnectionError message={error.message} />;
+  if (!app) return <LoadingScreen label="Connecting" />;
 
   if (status === "parsing" || status === "confirming") {
     return (
-      <div className="screen rise center-min">
-        <div className="loading-row">
-          <span className="spinner" />
-          {status === "parsing" ? "Parsing payslip — Haiku vision" : "Writing to store"}
-        </div>
-      </div>
+      <LoadingScreen
+        rise
+        label={
+          status === "parsing" ? "Parsing payslip — Haiku vision" : "Writing to store"
+        }
+      />
     );
   }
 
@@ -141,14 +120,14 @@ function UploadApp() {
 
   if (status === "error") {
     return (
-      <div className="screen rise stack">
-        <p className="note">{errorMessage}</p>
-        <div>
+      <ErrorScreen
+        message={errorMessage}
+        action={
           <Btn variant="secondary" size="sm" onClick={reset}>
             Try again
           </Btn>
-        </div>
-      </div>
+        }
+      />
     );
   }
 
@@ -298,4 +277,4 @@ function UploadApp() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<UploadApp />);
+mountScreen(<UploadApp />);

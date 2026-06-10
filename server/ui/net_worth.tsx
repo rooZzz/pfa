@@ -1,9 +1,5 @@
-import "./styles/index.css";
-import "./theme.js";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { createRoot } from "react-dom/client";
 import type {
   ContingentLine,
   NetWorthResult,
@@ -27,6 +23,15 @@ import { DataTable } from "./data_table.js";
 import type { DataGroup } from "./data_table.js";
 import { ABSENCE_LABEL, formatGbp, formatGbpk } from "./format.js";
 import type { ClassOutcome, DataClass } from "../core/freshness.js";
+import {
+  ConnectionError,
+  ErrorScreen,
+  LoadingScreen,
+  mountScreen,
+  parseToolJson,
+  toolText,
+  usePfaApp,
+} from "./screen.js";
 
 function monthYear(dateStr: string): string {
   const d = new Date(dateStr);
@@ -58,11 +63,10 @@ function parseBriefingDirectives(
   settled: PromiseSettledResult<unknown>,
 ): Directive[] | null {
   if (settled.status !== "fulfilled") return null;
-  const value = settled.value as { content?: { type: string; text?: string }[] };
-  const text = value.content?.find((c) => c.type === "text");
-  if (!text?.text) return null;
+  const text = toolText(settled.value as { content?: { type: string }[] });
+  if (!text) return null;
   try {
-    const briefing = JSON.parse(text.text) as { directives?: Directive[] };
+    const briefing = JSON.parse(text) as { directives?: Directive[] };
     return briefing.directives ?? null;
   } catch {
     return null;
@@ -403,10 +407,7 @@ function NetWorthApp() {
   const [failed, setFailed] = useState<Set<DataClass>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { app, error } = useApp({
-    appInfo: { name: "pfa", version: "0.1.0" },
-    capabilities: {},
-  });
+  const { app, error } = usePfaApp();
 
   const fetchData = useCallback(async (): Promise<NetWorthData | null> => {
     if (!app) return null;
@@ -423,11 +424,7 @@ function NetWorthApp() {
     ]);
 
     if (nwSettled.status === "rejected") throw nwSettled.reason;
-    const text = nwSettled.value.content?.find(
-      (c: { type: string }) => c.type === "text",
-    ) as { type: "text"; text: string } | undefined;
-    if (!text) throw new Error("No response from get_net_worth.");
-    const parsed = JSON.parse(text.text) as NetWorthData;
+    const parsed = parseToolJson<NetWorthData>(nwSettled.value, "get_net_worth");
     setData(parsed);
     setGoals(parseBriefingDirectives(brSettled));
     return parsed;
@@ -443,10 +440,8 @@ function NetWorthApp() {
           name: "refresh_stale_data",
           arguments: requestClasses ? { classes: requestClasses } : {},
         });
-        const text = result.content?.find((c: { type: string }) => c.type === "text") as
-          | { type: "text"; text: string }
-          | undefined;
-        const outcomes = text ? (JSON.parse(text.text) as ClassOutcome[]) : [];
+        const text = toolText(result);
+        const outcomes = text ? (JSON.parse(text) as ClassOutcome[]) : [];
         await fetchData();
         setFailed(
           new Set(outcomes.filter((o) => o.action === "failed").map((o) => o.class)),
@@ -498,33 +493,20 @@ function NetWorthApp() {
     if (app) void load();
   }, [app, load]);
 
-  if (error) {
-    return (
-      <div className="screen rise">
-        <p className="note">Connection error: {error.message}</p>
-      </div>
-    );
-  }
+  if (error) return <ConnectionError message={error.message} />;
   if (!app || loading) {
-    return (
-      <div className="screen center-min">
-        <div className="loading-row">
-          <span className="spinner" />
-          {app ? "Loading net worth" : "Connecting"}
-        </div>
-      </div>
-    );
+    return <LoadingScreen label={app ? "Loading net worth" : "Connecting"} />;
   }
   if (errorMessage) {
     return (
-      <div className="screen rise stack">
-        <p className="note">{errorMessage}</p>
-        <div>
+      <ErrorScreen
+        message={errorMessage}
+        action={
           <Btn variant="secondary" size="sm" icon="refresh" onClick={() => void load()}>
             Retry
           </Btn>
-        </div>
-      </div>
+        }
+      />
     );
   }
   if (!data) return null;
@@ -653,4 +635,4 @@ function NetWorthApp() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<NetWorthApp />);
+mountScreen(<NetWorthApp />);
