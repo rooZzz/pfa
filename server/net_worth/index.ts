@@ -1,4 +1,4 @@
-import { computeFreshness } from "../freshness_read.js";
+import { computeFreshness } from "../freshness.js";
 import { runQuery } from "../query.js";
 import { latestPriceTick, latestRangeSnapshot } from "../snapshots.js";
 import { toNum, validateDate } from "../sql_util.js";

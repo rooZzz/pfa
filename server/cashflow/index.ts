@@ -1,4 +1,4 @@
-import { computeFreshness } from "../freshness_read.js";
+import { computeFreshness } from "../freshness.js";
 import { queryPayslipCoverage } from "../net_worth/coverage.js";
 import { runQuery } from "../query.js";
 import { toNum, toStr, validateDate } from "../sql_util.js";

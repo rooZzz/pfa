@@ -4,8 +4,7 @@ import { MonzoReauthError } from "../connectors/monzo/errors.js";
 import type { PriceSyncRow } from "../connectors/prices/sync.js";
 import { saveConnectorCredentials } from "../connectors/state.js";
 import { getDb, initDb } from "../db.js";
-import type { DataClass } from "../freshness.js";
-import { ensureFresh, type EnsureFreshDeps } from "../freshness_refresh.js";
+import { ensureFresh, type DataClass, type EnsureFreshDeps } from "../freshness.js";
 
 const NOW = new Date("2026-06-08T12:00:00.000Z");
 const STALE_AT = "2026-01-01T00:00:00.000Z";

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { exec, spawn } from "node:child_process";
 import http from "node:http";
-import { exchangeMonzoCode } from "./connectors/monzo/tokens.js";
+import { exchangeMonzoCode } from "../connectors/monzo/tokens.js";
 
 const PORT = Number(process.env.MONZO_REDIRECT_PORT ?? 51789);
 const REDIRECT_URI = `http://localhost:${PORT}/callback`;

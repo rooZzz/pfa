@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { saveConnectorCredentials } from "../connectors/state.js";
 import { getDb, initDb } from "../db.js";
-import type { DataClass } from "../freshness.js";
-import type { EnsureFreshDeps } from "../freshness_refresh.js";
+import type { DataClass, EnsureFreshDeps } from "../freshness.js";
 import type { NetWorthResult } from "../net_worth/types.js";
 import { resetDuck } from "../query.js";
 import { getNetWorthTool } from "../tools/get_net_worth.js";
