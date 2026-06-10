@@ -7,7 +7,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PFA_ICONS } from "./icons.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { widgetAssetOrigin, widgetHtml } from "./widget_assets.js";
-import { resources, tools } from "../tools/registry.js";
+import { resources, tools, type ToolDescriptor } from "../tools/registry.js";
+
+function loggedHandler(tool: ToolDescriptor): ToolDescriptor["handler"] {
+  return async (input) => {
+    process.stderr.write(`pfa tool ${tool.name}\n`);
+    return tool.handler(input);
+  };
+}
 
 export function buildServer(): McpServer {
   const server = new McpServer(
@@ -48,7 +55,7 @@ export function buildServer(): McpServer {
             ...(tool.widgetAccessible ? { "openai/widgetAccessible": true } : {}),
           },
         },
-        tool.handler,
+        loggedHandler(tool),
       );
     } else {
       server.registerTool(
@@ -58,7 +65,7 @@ export function buildServer(): McpServer {
           inputSchema: tool.inputSchema,
           ...(tool.annotations ? { annotations: tool.annotations } : {}),
         },
-        tool.handler,
+        loggedHandler(tool),
       );
     }
   }

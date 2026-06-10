@@ -13,6 +13,7 @@ import { publicOrigin, mcpResource, authPort, publicOriginHost } from "./config.
 export function buildAuthApp(): express.Express {
   const app = express();
   app.disable("x-powered-by");
+  app.set("trust proxy", 1);
 
   const allowedHosts = new Set([
     publicOriginHost(),
@@ -26,6 +27,13 @@ export function buildAuthApp(): express.Express {
     }
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "no-referrer");
+    const startedAt = Date.now();
+    res.on("finish", () => {
+      const path = req.originalUrl.split("?")[0];
+      process.stderr.write(
+        `pfa auth ${req.method} ${path} ${res.statusCode} ${Date.now() - startedAt}ms\n`,
+      );
+    });
     next();
   });
 
