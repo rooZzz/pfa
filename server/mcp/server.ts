@@ -16,11 +16,14 @@ export function buildServer(): McpServer {
   );
 
   const assetOrigin = widgetAssetOrigin();
+  const assetHost = new URL(assetOrigin).host;
   const resourceMeta = {
     ui: {
+      domain: assetHost,
       csp: { connectDomains: [], resourceDomains: [assetOrigin] },
       prefersBorder: true,
     },
+    "openai/widgetDomain": assetHost,
     "openai/widgetCSP": { connect_domains: [], resource_domains: [assetOrigin] },
     "openai/widgetPrefersBorder": true,
   };
