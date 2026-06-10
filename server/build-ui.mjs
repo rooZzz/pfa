@@ -27,7 +27,7 @@ function buildScreen(name) {
       cssCodeSplit: false,
       cssMinify: !isDevelopment,
       minify: !isDevelopment,
-      assetsInlineLimit: 1024 * 1024,
+      assetsInlineLimit: (filePath) => !/\.woff2?$/.test(filePath),
       outDir: path.join(import.meta.dirname, "dist", "widgets", name),
       emptyOutDir: true,
       rollupOptions: {
@@ -35,7 +35,10 @@ function buildScreen(name) {
         output: {
           format: "es",
           entryFileNames: "app.js",
-          assetFileNames: "app[extname]",
+          assetFileNames: (asset) => {
+            const assetName = asset.names?.[0] ?? "";
+            return assetName.endsWith(".css") ? "app[extname]" : "[name][extname]";
+          },
           inlineDynamicImports: true,
         },
       },
