@@ -29,7 +29,7 @@ jobs:
         run: echo "ref=${{ github.event.release.tag_name || github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout released tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.tag.outputs.ref }}
           path: source
