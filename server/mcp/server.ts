@@ -20,11 +20,11 @@ export function buildServer(): McpServer {
   const resourceMeta = {
     ui: {
       domain: assetHost,
-      csp: { connectDomains: [], resourceDomains: [assetOrigin] },
+      csp: { connectDomains: [], resourceDomains: [assetHost] },
       prefersBorder: true,
     },
     "openai/widgetDomain": assetHost,
-    "openai/widgetCSP": { connect_domains: [], resource_domains: [assetOrigin] },
+    "openai/widgetCSP": { connect_domains: [], resource_domains: [assetHost] },
     "openai/widgetPrefersBorder": true,
   };
 
