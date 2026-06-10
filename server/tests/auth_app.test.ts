@@ -78,7 +78,7 @@ describe("auth app surface", () => {
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/html");
     expect(res.body).toContain('rel="icon"');
-    expect(res.body).toContain('href="/assets/auth.css"');
+    expect(res.body).toContain('href="/assets/auth.css?v=');
     expect(res.body).toContain('class="auth-card"');
   });
 
