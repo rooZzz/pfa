@@ -10,7 +10,12 @@ import { PFA_ICONS } from "./icons.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { resources, tools } from "../tools/registry.js";
 
-const DIST_DIR = path.join(import.meta.dirname, "dist");
+const DIST_DIR = path.join(import.meta.dirname, "..", "dist");
+
+const RESOURCE_UI_META = {
+  csp: { connectDomains: [], resourceDomains: [] },
+  prefersBorder: true,
+};
 
 export function buildServer(): McpServer {
   const server = new McpServer(
@@ -19,20 +24,26 @@ export function buildServer(): McpServer {
   );
 
   for (const tool of tools) {
-    if (tool.app) {
+    if (tool.app || tool.widgetAccessible) {
+      const visibility =
+        tool.app?.visibility ?? (tool.widgetAccessible ? ["model", "app"] : undefined);
       registerAppTool(
         server,
         tool.name,
         {
-          title: tool.app.title,
+          ...(tool.app?.title ? { title: tool.app.title } : {}),
           description: tool.description,
           inputSchema: tool.inputSchema,
           ...(tool.annotations ? { annotations: tool.annotations } : {}),
           _meta: {
             ui: {
-              ...(tool.app.resourceUri ? { resourceUri: tool.app.resourceUri } : {}),
-              ...(tool.app.visibility ? { visibility: tool.app.visibility } : {}),
+              ...(tool.app?.resourceUri ? { resourceUri: tool.app.resourceUri } : {}),
+              ...(visibility ? { visibility } : {}),
             },
+            ...(tool.app?.resourceUri
+              ? { "openai/outputTemplate": tool.app.resourceUri }
+              : {}),
+            ...(tool.widgetAccessible ? { "openai/widgetAccessible": true } : {}),
           },
         },
         tool.handler,
@@ -51,12 +62,25 @@ export function buildServer(): McpServer {
   }
 
   for (const { uri, file } of resources) {
-    registerAppResource(server, uri, uri, { mimeType: RESOURCE_MIME_TYPE }, async () => {
-      const html = await fs.readFile(path.join(DIST_DIR, file), "utf-8");
-      return {
-        contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: html }],
-      };
-    });
+    registerAppResource(
+      server,
+      uri,
+      uri,
+      { mimeType: RESOURCE_MIME_TYPE, _meta: { ui: RESOURCE_UI_META } },
+      async () => {
+        const html = await fs.readFile(path.join(DIST_DIR, file), "utf-8");
+        return {
+          contents: [
+            {
+              uri,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: html,
+              _meta: { ui: RESOURCE_UI_META },
+            },
+          ],
+        };
+      },
+    );
   }
 
   return server;
