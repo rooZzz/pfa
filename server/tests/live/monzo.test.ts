@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { createMonzoClient } from "../../connectors/monzo/client.js";
 import { saveConnectorCredentials } from "../../connectors/state.js";
-import { initDb } from "../../db.js";
+import { initDb } from "../../core/db.js";
 
 const credentials = {
   client_id: process.env.MONZO_CLIENT_ID ?? "",

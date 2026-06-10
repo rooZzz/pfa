@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createMonzoClient, type MonzoTransaction } from "../connectors/monzo/client.js";
 import { saveConnectorCredentials } from "../connectors/state.js";
-import { getDb, initDb } from "../db.js";
-import { resetDuck } from "../query.js";
+import { getDb, initDb } from "../core/db.js";
+import { resetDuck } from "../query/query.js";
 
 afterEach(() => {
   resetDuck();

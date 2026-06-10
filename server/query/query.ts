@@ -1,5 +1,5 @@
 import duckdb from "duckdb";
-import { DB_PATH } from "./db.js";
+import { DB_PATH } from "../core/db.js";
 
 type Row = Record<string, unknown>;
 

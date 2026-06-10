@@ -1,6 +1,6 @@
-import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
-import { latestRangeSnapshot } from "../snapshots.js";
-import { toNum } from "../sql_util.js";
+import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query/query.js";
+import { latestRangeSnapshot } from "../core/snapshots.js";
+import { toNum } from "../core/sql_util.js";
 import type { ImplementedGoalType } from "./catalog.js";
 
 const CLAIMED_ACCOUNT_TYPES: Record<ImplementedGoalType, readonly string[]> = {

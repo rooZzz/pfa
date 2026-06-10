@@ -8,8 +8,8 @@ vi.mock("@anthropic-ai/sdk", () => ({
   },
 }));
 
-import { getDb, initDb } from "../db.js";
-import { resetDuck } from "../query.js";
+import { getDb, initDb } from "../core/db.js";
+import { resetDuck } from "../query/query.js";
 import { queryNaturalLanguage } from "../tools/query_natural_language.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 

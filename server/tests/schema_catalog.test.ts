@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
-import { NLQ_TABLES } from "../nlq_allowlist.js";
+import { getDb, initDb } from "../core/db.js";
+import { NLQ_TABLES } from "../query/nlq_allowlist.js";
 
 const CATALOG_PATH = path.join(
   import.meta.dirname,

@@ -1,7 +1,7 @@
 import type { Transaction } from "kysely";
-import { getKysely } from "../../db.js";
-import { CRYPTO_QUANTITY_SCALE, ensureAsset } from "../../references.js";
-import type { DatabaseSchema } from "../../schema.js";
+import { getKysely } from "../../core/db.js";
+import { CRYPTO_QUANTITY_SCALE, ensureAsset } from "../../core/references.js";
+import type { DatabaseSchema } from "../../core/schema.js";
 import { tryPriceOnCapture } from "../prices/sync.js";
 import { writeConnectorDocument } from "../references.js";
 import { createEtherscanClient, type EtherscanClient } from "./client.js";

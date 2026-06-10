@@ -23,6 +23,7 @@ jobs:
       PREV_DIR: /Users/_pfa/pfa.prev
       NPM: /opt/homebrew/opt/node@22/bin/npm
       PORT: "4000"
+      AUTH_PORT: "4001"
     steps:
       - name: Resolve tag
         id: tag
@@ -42,6 +43,10 @@ jobs:
           if [ -f "$DATA_DIR/data.sqlite" ]; then
             /usr/bin/sqlite3 "$DATA_DIR/data.sqlite" ".backup '$BACKUP_DIR/predeploy-$stamp.sqlite'"
             echo "BACKUP=$BACKUP_DIR/predeploy-$stamp.sqlite" >> "$GITHUB_ENV"
+          fi
+          if [ -f "$DATA_DIR/secrets.sqlite" ]; then
+            /usr/bin/sqlite3 "$DATA_DIR/secrets.sqlite" ".backup '$BACKUP_DIR/predeploy-secrets-$stamp.sqlite'"
+            echo "SECRETS_BACKUP=$BACKUP_DIR/predeploy-secrets-$stamp.sqlite" >> "$GITHUB_ENV"
           fi
 
       - name: Snapshot current source for rollback
@@ -70,12 +75,22 @@ jobs:
       - name: Health check
         run: |
           set -euo pipefail
+          mcp_up=""
           for i in $(seq 1 20); do
             code="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:${PORT}/mcp" -H 'content-type: application/json' -d '{}' || true)"
-            case "$code" in 2??|4??) echo "server up (http $code)"; exit 0 ;; esac
+            case "$code" in 2??|4??) echo "server up (http $code)"; mcp_up=1; break ;; esac
             sleep 2
           done
-          echo "server did not respond on :${PORT}" >&2
+          if [ -z "$mcp_up" ]; then
+            echo "server did not respond on :${PORT}" >&2
+            exit 1
+          fi
+          for i in $(seq 1 20); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${AUTH_PORT}/.well-known/jwks.json" || true)"
+            case "$code" in 2??) echo "auth listener up (http $code)"; exit 0 ;; esac
+            sleep 2
+          done
+          echo "auth listener did not serve jwks on :${AUTH_PORT}" >&2
           exit 1
 
       - name: Roll back on failure
@@ -89,6 +104,10 @@ jobs:
           fi
           if [ -n "${BACKUP:-}" ] && [ -f "${BACKUP:-}" ]; then
             cp "$BACKUP" "$DATA_DIR/data.sqlite"
+          fi
+          if [ -n "${SECRETS_BACKUP:-}" ] && [ -f "${SECRETS_BACKUP:-}" ]; then
+            cp "$SECRETS_BACKUP" "$DATA_DIR/secrets.sqlite"
+            chmod 600 "$DATA_DIR/secrets.sqlite"
           fi
           sudo /bin/launchctl kickstart -k system/com.pfa.server
           exit 1

@@ -1,6 +1,6 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { resetDb } from "../db.js";
+import { resetDb } from "../core/db.js";
 import { archiveGoal, archiveGoalSchema } from "./archive_goal.js";
 import { confirmGoal, confirmGoalSchema } from "./confirm_goal.js";
 import { updateGoal, updateGoalSchema } from "./update_goal.js";
@@ -65,6 +65,7 @@ export type ToolDescriptor = {
   inputSchema: z.ZodRawShape;
   handler: (input: Record<string, unknown>) => Promise<ToolResult>;
   app?: AppMeta;
+  widgetAccessible?: boolean;
   annotations?: ToolAnnotations;
 };
 
@@ -74,6 +75,7 @@ function defineTool<S extends z.ZodRawShape>(descriptor: {
   inputSchema: S;
   handler: (input: z.infer<ReturnType<typeof z.object<S>>>) => Promise<ToolResult>;
   app?: AppMeta;
+  widgetAccessible?: boolean;
   annotations?: ToolAnnotations;
 }): ToolDescriptor {
   return descriptor as unknown as ToolDescriptor;
@@ -183,6 +185,7 @@ export const tools: ToolDescriptor[] = [
       "Display cashflow figures for a UK tax year: income, transactions by category, net cashflow, monthly trend. Use to show the user their numbers — not as a basis for recommendations. Defaults to today's tax year; supply tax_year (YYYY/YY) to target a specific year. Refreshes a stale bank feed before computing unless auto_refresh is false.",
     annotations: { readOnlyHint: true },
     inputSchema: getCashflowSchema,
+    widgetAccessible: true,
     handler: async (input) => text(await getCashflowTool(input)),
   }),
   defineTool({
@@ -200,6 +203,7 @@ export const tools: ToolDescriptor[] = [
       "Display net worth at a given date: realised assets and liabilities (accounts, pension, property, mortgage) plus contingent unvested equity, each with its observation date. Use to show the user their numbers — not as a basis for recommendations. Also returns a 12-month realised trend. Refreshes stale connector data (bank, prices, on-chain) before computing unless auto_refresh is false.",
     annotations: { readOnlyHint: true },
     inputSchema: getNetWorthSchema,
+    widgetAccessible: true,
     handler: async (input) => text(await getNetWorthTool(input)),
   }),
   defineTool({
@@ -235,6 +239,7 @@ export const tools: ToolDescriptor[] = [
       "Save Monzo credentials and run an initial full-history backfill. Called from the connectors widget — not model-visible. Credentials are never passed through chat.",
     inputSchema: connectMonzoSchema,
     app: { title: "Connect Monzo", resourceUri: CONNECTORS_URI, visibility: ["app"] },
+    widgetAccessible: true,
     handler: async (input) => text(await connectMonzo(input)),
   }),
   defineTool({
@@ -242,6 +247,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Sync the latest Monzo transactions, balances, and pots into the canonical store. Idempotent — re-running does not duplicate transactions. Requires Monzo to be connected first.",
     inputSchema: {},
+    widgetAccessible: true,
     handler: async () => text(await syncMonzo()),
   }),
   defineTool({
@@ -250,6 +256,7 @@ export const tools: ToolDescriptor[] = [
       "Read an Ethereum wallet's ETH balance and the ERC-20 tokens it holds, for the user to choose which to track. Called from the connectors widget — not model-visible. Uses the ETHERSCAN_API_KEY from server config. Read-only: writes no holdings.",
     inputSchema: discoverEthereumWalletSchema,
     app: { title: "Discover Wallet", resourceUri: CONNECTORS_URI, visibility: ["app"] },
+    widgetAccessible: true,
     annotations: { readOnlyHint: true },
     handler: async (input) => text(await discoverEthereumWallet(input)),
   }),
@@ -259,6 +266,7 @@ export const tools: ToolDescriptor[] = [
       "Save the Ethereum wallet and the chosen assets, then import them as connector-owned holdings. Called from the connectors widget — not model-visible. Credentials are never passed through chat.",
     inputSchema: connectEthereumSchema,
     app: { title: "Connect Ethereum", resourceUri: CONNECTORS_URI, visibility: ["app"] },
+    widgetAccessible: true,
     handler: async (input) => text(await connectEthereum(input)),
   }),
   defineTool({
@@ -266,6 +274,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Refresh the connected Ethereum wallet: re-read on-chain balances for the tracked assets and write fresh holding snapshots. Idempotent. Requires Ethereum to be connected first. Prices refresh separately via sync_prices.",
     inputSchema: {},
+    widgetAccessible: true,
     handler: async () => text(await syncEthereum()),
   }),
   defineTool({
@@ -287,6 +296,7 @@ export const tools: ToolDescriptor[] = [
       notes: z.string().optional().describe("Optional annotation for the document."),
     },
     app: { title: "Ingest Document", visibility: ["app"] },
+    widgetAccessible: true,
     handler: async (input) => text(await ingestDocument(input)),
   }),
   defineTool({
@@ -299,6 +309,7 @@ export const tools: ToolDescriptor[] = [
         .describe("The review session ID returned by ingest_document."),
     },
     app: { title: "Confirm Staged Rows", resourceUri: UPLOAD_URI, visibility: ["app"] },
+    widgetAccessible: true,
     handler: async (input) => text(await confirmStagedRows(input)),
   }),
   defineTool({
@@ -367,6 +378,7 @@ export const tools: ToolDescriptor[] = [
       "Return the grounded basis for any 'how am I doing / what should I focus on' question: the complete set of observations across all active goals — progress, deadlines, and data gaps. Facts only, never ranked options or advice. Call this before synthesising any financial guidance. Refreshes stale connector data (bank, prices, on-chain) before computing unless auto_refresh is false. Defaults to today.",
     inputSchema: getBriefingSchema,
     annotations: { readOnlyHint: true },
+    widgetAccessible: true,
     handler: async (input) => text(await getBriefingTool(input)),
   }),
   defineTool({
@@ -374,6 +386,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Refresh connector data that has aged past its freshness window: Monzo bank feed and Ethereum holdings (daily), automated asset prices (hourly). Fail-soft — a connector being down returns a 'failed' outcome rather than throwing. Returns a structured per-class outcome. The dashboards call this on load; call it directly only to force a freshness check.",
     inputSchema: refreshStaleDataSchema,
+    widgetAccessible: true,
     handler: async (input) => text(await refreshStaleData(input)),
   }),
   defineTool({

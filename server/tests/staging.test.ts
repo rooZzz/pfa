@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { clearReview, getReview, stageReview } from "../staging.js";
-import type { StagedIncomeEvent } from "../staging.js";
+import { clearReview, getReview, stageReview } from "../core/staging.js";
+import type { StagedIncomeEvent } from "../core/staging.js";
 
 const SAMPLE: StagedIncomeEvent = {
   file_bytes: Buffer.from("mock-pdf-content"),

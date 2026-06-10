@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runMonzoSync } from "../connectors/monzo/sync.js";
 import { saveConnectorCredentials } from "../connectors/state.js";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { averageMonthlyOutgoings, liquidSavings } from "../metrics/index.js";
 import { getNetWorth } from "../net_worth/index.js";
-import { resetDuck } from "../query.js";
+import { resetDuck } from "../query/query.js";
 import { makeFakeClient } from "./fixtures/monzo.js";
 
 const TODAY = new Date().toISOString().slice(0, 10);

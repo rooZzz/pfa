@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
-import { writeManualDocument } from "../references.js";
+import { getKysely } from "../core/db.js";
+import { writeManualDocument } from "../core/references.js";
 
 export const recordMortgageSchema = {
   lender: z.string().describe("Lender name, e.g. 'Nationwide'."),

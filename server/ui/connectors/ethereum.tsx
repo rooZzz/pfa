@@ -1,214 +1,8 @@
-import "./styles/index.css";
-import "./theme.js";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import { useState } from "react";
-import type { ReactNode } from "react";
-import { createRoot } from "react-dom/client";
-import { Masthead } from "./branding.js";
-import { ActionBar, Badge, Btn, Icon, TickerChip } from "./components.js";
-
-type App = NonNullable<ReturnType<typeof useApp>["app"]>;
-
-function textOf(result: { content?: { type: string }[] }): string {
-  const block = result.content?.find((c) => c.type === "text") as
-    | { type: "text"; text: string }
-    | undefined;
-  return block?.text ?? "Done.";
-}
-
-function Loading({ label }: { label: string }) {
-  return (
-    <div className="screen rise center-min">
-      <div className="loading-row">
-        <span className="spinner" />
-        {label}
-      </div>
-    </div>
-  );
-}
-
-type MonzoStatus = "form" | "connecting" | "connected" | "syncing" | "error";
-
-type ConnectArgs = {
-  access_token: string;
-  client_id?: string;
-  client_secret?: string;
-  refresh_token?: string;
-};
-
-function parseConnectInput(raw: string): ConnectArgs {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith("{")) {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    if (typeof parsed.access_token !== "string" || parsed.access_token === "") {
-      throw new Error("The pasted result has no access_token.");
-    }
-    const args: ConnectArgs = { access_token: parsed.access_token };
-    if (typeof parsed.client_id === "string") args.client_id = parsed.client_id;
-    if (typeof parsed.client_secret === "string")
-      args.client_secret = parsed.client_secret;
-    if (typeof parsed.refresh_token === "string")
-      args.refresh_token = parsed.refresh_token;
-    return args;
-  }
-  return { access_token: trimmed };
-}
-
-function MonzoConnector({ app, onBack }: { app: App; onBack: () => void }) {
-  const [status, setStatus] = useState<MonzoStatus>("form");
-  const [input, setInput] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const canConnect = input.trim() !== "";
-
-  async function handleConnect() {
-    if (!canConnect) return;
-    let args: ConnectArgs;
-    try {
-      args = parseConnectInput(input);
-    } catch (err) {
-      setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : "Could not read the input.");
-      return;
-    }
-    setStatus("connecting");
-    setErrorMessage(null);
-    try {
-      const result = await app.callServerTool({ name: "connect_monzo", arguments: args });
-      setInput("");
-      setMessage(textOf(result));
-      setStatus("connected");
-    } catch (err) {
-      setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : "Connection failed.");
-    }
-  }
-
-  async function handleSync() {
-    setStatus("syncing");
-    setErrorMessage(null);
-    try {
-      const result = await app.callServerTool({ name: "sync_monzo", arguments: {} });
-      setMessage(textOf(result));
-      setStatus("connected");
-    } catch (err) {
-      setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : "Sync failed.");
-    }
-  }
-
-  if (status === "connecting" || status === "syncing") {
-    return (
-      <Loading
-        label={
-          status === "connecting"
-            ? "Connecting Monzo · backfilling history"
-            : "Syncing transactions"
-        }
-      />
-    );
-  }
-
-  if (status === "connected") {
-    return (
-      <div className="screen rise">
-        <Masthead
-          lead={
-            <span className="chip-ico chip-ico--accent">
-              <Icon name="bank" size={18} />
-            </span>
-          }
-          title="Monzo"
-          sub="high-trust ingestion · manual sync"
-          titleSize="var(--text-md)"
-          action={
-            <Badge tone="ok" led>
-              connected
-            </Badge>
-          }
-        />
-        <div className="card card-sunken mt-4">
-          <p className="note">{message}</p>
-        </div>
-        <ActionBar
-          secondary={
-            <>
-              <Btn variant="ghost" size="sm" onClick={onBack}>
-                All connectors
-              </Btn>
-              <Btn
-                variant="ghost"
-                icon="plug"
-                onClick={() => {
-                  setStatus("form");
-                  setInput("");
-                  setMessage(null);
-                }}
-              >
-                Reconnect
-              </Btn>
-            </>
-          }
-          primary={
-            <Btn variant="primary" icon="sync" onClick={() => void handleSync()}>
-              Sync now
-            </Btn>
-          }
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="screen rise">
-      <Masthead
-        lead={
-          <span className="chip-ico chip-ico--muted">
-            <Icon name="bank" size={18} />
-          </span>
-        }
-        title="Connect Monzo"
-        titleSize="var(--text-md)"
-      />
-      <p className="note mt-3 mb-4">
-        Run <span className="mono">npm run monzo:auth</span> and paste the result below.
-      </p>
-      {status === "error" && errorMessage && <p className="note mb-4">{errorMessage}</p>}
-      <label className="field-label">OAuth tokens or bare access token</label>
-      <textarea
-        className="textarea"
-        rows={5}
-        spellCheck={false}
-        placeholder={
-          '{"client_id":"…","client_secret":"…","access_token":"…","refresh_token":"…"}\n— or a bare access token'
-        }
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
-      <p className="caption row-2 mt-3" style={{ gap: "var(--space-1)" }}>
-        <Icon name="info" size={12} /> credentials stay local
-      </p>
-      <ActionBar
-        secondary={
-          <Btn variant="ghost" size="sm" onClick={onBack}>
-            All connectors
-          </Btn>
-        }
-        primary={
-          <Btn
-            variant="primary"
-            icon="check"
-            onClick={() => void handleConnect()}
-            disabled={!canConnect}
-          >
-            Connect
-          </Btn>
-        }
-      />
-    </div>
-  );
-}
+import { Masthead } from "../branding.js";
+import { ActionBar, Badge, Btn, Icon, TickerChip } from "../components.js";
+import { LoadingScreen, toolText } from "../screen.js";
+import type { App } from "../screen.js";
 
 type EthStatus =
   | "form"
@@ -241,7 +35,7 @@ function assetKey(asset: DiscoveredAsset): string {
     : `native:${asset.symbol.toUpperCase()}`;
 }
 
-function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
+export function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
   const [status, setStatus] = useState<EthStatus>("form");
   const [address, setAddress] = useState("");
   const [discovery, setDiscovery] = useState<WalletDiscovery | null>(null);
@@ -260,7 +54,7 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
         name: "discover_ethereum_wallet",
         arguments: { address: address.trim() },
       });
-      const parsed = JSON.parse(textOf(result)) as WalletDiscovery;
+      const parsed = JSON.parse(toolText(result) ?? "") as WalletDiscovery;
       setDiscovery(parsed);
       setSelected(preselect ?? new Set(parsed.assets.map(assetKey)));
       setStatus("select");
@@ -292,7 +86,7 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
         name: "connect_ethereum",
         arguments: { address: address.trim(), selections },
       });
-      setMessage(textOf(result));
+      setMessage(toolText(result) ?? "Done.");
       setStatus("connected");
     } catch (err) {
       setStatus("error");
@@ -305,7 +99,7 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
     setErrorMessage(null);
     try {
       const result = await app.callServerTool({ name: "sync_ethereum", arguments: {} });
-      setMessage(textOf(result));
+      setMessage(toolText(result) ?? "Done.");
       setStatus("connected");
     } catch (err) {
       setStatus("error");
@@ -338,7 +132,7 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
         : status === "connecting"
           ? "Importing holdings"
           : "Syncing balances";
-    return <Loading label={label} />;
+    return <LoadingScreen rise label={label} />;
   }
 
   if (status === "select" && discovery) {
@@ -537,83 +331,3 @@ function EthereumConnector({ app, onBack }: { app: App; onBack: () => void }) {
     </div>
   );
 }
-
-function ConnectorCard({
-  icon,
-  title,
-  sub,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  sub: string;
-  onClick: () => void;
-}) {
-  return (
-    <button className="card row-between connector-card" onClick={onClick}>
-      <span className="row row-2 grow">
-        <span className="chip-ico chip-ico--muted">{icon}</span>
-        <span className="connector-meta">
-          <span className="connector-name">{title}</span>
-          <span className="connector-sub">{sub}</span>
-        </span>
-      </span>
-      <Icon
-        name="chevron"
-        size={16}
-        className="chev"
-        style={{ transform: "rotate(-90deg)" }}
-      />
-    </button>
-  );
-}
-
-function Picker({ onPick }: { onPick: (c: "monzo" | "ethereum") => void }) {
-  return (
-    <div className="screen rise">
-      <Masthead
-        title="Connectors"
-        sub="import balances and holdings"
-        titleSize="var(--text-md)"
-      />
-      <div className="stack-2 mt-4">
-        <ConnectorCard
-          icon={<Icon name="bank" size={18} />}
-          title="Monzo"
-          sub="accounts, pots, transactions"
-          onClick={() => onPick("monzo")}
-        />
-        <ConnectorCard
-          icon={<Icon name="plug" size={18} />}
-          title="Ethereum wallet"
-          sub="ETH and ERC-20 holdings"
-          onClick={() => onPick("ethereum")}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ConnectorsApp() {
-  const [connector, setConnector] = useState<"monzo" | "ethereum" | null>(null);
-  const { app, error } = useApp({
-    appInfo: { name: "pfa", version: "0.1.0" },
-    capabilities: {},
-  });
-
-  if (error) {
-    return (
-      <div className="screen rise">
-        <p className="note">Connection error: {error.message}</p>
-      </div>
-    );
-  }
-  if (!app) return <Loading label="Connecting" />;
-  if (connector === "monzo")
-    return <MonzoConnector app={app} onBack={() => setConnector(null)} />;
-  if (connector === "ethereum")
-    return <EthereumConnector app={app} onBack={() => setConnector(null)} />;
-  return <Picker onPick={setConnector} />;
-}
-
-createRoot(document.getElementById("root")!).render(<ConnectorsApp />);

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DOCUMENTS_DIR, getKysely, resetDb } from "../db.js";
-import { writeManualDocument } from "../references.js";
+import { DOCUMENTS_DIR, getKysely, resetDb } from "../core/db.js";
+import { writeManualDocument } from "../core/references.js";
 import { recordAccountBalance } from "./record_account_balance.js";
 import { recordAssetHolding } from "./record_asset_holding.js";
 import { recordAssetPrice } from "./record_asset_price.js";

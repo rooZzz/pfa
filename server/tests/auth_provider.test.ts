@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { setupAuthEnv } from "./auth_env.js";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { clientsStore } from "../auth/clients_store.js";
 import { provider, finalizePendingAuthorization } from "../auth/provider.js";
 import { nowSec, randomId } from "../auth/util.js";

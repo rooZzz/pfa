@@ -1,10 +1,10 @@
-import { loadEnv } from "./env.js";
+import { loadEnv } from "../core/env.js";
 
 loadEnv();
 
-const { initDb } = await import("./db.js");
-const { mintEnrollmentToken } = await import("./auth/enrollment.js");
-const { publicOrigin } = await import("./auth/config.js");
+const { initDb } = await import("../core/db.js");
+const { mintEnrollmentToken } = await import("../auth/enrollment.js");
+const { publicOrigin } = await import("../auth/config.js");
 
 initDb();
 const token = mintEnrollmentToken();

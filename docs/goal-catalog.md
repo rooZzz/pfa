@@ -154,6 +154,8 @@ The dated values the UK-edges sections reference — the safe-withdrawal-rate de
 
 ## `debt_payoff`
 
+**Status.** Catalogued but not implemented — the classifier knows the type, but no decomposition or metric exists in `server/goals/`; confirming a `debt_payoff` goal is refused. The only authored type in this state.
+
 **Maps from.** "Clear my debts", "pay off the credit card", "be debt-free".
 
 **Needs spec.**

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import crypto from "node:crypto";
 import { z } from "zod";
-import { stageReview } from "../staging.js";
+import { stageReview } from "../core/staging.js";
 
 const SUPPORTED_MIME_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 

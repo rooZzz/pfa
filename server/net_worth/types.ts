@@ -47,7 +47,7 @@ export type TrendPoint = {
 
 export type { MonthCoverage, SeriesStatus } from "./coverage.js";
 import type { MonthCoverage } from "./coverage.js";
-import type { ClassFreshness } from "../freshness.js";
+import type { ClassFreshness } from "../core/freshness.js";
 
 export type NetWorthResult = {
   as_of: string;

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { getBriefing } from "../goals/briefing.js";
-import { resetDuck } from "../query.js";
+import { resetDuck } from "../query/query.js";
 import { archiveGoal } from "../tools/archive_goal.js";
 import { confirmGoal } from "../tools/confirm_goal.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";

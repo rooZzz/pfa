@@ -1,6 +1,6 @@
 import type { OAuthRegisteredClientsStore } from "@modelcontextprotocol/sdk/server/auth/clients.js";
 import type { OAuthClientInformationFull } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { getDb } from "../db.js";
+import { getDb } from "../core/db.js";
 import { nowSec, randomToken } from "./util.js";
 
 type ClientRow = {

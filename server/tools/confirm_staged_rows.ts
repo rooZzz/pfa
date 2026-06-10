@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DOCUMENTS_DIR, getKysely } from "../db.js";
-import { clearReview, getReview } from "../staging.js";
+import { DOCUMENTS_DIR, getKysely } from "../core/db.js";
+import { clearReview, getReview } from "../core/staging.js";
 
 function taxYearDates(taxYear: string): { starts_on: string; ends_on: string } {
   const startYear = parseInt(taxYear.slice(0, 4), 10);

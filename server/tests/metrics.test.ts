@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import {
   averageMonthlyOutgoings,
   emergencyFundMonths,
   isaAllowanceRemaining,
   liquidSavings,
 } from "../metrics/index.js";
-import { resetDuck } from "../query.js";
+import { resetDuck } from "../query/query.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";
 import { recordTransaction } from "../tools/record_transaction.js";
 

@@ -1,11 +1,11 @@
 import path from "node:path";
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { generateKeyPair, exportPKCS8 } from "jose";
-import { loadEnv } from "./env.js";
+import { loadEnv } from "../core/env.js";
 
 loadEnv();
 
-const { signingKeyPath } = await import("./auth/config.js");
+const { signingKeyPath } = await import("../auth/config.js");
 const keyPath = signingKeyPath();
 
 if (existsSync(keyPath)) {

@@ -1,7 +1,7 @@
 import { resolvePeriod } from "../cashflow/index.js";
 import { queryIncome } from "../cashflow/income.js";
-import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query.js";
-import { toNum } from "../sql_util.js";
+import { LIVE_CONTEXT, type ReadContext, runQuery } from "../query/query.js";
+import { toNum } from "../core/sql_util.js";
 import { taxConstantsForDate } from "./constants.js";
 
 export type TaxPositionContext = {

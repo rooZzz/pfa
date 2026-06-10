@@ -2,7 +2,7 @@ import http from "node:http";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupAuthEnv } from "./auth_env.js";
-import { initDb } from "../db.js";
+import { initDb } from "../core/db.js";
 
 const PORT = 45711;
 let server: Server;

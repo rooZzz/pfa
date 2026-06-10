@@ -6,7 +6,7 @@ import {
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import { provider } from "./provider.js";
 import { authRoutes } from "./routes.js";
-import { handleMcpRequest } from "../mcp_request.js";
+import { handleMcpRequest } from "../mcp/mcp_request.js";
 import { publicOrigin, mcpResource, authPort, publicOriginHost } from "./config.js";
 
 export function buildAuthApp(): express.Express {

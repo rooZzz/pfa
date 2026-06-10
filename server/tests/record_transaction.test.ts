@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { recordTransaction } from "../tools/record_transaction.js";
 
 beforeEach(() => {

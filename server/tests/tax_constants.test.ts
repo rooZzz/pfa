@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { initDb } from "../db.js";
-import { resetDuck } from "../query.js";
+import { initDb } from "../core/db.js";
+import { resetDuck } from "../query/query.js";
 import {
   resolveConstant,
   taxConstantsForDate,

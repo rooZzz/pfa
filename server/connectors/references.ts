@@ -2,8 +2,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { Transaction } from "kysely";
-import { DOCUMENTS_DIR } from "../db.js";
-import type { AccountType, DatabaseSchema } from "../schema.js";
+import { DOCUMENTS_DIR } from "../core/db.js";
+import type { AccountType, DatabaseSchema } from "../core/schema.js";
 
 export async function writeConnectorDocument(
   trx: Transaction<DatabaseSchema>,

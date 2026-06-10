@@ -6,7 +6,7 @@ import {
   type RegistrationResponseJSON,
   type AuthenticationResponseJSON,
 } from "@simplewebauthn/server";
-import { getDb } from "../db.js";
+import { getDb } from "../core/db.js";
 import { rpId, rpName, publicOrigin, authorizedSubject } from "./config.js";
 import { nowSec, randomId } from "./util.js";
 

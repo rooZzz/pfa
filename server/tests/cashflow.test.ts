@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getDb, getKysely, initDb } from "../db.js";
-import { writeManualDocument } from "../references.js";
-import { resetDuck } from "../query.js";
+import { getDb, getKysely, initDb } from "../core/db.js";
+import { writeManualDocument } from "../core/references.js";
+import { resetDuck } from "../query/query.js";
 import { getCashflow } from "../cashflow/index.js";
 import { recordTransaction } from "../tools/record_transaction.js";
 

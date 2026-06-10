@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
-import { ensureAsset, requiresTicker, writeManualDocument } from "../references.js";
+import { getKysely } from "../core/db.js";
+import { ensureAsset, requiresTicker, writeManualDocument } from "../core/references.js";
 
 export const recordAssetPriceSchema = {
   asset_name: z.string().describe("Asset name, e.g. 'ETH', 'Vanguard FTSE All-World'."),

@@ -1,7 +1,7 @@
 import http from "node:http";
-import { loadEnv } from "./env.js";
-import { initDb } from "./db.js";
-import { handleMcpRequest } from "./mcp_request.js";
+import { loadEnv } from "./core/env.js";
+import { initDb } from "./core/db.js";
+import { handleMcpRequest } from "./mcp/mcp_request.js";
 import { authConfigured } from "./auth/config.js";
 import { startAuthServer } from "./auth/app.js";
 

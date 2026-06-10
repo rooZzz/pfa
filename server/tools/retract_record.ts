@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { RetractableSeries } from "../corrections.js";
-import { retractableSeriesNames, retractRecord } from "../corrections.js";
+import type { RetractableSeries } from "../core/corrections.js";
+import { retractableSeriesNames, retractRecord } from "../core/corrections.js";
 
 export const retractRecordSchema = {
   series: z

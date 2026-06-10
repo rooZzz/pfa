@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb, SECRETS_PATH } from "../db.js";
-import { runProductQuery } from "../nlq_query.js";
-import { runQuery, resetDuck } from "../query.js";
+import { getDb, initDb, SECRETS_PATH } from "../core/db.js";
+import { runProductQuery } from "../query/nlq_query.js";
+import { runQuery, resetDuck } from "../query/query.js";
 
 beforeEach(() => {
   initDb();

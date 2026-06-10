@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../../db.js";
+import { getDb, initDb } from "../../core/db.js";
 import { recordAccountBalance } from "../../tools/record_account_balance.js";
 import { generateSql, queryNaturalLanguage } from "../../tools/query_natural_language.js";
 import { sqlTranslationFixtures } from "./fixtures/sql-translations.js";

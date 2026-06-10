@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import { recordAssetHolding } from "../tools/record_asset_holding.js";
 import { recordEquityGrant } from "../tools/record_equity_grant.js";
 

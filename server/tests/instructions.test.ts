@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SERVER_INSTRUCTIONS } from "../instructions.js";
+import { SERVER_INSTRUCTIONS } from "../mcp/instructions.js";
 import { tools } from "../tools/registry.js";
 
 describe("SERVER_INSTRUCTIONS", () => {

@@ -1,5 +1,5 @@
-import { runQuery } from "../query.js";
-import { toStr } from "../sql_util.js";
+import { runQuery } from "../query/query.js";
+import { toStr } from "../core/sql_util.js";
 
 export type SeriesStatus = {
   label: string;

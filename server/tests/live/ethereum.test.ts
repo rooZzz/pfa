@@ -9,7 +9,7 @@ import {
   saveEthereumWallet,
 } from "../../connectors/ethereum/state.js";
 import { runEthereumSync } from "../../connectors/ethereum/sync.js";
-import { getDb, initDb } from "../../db.js";
+import { getDb, initDb } from "../../core/db.js";
 import { getNetWorth } from "../../net_worth/index.js";
 
 const WALLET = "0x2B1b257aAC301F5cdfB7bE88Bb84D2207618e56D";

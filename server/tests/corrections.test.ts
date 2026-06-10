@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { correctRecord, retractRecord } from "../corrections.js";
-import { getDb, initDb } from "../db.js";
+import { correctRecord, retractRecord } from "../core/corrections.js";
+import { getDb, initDb } from "../core/db.js";
 import { queryTransactionsByCategory } from "../cashflow/transactions.js";
 import { liquidSavings } from "../metrics/index.js";
 import { recordAccountBalance } from "../tools/record_account_balance.js";

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { CorrectableSeries } from "../corrections.js";
-import { correctableSeriesNames, correctRecord } from "../corrections.js";
+import type { CorrectableSeries } from "../core/corrections.js";
+import { correctableSeriesNames, correctRecord } from "../core/corrections.js";
 
 export const correctRecordSchema = {
   series: z

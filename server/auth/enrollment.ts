@@ -1,4 +1,4 @@
-import { getDb } from "../db.js";
+import { getDb } from "../core/db.js";
 import { sha256, nowSec, randomToken } from "./util.js";
 
 const ENROLLMENT_TTL = 1800;

@@ -1,6 +1,6 @@
 # End-State Flow Map
 
-**Status:** Draft for refinement. Defines the finished-app target the staged plan derives from. Not a description of what exists today.
+**Status:** Canonical end-state target. Defines the finished-app destination that stages derive backward from. Not a description of what exists today — see [architecture.md](architecture.md) for that.
 
 **Purpose:** We have been planning stages forward from the current code, so every new concern reopens the stage definitions. This document fixes the destination. Stages are then derived backward from it. Capabilities are not invented per stage — they fall out of the flows below.
 
@@ -106,7 +106,7 @@ The fan-out (rather than a single dispatching tool) keeps each tool's argument s
 
 ## Flow 2 — Edit
 
-**Status: built (2026-06-01).** Deterministic primitive in `server/corrections.ts`; `correct_record` and `retract_record` tools. `superseded_by` marker (migration `0009`) excludes corrected/retracted rows from every read; removal is a logical tombstone. Connector-sourced rows are refused; equity grants are retract-and-recreate.
+**Status: built (2026-06-01).** Deterministic primitive in `server/core/corrections.ts`; `correct_record` and `retract_record` tools. `superseded_by` marker (migration `0009`) excludes corrected/retracted rows from every read; removal is a logical tombstone. Connector-sourced rows are refused; equity grants are retract-and-recreate.
 
 Edit is not a separate surface. It folds into the manual-entry path: a correction is a new manual observation that supersedes a prior one. There is no `ui://sources` browser. Editing must never destroy history — a correction is a new fact about an old fact.
 

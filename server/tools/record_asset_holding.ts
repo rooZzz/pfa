@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
+import { getKysely } from "../core/db.js";
 import { tryPriceOnCapture } from "../connectors/prices/sync.js";
 import {
   ensureAsset,
   quantityScaleForAssetType,
   requiresTicker,
   writeManualDocument,
-} from "../references.js";
+} from "../core/references.js";
 
 export const recordAssetHoldingSchema = {
   asset_name: z.string().describe("Asset name, e.g. 'ETH', 'Vanguard FTSE All-World'."),

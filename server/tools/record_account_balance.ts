@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getKysely } from "../db.js";
-import { ensureAccount, writeManualDocument } from "../references.js";
+import { getKysely } from "../core/db.js";
+import { ensureAccount, writeManualDocument } from "../core/references.js";
 
 export const recordAccountBalanceSchema = {
   account_name: z

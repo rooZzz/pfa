@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, initDb, resetDb } from "../db.js";
+import { getDb, initDb, resetDb } from "../core/db.js";
 import { rollbackAll, runMigrations } from "../migrations/index.js";
 
 function tableNames(): string[] {

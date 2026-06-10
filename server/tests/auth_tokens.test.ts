@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { SignJWT } from "jose";
 import { setupAuthEnv } from "./auth_env.js";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import {
   mintAccessToken,
   verifyAccessToken,

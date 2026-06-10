@@ -1,6 +1,6 @@
 # Architecture — Personal Finance App
 
-**Status:** Design-complete, pre-implementation. Governs Stage 3 POC and all subsequent stages.
+**Status:** Live. Describes the deployed system; the target it converges on is [end-state-flows.md](end-state-flows.md), and the rationale for how it got here is [decision-log.md](decision-log.md).
 
 ---
 
@@ -12,7 +12,7 @@ A local-first, AI-native personal finance app for a single user (UK tax context)
 2. **Cashflow and budgeting** — PAYE, NI, pension contributions, ISA allowances.
 3. **Insight and Q&A** — natural language queries answered from real data.
 
-**The app is a local MCP server over Streamable HTTP, bound to localhost.** It is built as though it could be served remotely but only runs on `127.0.0.1`. Claude Desktop is the harness: it provides chat, tool orchestration, and renders interactive UI resources (`ui://`) in sandboxed iframes via the MCP Apps extension. Desktop connects through the `mcp-remote` stdio-to-HTTP bridge (it does not reliably accept a raw `url` entry). No public exposure (localhost-only bind). All data stays on disk.
+**The app is an MCP server over Streamable HTTP.** Claude Desktop is the primary harness: it provides chat, tool orchestration, and renders interactive UI resources (`ui://`) in sandboxed iframes via the MCP Apps extension; a co-located Desktop connects to the open loopback listener through the `mcp-remote` stdio-to-HTTP bridge (it does not reliably accept a raw `url` entry). The server runs always-on on a Mac mini and is internet-reachable through ngrok behind passkey auth — see Remote hosting, authentication, and operations below. All data stays on disk.
 
 ---
 
@@ -22,21 +22,20 @@ A local-first, AI-native personal finance app for a single user (UK tax context)
 
 Three modes:
 
-**Conversation (chat)** — The default mode. The user types in Claude Desktop's chat interface. Claude invokes tools directly from the conversation: "My pension pot is £42,000 as of today's statement" calls `ingest_manual_entry`. "What's my net worth?" calls `query_natural_language`. No form required.
+**Conversation (chat)** — The default mode. The user types in Claude Desktop's chat interface. Claude invokes tools directly from the conversation: "My pension pot is £42,000 as of today's statement" calls `record_pension_value`. "What's my net worth?" calls `query_natural_language`. No form required.
 
 **UI resources** — For interactions that benefit from dedicated UI. Rendered as sandboxed iframes via MCP Apps:
 
 | Resource | Purpose |
 |---|---|
-| `ui://upload` | Drag and drop documents (PDFs, screenshots). Displays ingestion queue and parse progress. |
-| `ui://connectors` | Add, configure, and disable API connectors. Handles OAuth flows and API key entry. |
-| `ui://review` | Confirm or reject rows staged from document parsing before they write to the store. |
-| `ui://net_worth` | Net worth dashboard — trended, point-in-time. |
-| `ui://cashflow` | Cashflow and budget dashboard. |
+| `ui://pfa/upload.html` | Drag and drop documents (PDFs, screenshots). Renders staged rows for confirm-or-reject before they write to the store. |
+| `ui://pfa/connectors.html` | Add and configure connectors (Monzo, Ethereum wallet). Handles credential entry and discovery. |
+| `ui://pfa/net_worth.html` | Net worth dashboard — trended, point-in-time, goals briefing. |
+| `ui://pfa/cashflow.html` | Cashflow and budget dashboard with the gross-to-net waterfall. |
 
-Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/src/styles/` and `server/src/components.tsx`.
+Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/ui/styles/` and `server/ui/components.tsx`.
 
-**Background processes** — Connector runners (Monzo, Ethereum wallet) run as launchd daemons independent of Claude Desktop. Their *setup* — credentials, schedule, enable/disable — happens through `ui://connectors`. Once configured they run autonomously, writing to SQLite directly. The user never touches them again unless reconfiguring.
+**Connector sync** — Connectors (Monzo, Ethereum wallet) sync via manually-invoked tools (`sync_monzo`, `sync_ethereum`, `sync_prices`) inside the server process, preserving the single-writer invariant. Setup — credentials, asset selection — happens through `ui://pfa/connectors.html`. Scheduled background sync (launchd/cron) is deferred.
 
 ---
 
@@ -50,7 +49,7 @@ Presentation across these surfaces follows a single design language — "Instrum
 | Document parsing | Haiku 4.5 (vision) | Fast, cheap, accurate enough on payslips and statements at ~£0.005–0.01/page. |
 | Natural language queries | Haiku 4.5 (text-to-SQL) | Generates SQL from natural language against schema catalog + DDL. DuckDB executes it. |
 | UI resources | MCP Apps (`ui://` resources) | Rendered in Claude Desktop's sandboxed iframe. No separate frontend. |
-| Background connectors | Separate OS process (launchd on Mac) | MCP server lifecycle is bound to Claude Desktop. Periodic API syncs must run independently. |
+| Connectors | Manually-invoked sync tools in-process | Single-writer invariant (no multi-process SQLite contention); re-auth failures surface as a visible re-connect, not a silent stall. Scheduling deferred. |
 
 ---
 
@@ -63,27 +62,23 @@ flowchart TD
     subgraph CD["Claude Desktop — exclusive interaction surface"]
         CHAT["Chat\nmanual entry · Q&A · conversation"]
         subgraph UI["MCP Apps UI resources"]
-            UPLOAD["ui://upload\ndrag and drop documents"]
-            CONNECTORS["ui://connectors\nadd / configure API connectors"]
-            REVIEW["ui://review\nstaged-row confirmation"]
-            NW["ui://net_worth"]
-            CF["ui://cashflow"]
+            UPLOAD["ui://pfa/upload.html\ndrag and drop · staged-row confirmation"]
+            CONNECTORS["ui://pfa/connectors.html\nadd / configure connectors"]
+            NW["ui://pfa/net_worth.html"]
+            CF["ui://pfa/cashflow.html"]
         end
     end
 
-    subgraph MCP["MCP Server — Streamable HTTP (localhost)"]
+    subgraph MCP["MCP Server — Streamable HTTP"]
         IT["ingest_document"]
         ME["record_* manual entry tools\nbalance · pension · mortgage · asset · grant · vesting"]
-        SC["setup_connector"]
+        SC["connect_monzo · connect_ethereum"]
+        CONN["sync_monzo · sync_ethereum · sync_prices\ndeterministic reconciliation"]
         QT["query_natural_language"]
         CT["confirm_staged_rows"]
         NWT["get_net_worth"]
         STAGE[("staging buffer\nunconfirmed rows")]
         CAT[["schema_catalog.md + DDL\ninjected into every Haiku call"]]
-    end
-
-    subgraph BGP["Background process — launchd"]
-        CONN["Connector runners\nMonzo · Ethereum · ..."]
     end
 
     subgraph HAIKU["Haiku 4.5 — Anthropic API"]
@@ -106,8 +101,8 @@ flowchart TD
     UPLOAD -->|"tool call"| IT
     IT -->|parse| VIS
     VIS -->|extracted rows| STAGE
-    STAGE -->|renders| REVIEW
-    REVIEW -->|user approves| CT
+    STAGE -->|renders| UPLOAD
+    UPLOAD -->|user approves| CT
     CT -->|"write · source_id enforced"| DOCS
 
     CHAT -->|"tool call"| ME
@@ -121,6 +116,7 @@ flowchart TD
 
     CONNECTORS -->|"tool call"| SC
     SC -->|"store credentials"| CONN
+    CHAT -->|"tool call"| CONN
 
     CONN -->|"INSERT OR IGNORE · external_id dedup"| EV
     CONN -->|snapshot| SN
@@ -221,7 +217,7 @@ These are invariants. They hold across all tables, all ingestion types, all stag
 
 4. **Snapshot staleness is always surfaced.** Every query over snapshot data returns `recorded_at` alongside the value. The UI displays it. "Your pension is £42,000" without a date is a misleading statement.
 
-5. **As-of lookup is a single query contract.** The value for a snapshot at any query date is the most recent observation whose validity range covers it — `valid_from <= as_of AND (valid_to IS NULL OR valid_to > as_of)`, taking the latest `valid_from` per series (`DISTINCT ON (series) ... ORDER BY series, valid_from DESC`). This last-observation-carried-forward (LOCF) semantic lives in one centralised helper (`server/snapshots.ts`), composed by every line query and by the trend points. The application never interpolates or estimates. Unknown = last observed; null = never tracked, distinguished from zero.
+5. **As-of lookup is a single query contract.** The value for a snapshot at any query date is the most recent observation whose validity range covers it — `valid_from <= as_of AND (valid_to IS NULL OR valid_to > as_of)`, taking the latest `valid_from` per series (`DISTINCT ON (series) ... ORDER BY series, valid_from DESC`). This last-observation-carried-forward (LOCF) semantic lives in one centralised helper (`server/core/snapshots.ts`), composed by every line query and by the trend points. The application never interpolates or estimates. Unknown = last observed; null = never tracked, distinguished from zero.
 
 6. **`external_id` on event rows.** Required for connector-ingested events. Inserts from connectors use `INSERT OR IGNORE` — deduplication is guaranteed at the database level, not application logic.
 
@@ -348,18 +344,19 @@ Manual input → record_* tool → writeManualDocument generates JSON → write 
 
 ### API connectors (high trust)
 
-Monzo, Ethereum wallet, or any structured data source. **Runs as a background OS process (launchd), not inside the MCP server.**
+Monzo, Ethereum wallet, or any structured data source. **Sync is a manually-invoked tool (`sync_monzo`, `sync_ethereum`) running inside the server process** — this preserves the single-writer invariant and makes re-auth failures a visible re-connect rather than a silent stall. Scheduled background sync is deferred.
 
 ```
-Connector runner → API call → structured data → INSERT OR IGNORE (external_id dedup)
+sync_* tool → API call → structured data → INSERT OR IGNORE (external_id dedup)
 → write event/snapshot rows → write connector run record to documents
 ```
 
 - `documents.source_type = 'connector'`
 - Auto-write, no confirmation step. Data is structured; confidence is high.
-- `external_id` on every event row (Monzo transaction ID, ETH tx hash). Idempotent inserts.
-- The MCP server is not involved in writes. It reads the results via DuckDB.
-- Connector run record in `documents` includes: connector name, run timestamp, rows written, API response hash.
+- `external_id` on every event row (Monzo transaction ID). Idempotent inserts. Wallet balances are holding snapshots, not a transaction stream.
+- Reconciliation is deterministic code — no model in the sync path.
+- Connector run record in `documents` includes: connector name, run timestamp, rows written.
+- Credentials enter only via the connectors widget calling `app`-visibility-only tools (`connect_monzo`, `connect_ethereum`), never through chat; state lives in `connector_state` inside `secrets.sqlite`.
 
 ### The `documents` table as universal source anchor
 
@@ -445,7 +442,7 @@ a co-located Claude Desktop with no auth. The authenticated `127.0.0.1:4001` (Ex
 port ngrok forwards to; everything public goes through it. The same process is the MCP server, the
 OAuth 2.1 Authorization Server, and the Resource Server — it signs access tokens with an Ed25519
 key and verifies them in process. The per-request MCP handling is shared by both listeners
-(`server/mcp_request.ts`).
+(`server/mcp/mcp_request.ts`).
 
 ### Authentication
 
@@ -459,8 +456,9 @@ signed access JWT (short-lived) plus a rotating, revocable opaque refresh token.
 single-user: every token's `sub` must equal `AUTHORIZED_SUBJECT`. Code lives in `server/auth/`.
 Enrolment is a one-time local CLI that prints a single-use link opened at the public origin so the
 credential binds to the production RP ID; recovery is re-enrolment (machine access is the root of
-trust). The auth pages are intentionally unstyled — the Instrument design system applies to the
-`ui://` iframe surfaces, not these server-rendered pages.
+trust). The auth pages follow the Instrument design language as server-rendered HTML — the
+canonical tokens CSS plus a focused `server/auth/assets/auth.css`, no React/Vite build; see the
+Authentication surfaces section of [design-language.md](design-language.md).
 
 ### Secrets isolation from the query path
 
@@ -468,8 +466,8 @@ Sensitive tables — `connector_state` (Monzo/Ethereum tokens) and the OAuth/Web
 in a separate `secrets.sqlite` (`0600`), attached to the single better-sqlite3 writer as schema
 `secrets`; SQLite resolves the unqualified names there, so app code is unchanged. No DuckDB read
 engine attaches that file. The natural-language (text-to-SQL) path runs a dedicated DuckDB engine
-that materialises only an allow-listed set of product tables (`server/nlq_allowlist.ts`,
-`server/nlq_query.ts`) and detaches the source, so secrets and `tax_constants` are physically
+that materialises only an allow-listed set of product tables (`server/query/nlq_allowlist.ts`,
+`server/query/nlq_query.ts`) and detaches the source, so secrets and `tax_constants` are physically
 absent — a model-generated query against them returns a DuckDB Catalog Error, not a policy miss.
 Internal/admin reads keep the full read path. This is the enforceable analog of "two SQL users"
 given SQLite and embedded DuckDB have no roles/`GRANT`s.
@@ -512,7 +510,7 @@ theme-aware SVG via `@media (prefers-color-scheme: dark)`, an ICO fallback, an a
 served at the origin root and linked from every auth page, including a minimal `200` landing page at
 `/` (the root previously 404'd). The connector chip icon in Claude is sourced from Google's S2
 favicon service (`google.com/s2/favicons?domain=…`), which crawls the public domain rather than
-reading the MCP `serverInfo.icons` field (already populated in `server/icons.ts`); the landing page
+reading the MCP `serverInfo.icons` field (already populated in `server/mcp/icons.ts`); the landing page
 exists so that crawl finds the favicon. Cache refresh there is on Google's own cadence (often a day
 or more) and cannot be forced.
 
@@ -520,41 +518,4 @@ or more) and cannot be forced.
 
 ## Decision log
 
-| Date | Decision | Rationale |
-|---|---|---|
-| 2026-06-09 | Auth pages restyled onto the Instrument design language ("Instrument Card" passkey sign-in) | The public sign-in/enrol/error/landing pages were unstyled system-font HTML. Recreated on the shared Instrument system — one calm centered card, passkey-only, four states (idle/authenticating/success/error) behind the real WebAuthn ceremony, light/dark equal. Server-rendered HTML + vanilla JS (not React/Vite), so they reuse the canonical `tokens.css` + a focused `server/auth/assets/auth.css` served at `/assets/auth.css` with self-hosted fonts at `/assets/fonts/`. Cross-device sign-in stays the browser's native passkey UI (no bespoke QR); prototype placeholder data is omitted, not fabricated. See the Authentication surfaces section of `docs/design-language.md`. |
-| 2026-06-09 | Remote hosting + deploy: always-on Mac mini, ngrok ingress, self-hosted runner, release-triggered deploy with backup/rollback | Local-first but internet-reachable; LaunchDaemons under `_pfa` (FileVault forces the system domain). See "Remote hosting, authentication, and operations" + the runbook. |
-| 2026-06-09 | Passkey auth: OAuth 2.1 + WebAuthn on a second loopback listener (4001), single-user | Passwordless, request-bound, single `sub`; Ed25519 in a `0600` file; open 4000 unchanged. See the hosting/auth section. |
-| 2026-06-09 | Secrets split from the NLQ path: `secrets.sqlite` + a restricted allow-list DuckDB engine | Sensitive tables physically absent from the text-to-SQL engine (Catalog Error, not a policy miss); the enforceable analog of two SQL users. |
-| 2026-06-08 | Transport: stdio to Streamable HTTP on localhost; Desktop bridges via `mcp-remote` | Decouples the server from Desktop's lifecycle (restart without relaunching Desktop). Stateless transport, per-request `buildServer()`, `node:http` with a Host/Origin allowlist. UI `ui://` HTML re-read from disk per request so rebuilds need no restart. |
-| 2026-05-26 | Architecture: Claude Desktop + local stdio MCP server + MCP Apps | App is the MCP server. No web server, no OAuth, no public exposure. Data stays on disk. |
-| 2026-05-26 | Ingestion: human review non-negotiable for document uploads | Haiku vision can misparse. Silent writes to canonical store are not acceptable. |
-| 2026-05-26 | Recommendations: observations only | "ISA 60% funded, 47 days left." No buy/sell/overpay advice until trust is established. |
-| 2026-05-26 | Write store: SQLite via `better-sqlite3` | Local-first, ACID, single file, zero ops. |
-| 2026-05-26 | Read layer: DuckDB via SQLite extension | One file, two engines. No ETL. Columnar reads for LOCF and aggregations. |
-| 2026-05-26 | Amounts: integers (pence), never floats | Financial correctness. Rounding errors in floats are unacceptable for tax calculations. |
-| 2026-05-26 | UK tax year: explicit `tax_periods` table | All ISA/PAYE queries anchor here. Haiku must never assume calendar year. |
-| 2026-05-26 | Source anchor: `documents` table, universal | All ingested rows (upload, manual, connector) carry `source_id`. No orphaned data. |
-| 2026-05-26 | Manual entry: system-generated JSON acts as document | No schema change needed. Uniform audit trail across all ingestion types. |
-| 2026-05-26 | Connectors: separate OS process (launchd) | MCP server lifecycle is bound to Claude Desktop. Periodic syncs must run independently. |
-| 2026-05-26 | Connector deduplication: `external_id` + `INSERT OR IGNORE` | Idempotent at the database level. No application-layer dedup logic. |
-| 2026-05-26 | Text-to-SQL accuracy: schema design + catalog, not fine-tuning | Well-named schemas + `schema_catalog.md` reach ~95% accuracy on bounded domains. |
-| 2026-05-26 | Staleness: always surface `recorded_at` | Every snapshot-derived value carries its observation date. Never imply live data. |
-| 2026-05-27 | Flex layer: bounded `payload` JSON on proven-tail tables | Typed spine for anything aggregated or trended; `payload` for the unmodelled long tail on `income_events` and the equity tables. Not blanket, not a query target, with a promotion path. Derived from the end-state flow refinement in `docs/end-state-flows.md`. See design rule 7. |
-| 2026-05-27 | Equity entities: `equity_grant` + `equity_vesting_event` | Typed primitives (scheme type, units, strike, vest dates) plus `payload` for scheme-specific terms. Valuation and vesting-tax methods remain open decisions. |
-| 2026-05-28 | Manual entry: fanned per series, not a single dispatching tool | One `record_*` tool per series (`account_balance`, `pension_value`, `mortgage`, `mortgage_balance`, `asset_holding`, `asset_price`, `refresh_asset_price`, `equity_grant`, `vesting_event`). Each owns its own zod schema, ensures its reference row, writes the audit JSON, and inserts the typed row in one transaction. The LLM picks the right one from chat. Shared helpers in `references.ts`. |
-| 2026-05-28 | Net worth: dedicated `get_net_worth` tool, not text-to-SQL | Contingent (unvested) equity valuation isn't expressible as a single clean query and must not be confused with realised holdings. A typed module computes the split and is consumed by `ui://pfa/net_worth.html`. |
-| 2026-05-28 | Asset pricing: split inventory from valuation; event-locked prices stay on event rows | `holdings` (quantity, changes on transactions) + `asset_prices` (per-unit price ticks, source-tagged) replace the old `asset_values` table which bundled both. Property value moves to `asset_prices` against a `property` asset, removing it from `mortgage_balance`. Equity grant current price moves from `payload` to `asset_prices` via `equity_grant.asset_id`. Strike and market-at-vest remain on their respective event rows as immutable tax facts. `assets.price_source` is a strategy hint for future connectors. |
-| 2026-05-28 | Data access: Kysely typed query builder + migrator | Write path (`record_*` tools, `references.ts`) uses Kysely over `better-sqlite3` for typed inserts/selects and transactions. Schema lives once as the Kysely `DatabaseSchema` interface (`server/schema.ts`); a coverage test asserts every table/column appears in `docs/schema_catalog.md`. Versioned migrations (`server/migrations/`) replace the destructive `DDL` + `DROP_ALL` strings; `initDb()` runs `migrateToLatest()` on startup, `resetDb()` is test-only. The DuckDB read path keeps parameterised `sql` (no string interpolation); `runQuery(sql, params)` passes bind parameters. |
-| 2026-05-28 | As-of lookup: one centralised LOCF helper | The "latest snapshot covering a date" logic, previously hand-rolled per query, lives once in `server/snapshots.ts` and is composed by every net-worth line query and the trend points. See design rule 5. |
-| 2026-05-29 | Goals: goals-first, deterministic decomposition, push briefing | Goal capture is a first-class flow. The dividing line is grounded observation versus synthesised advice, not model capability — the app owns truth, the goal catalog, decomposition, metrics, and the directive engine; the harness owns framing and tradeoffs; Haiku only classifies free text onto a goal type. Goal-type decomposition into sub-goals is authored and frozen, never model-generated. Metrics bind to definitions (absence fires a data-gap directive). The briefing pushes the complete observation set rather than the harness pulling. The verbatim utterance is stored as provenance and framing context, never a data source. The advice gate is unchanged. See the Goal framework section and `docs/goal-catalog.md`. |
-| 2026-05-29 | Tax rules: app-owned `tax_constants`, injected, never recalled | UK tax and legal constants are app-owned reference data, the sibling of `tax_periods` — dated (`valid_from`/`valid_to`), status-tagged (`enacted` vs `announced`), provenanced. Injected into the advice and briefing payload for the tax year in scope; the harness applies and frames the rules but never sources a tax figure from its own training. A future-effective row is an announced change; deadline directives fire from pending constants and carry their certainty ("proposed, subject to legislation"), while "act now" stays advice. Updates are human-curated on the fiscal cadence — legislation is never auto-parsed into the canonical table. See the Domain rule data section. Built: `server/migrations/0006_tax_constants.ts` (table + primary-source seed) and `server/tax_constants.ts` (the `resolveConstant`/`upcomingChange`/`taxConstantsForDate` accessor); the briefing injects the bundle and fires a cash-ISA-2027 deadline directive for `isa_max` goals. Refinement: `status` (certainty) and `valid_from`/`valid_to` (effect window) are orthogonal — an `enacted` row can be future-effective — and `valid_to` is inclusive, matching `tax_periods`. |
-| 2026-05-29 | Market and macro context: out of scope | Market direction and timing — "markets are down, buy now" — is a judgment about live external state, not reference data. The app never asserts it. Any factual market data is a far-future grounded-connector concern with provenance, never a recommendation; the directional call is market timing and stays out. |
-| 2026-05-29 | Advice gate enforcement: behavioural via server instructions and tool metadata, not structural | The goals-first rule, observations-not-advice gate, and push-not-pull briefing contract are enforced via MCP server `instructions` and tool descriptions. These are best-effort nudges — `instructions` is MAY-injected per spec, and tool descriptions shift model behaviour probabilistically. They are not a hard guarantee: a determined user or model can still bypass them, and `query_natural_language` remains an open data path. The only proof of effect is empirical (manual Claude Desktop test per the verification protocol). True enforcement requires handler-side gating or removing model-facing raw-data tools; this is deferred as a larger product decision. |
-| 2026-05-29 | Monzo connector pulled forward from Deferred; manual sync, not cron | Connectors were deferred, but a real-transaction source is what every downstream capability needed to be tested on true data, so the Monzo connector was built. Scoped to what the Monzo developer API actually exposes: current + joint accounts, pots, balances, transactions — not investments or pensions (no API), which stay on manual entry. v1 is a manually-invoked `sync_monzo` tool, not a launchd/cron daemon — this keeps the single-writer invariant (no multi-process SQLite contention) and turns Monzo's 90-day re-auth from a silent stall into a visible re-connect. Each Monzo account and pot is modelled as its own `accounts` row keyed by `(provider, external_id)`; pots map to `savings`/`isa` so they flow into net worth and `liquid_savings` unchanged. Transactions dedupe on `external_id` via INSERT OR IGNORE. Reconciliation is deterministic code, no model in the sync path. Credentials enter only through the `ui://connectors` widget calling an `app`-visibility-only `connect_monzo` tool, never through chat; a local `npm run monzo:auth` loopback helper mints OAuth tokens and the user pastes them into the widget, so the widget→tool→server channel stays the sole ingestion boundary and survives a future remote-hosted server. See the connector modules in `server/connectors/`. |
-| 2026-05-29 | Internal transfers tagged at ingest, excluded from spend | A movement between the user's own accounts or pots (funding a savings pot, current→ISA, current→joint) is not consumption and not income. The connector tags such transactions `is_internal = 1` deterministically at ingest (pot scheme/metadata, or a counterparty matching a known own account). Spend aggregations — average monthly outgoings and cashflow inflow/outflow — exclude `is_internal = 1`. The ISA-allowance metric does NOT exclude them, because a current→ISA transfer is itself a genuine contribution. The classifier is isolated for refinement against live data. |
-| 2026-05-29 | Cashflow income: bank feed is the amount truth, payslip is the tax decomposition | Once the bank feed exists, actual money in/out comes from `transactions` — the salary credit, rent, and other income all land there as credits, each counted exactly once. Payslip `income_events` is no longer an additive cashflow line; it is the tax decomposition of the salary credit (gross, PAYE, NI, employee/employer pension) and drives the tax-year and allowance logic. Summing payslip net with transaction inflows double-counts salary. This assumes the salary-receiving account is connected (confirmed: salary always lands in Monzo); a payslip with no matching credit in a connected account is a data-gap directive, not a silent fallback. Labelling income credits as salary-vs-other (by employer payer) is a deferred enhancement on top of a now-correct total. See Flow 5 in `docs/end-state-flows.md`. |
-| 2026-06-01 | Edit/correction/removal built — `superseded_by` marker, unified tool pair, logical removal | Flow 2 is built. Three operations are kept distinct: a *new version* (the value changed) is an ordinary `record_*` insert; a *correction* (the row was recorded wrong) inserts a superseding row at the original effective date and marks the wrong row `superseded_by`; a *removal* (no version applies) sets `superseded_by` with no successor. Migration `0009_superseded_by` adds a nullable `superseded_by` to every editable event and snapshot table, narrowing event-immutability to "financial columns immutable; the marker is the one permitted mutation." Removal is logical only (tombstone retained for audit), never a hard delete. The deterministic primitive lives in `server/corrections.ts`; `correct_record` and `retract_record` (both `destructiveHint`) are the only edit channel — never LLM-generated mutation SQL — and refuse connector-sourced rows. Equity grants are retract-and-recreate (retracting a grant cascades to its vesting events). Every aggregate and the LOCF helpers filter `superseded_by IS NULL`; the text-to-SQL catalog instruction enforces the same on the NL path (best-effort, like the advice gate). See Flow 2 in `docs/end-state-flows.md`. |
-| 2026-05-31 | Payslip surfacing: two-denominator model, gross-to-net waterfall in cashflow | Every pound is shown once per denominator, and each view states which it uses. Denominator A is gross earnings (the payslip's domain): the waterfall Gross − pre-tax − PAYE − NI − post-tax = Net. Denominator B is cash in the account (the bank feed): net credit + other credits − spending − savings. They meet only at net pay = salary credit. Post-tax outgoings are outflows of earnings, shown as a waterfall leg in A, never as bank spending categories in B (they never land as a spendable credit). Pension is deferred-not-spent and visually distinct from tax; employer pension is total-reward context, never added to income. Surface is split by question: the current-period waterfall lives in cashflow; longitudinal trends (gross over time, tax-code timeline, YTD PAYE/NI) are deferred to a standalone earnings surface. Two capture gaps unblock this: `tax_code` is promoted to the `income_events` spine (migration `0007`), and each payslip `line_item` gains a `section` (payment vs deduction) to resolve salary-sacrifice ordering deterministically — no fuzzy category enum yet. An unexplained gross-to-net gap surfaces as a labelled "other deductions" leg, never hidden. Net-pay ⇄ salary-credit reconciliation as a data-gap directive remains asserted-not-built and is a follow-on. See Flow 5 in `docs/end-state-flows.md`. |
-| 2026-06-01 | Multi-goal contention and a conditional-truth engine for hypotheticals | Goals share one balance sheet; the app stops treating each as if it privately owned the whole. Three moves. (1) A third boundary layer — the conditional engine — sits between app-facts and harness-framing: the same metric and directive code evaluated against the real data plus a hypothetical overlay. A hypothetical is the real balance sheet plus a delta; the harness composes the delta (unbounded), the app recomputes the consequence over real balances (the one thing the harness must never hand-arithmetic, per the re-ground rule). The overlay vocabulary is rows the schema already holds (`account_balance`, `transaction`), not an authored scenario catalog — a real event is expressed as the rows it produces (a bonus into the ISA is both a positive ISA transaction and a balance bump), so expressiveness tracks the schema and structural hypotheticals outside it are left to harness reasoning, flagged as assumption-based. Mechanism: DuckDB read-context carrying a schema prefix (`pfa` live, `scen` for scenarios); the scenario clones the touched tables into `scen` and inserts the overlay; one query-building path, so the live briefing is the evaluator run with an empty overlay — enforced by a test asserting `evaluate_scenario({overlay:{}})` deep-equals `get_briefing()` (`server/query.ts`, `server/tools/evaluate_scenario.ts`). (2) Contention is a grounded observation: each goal type declares the account-type set it claims (default-by-class, no earmark capture yet), and the briefing emits a `contention` directive over accounts two goals share, wording it "shared pool" since default-by-class is coarse; resolving the contention stays advice (`server/goals/resources.ts`). (3) The advice gate is sharpened, not moved: showing each allocation's grounded conditional outcome (the frontier) is observation and permitted; ranking the options or saying "do this one" stays gated. `house_deposit` is promoted to an implemented goal type to give contention a second liquid claimant. Earmarks (a `goal_resource` join table), cross-engine feasibility against the cashflow surplus, and `fire`/`retirement` remain deferred. See the Goal framework section and Flow 8. |
-| 2026-06-05 | Tax-position engine — the briefing joins the rulebook to the user's income | The briefing stored the UK rulebook (`tax_constants`) and the user's income (payslips, salary, equity) but never joined them, so any "how much tax / what's my real position" question forced the harness to hand-compute or ask the user (the "higher or basic rate?" failure). A deterministic engine (`server/tax/engine.ts`, `taxPosition(asOf, ctx)`) now applies the seeded constants to actual income and pushes a `tax_position` block into the briefing (a block like `earnings`, not a goal-directive). It computes projected annual income, adjusted net income, marginal rate (including the ~60% personal-allowance taper band £100k–£125,140), an income-tax and employee-NI estimate, and the pension annual-allowance taper above £260k adjusted income. Inputs reuse existing helpers; `tax_constants` (migration `0006`) already seeds every band/threshold/rate, so no constants work — taper *rates* (£1-per-£2) are derived in code from the seeded threshold pairs. Projected income = regular run-rate (salary from the newly-activated `person_profile`, else annualised payslips) + income above that run-rate (a bonus or one-off) + RSU vesting this tax year; **RSU only** is treated as income at vest (EMI/SAYE/unapproved excluded and surfaced in `assumptions[]`). Adjusted net income nets off annualised employee pension contributions so the £100k test is accurate. Partial-year data works because UK PAYE is already a cumulative annual estimate: the run-rate annualises the regular salary and known future events layer on, getting sharper as real payslips land — projected and realized stay separate, labelled fields. `record_person_profile` activates the dormant `person_profile` table (salary/employer/tax_code as a correctable snapshot), making salary first-class. Scenario integration: `income_events` joins the overlay clone set and the `evaluate_scenario` vocabulary, and `earningsContext`/`taxPosition` are threaded with the read-context, so a hypothetical bonus (the rows a real bonus produces) recomputes the position with no hand arithmetic; the empty-overlay invariant still holds. It stays on the observation side of the advice gate — facts and flags, never a recommendation. Deferred: the comp-expectation layer (bonus %, BIK, LTIP policy) and a standing `total_comp` observation; CGT-on-disposals and dividend tax (need disposal/cost-basis capture); scheme-specific equity tax beyond RSU; Scottish rates; the pension threshold-income (£200k) secondary test. See Flow 8. |
+Moved: the single canonical log of every significant decision, chronological with rationale, is [decision-log.md](decision-log.md). New decisions are recorded there and only there.

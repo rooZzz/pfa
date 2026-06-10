@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { setupAuthEnv } from "./auth_env.js";
-import { getDb, initDb } from "../db.js";
+import { getDb, initDb } from "../core/db.js";
 import {
   registrationOptions,
   authenticationOptions,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ABSENCE_LABEL, formatGbp, formatGbpk } from "../src/format.js";
+import { ABSENCE_LABEL, formatGbp, formatGbpk } from "../ui/format.js";
 
 describe("ABSENCE_LABEL", () => {
   it("maps the three absence meanings to their fixed words", () => {
