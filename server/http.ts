@@ -1,12 +1,11 @@
-import { config } from "dotenv";
 import http from "node:http";
-import path from "node:path";
+import { loadEnv } from "./env.js";
 import { initDb } from "./db.js";
 import { handleMcpRequest } from "./mcp_request.js";
 import { authConfigured } from "./auth/config.js";
 import { startAuthServer } from "./auth/app.js";
 
-config({ override: true, path: path.join(import.meta.dirname, ".env") });
+loadEnv();
 
 const PORT = Number(process.env.PORT ?? 4000);
 if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {

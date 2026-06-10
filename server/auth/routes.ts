@@ -34,6 +34,27 @@ const FAVICON_ICO = readFileSync(path.join(ASSETS_DIR, "favicon.ico"));
 const APPLE_TOUCH_ICON = readFileSync(path.join(ASSETS_DIR, "apple-touch-icon.png"));
 const ICON_CACHE_CONTROL = "public, max-age=86400";
 
+const TOKENS_CSS = readFileSync(
+  path.join(import.meta.dirname, "..", "src", "styles", "tokens.css"),
+  "utf8",
+);
+const AUTH_CSS = readFileSync(path.join(ASSETS_DIR, "auth.css"), "utf8");
+const AUTH_STYLESHEET = `${TOKENS_CSS}\n${AUTH_CSS}`;
+
+const FONTS_DIR = path.join(import.meta.dirname, "..", "src", "fonts");
+const FONT_FILES = new Map(
+  [
+    "newsreader-latin-400-normal",
+    "newsreader-latin-500-normal",
+    "hanken-grotesk-latin-400-normal",
+    "hanken-grotesk-latin-500-normal",
+    "hanken-grotesk-latin-600-normal",
+    "ibm-plex-mono-latin-400-normal",
+    "ibm-plex-mono-latin-500-normal",
+  ].map((name) => [`${name}.woff2`, readFileSync(path.join(FONTS_DIR, `${name}.woff2`))]),
+);
+const FONT_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 export function authRoutes(): express.Router {
   const router = express.Router();
 
@@ -55,6 +76,19 @@ export function authRoutes(): express.Router {
 
   router.get("/apple-touch-icon.png", (_req: Request, res: Response) => {
     res.type("image/png").set("Cache-Control", ICON_CACHE_CONTROL).send(APPLE_TOUCH_ICON);
+  });
+
+  router.get("/assets/auth.css", (_req: Request, res: Response) => {
+    res.type("text/css").set("Cache-Control", ICON_CACHE_CONTROL).send(AUTH_STYLESHEET);
+  });
+
+  router.get("/assets/fonts/:file", (req: Request, res: Response) => {
+    const font = FONT_FILES.get(String(req.params.file ?? ""));
+    if (!font) {
+      res.status(404).type("text/plain").send("Not found");
+      return;
+    }
+    res.type("font/woff2").set("Cache-Control", FONT_CACHE_CONTROL).send(font);
   });
 
   router.get("/health", (_req: Request, res: Response) => {
