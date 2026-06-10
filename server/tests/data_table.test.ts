@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { partitionGroupRows, topN } from "../src/data_table.js";
-import type { DataRow } from "../src/data_table.js";
+import { partitionGroupRows, topN } from "../ui/data_table.js";
+import type { DataRow } from "../ui/data_table.js";
 
 function row(key: string, valuePence: number | null): DataRow {
   return { key, label: key, valuePence };

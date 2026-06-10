@@ -60,9 +60,9 @@ of patching the database directly and making backwards-breaking changes are gone
 
 ### Design
 The `ui://pfa/*` surfaces follow one design language — "Instrument" — captured in [docs/design-language.md](docs/design-language.md). Build new UI from the shared system, not bespoke styles.
-- The token system (`server/src/styles/`) is the single source: oklch colors, type scale, spacing, radii, motion. No hardcoded hex, no inline style objects for anything a token or class covers.
-- Compose from the shared primitives in `server/src/components.tsx` before inventing a new one.
-- Figures are mono and tabular (`var(--font-mono)`, `tabular-nums`); pence in, formatted at the edge via `server/src/format.ts`. Never render a float, never let a number wrap or jitter.
+- The token system (`server/ui/styles/`) is the single source: oklch colors, type scale, spacing, radii, motion. No hardcoded hex, no inline style objects for anything a token or class covers.
+- Compose from the shared primitives in `server/ui/components.tsx` before inventing a new one.
+- Figures are mono and tabular (`var(--font-mono)`, `tabular-nums`); pence in, formatted at the edge via `server/ui/format.ts`. Never render a float, never let a number wrap or jitter.
 - One clay accent per view. Money in/out uses the desaturated moss/rust tokens — no traffic-light color, no emoji.
 - Light and dark are equals (dark default, follows the host theme). Respect the narrow iframe frame and `prefers-reduced-motion`.
 
@@ -84,14 +84,14 @@ The `ui://pfa/*` surfaces follow one design language — "Instrument" — captur
 ## Capabilities
 What exists today, grouped by domain. Detail lives in [docs/architecture.md](docs/architecture.md); the rationale for each in [docs/decision-log.md](docs/decision-log.md).
 
-- Store: SQLite write path (Kysely over `better-sqlite3`, schema in `server/schema.ts`, migrations in `server/migrations/`) + DuckDB read layer sharing one file; `superseded_by` tombstones on every editable table; LOCF helpers in `server/snapshots.ts`.
+- Store: SQLite write path (Kysely over `better-sqlite3`, schema in `server/core/schema.ts`, migrations in `server/migrations/`) + DuckDB read layer sharing one file; `superseded_by` tombstones on every editable table; LOCF helpers in `server/core/snapshots.ts`.
 - Ingest: `ingest_document` (payslip via Haiku vision, staged) + `confirm_staged_rows`; manual entry fanned per series — `record_account_balance`, `record_pension_value`, `record_mortgage`, `record_mortgage_balance`, `record_asset_holding`, `record_asset_price`, `record_equity_grant`, `record_vesting_event`, `record_transaction`, `record_person_profile`.
-- Edit: `correct_record` / `retract_record` over the deterministic primitive in `server/corrections.ts`; connector-sourced rows refused.
+- Edit: `correct_record` / `retract_record` over the deterministic primitive in `server/core/corrections.ts`; connector-sourced rows refused.
 - Connectors (manual sync, deterministic reconciliation): Monzo (`connect_monzo`, `sync_monzo`), Ethereum wallet (`discover_ethereum_wallet`, `connect_ethereum`, `sync_ethereum`), prices (`sync_prices`, `refresh_asset_price` — Yahoo for shares/ETFs, CoinGecko for crypto). Code in `server/connectors/`.
 - Read: `get_net_worth`, `get_cashflow`, `query_natural_language` (Haiku text-to-SQL over [docs/schema_catalog.md](docs/schema_catalog.md), executed by an allow-listed DuckDB engine), `refresh_stale_data`.
 - Goals: `propose_goal` (Haiku classify), `confirm_goal`, `update_goal`, `archive_goal`, `get_briefing` (full directive set + `earnings`/`tax_position`/`retirement_projection` blocks), `evaluate_scenario` (overlay recompute, empty overlay equals live). Types implemented: `emergency_fund`, `isa_max`, `house_deposit`, `retirement`, `fire`; `debt_payoff` is catalogued but unbuilt. Engines: `server/tax/engine.ts`, projection in `server/metrics/`, catalog in `server/goals/`.
-- Tax reference: `tax_constants` table seeded from primary sources, injected via `server/tax_constants.ts`, excluded from text-to-SQL.
-- UI: the four `ui://pfa/*` screens on the Instrument system ([docs/design-language.md](docs/design-language.md)); presentation in `server/src/styles/` and `server/src/components.tsx`.
+- Tax reference: `tax_constants` table seeded from primary sources, injected via `server/tax/constants.ts`, excluded from text-to-SQL.
+- UI: the four `ui://pfa/*` screens on the Instrument system ([docs/design-language.md](docs/design-language.md)); presentation in `server/ui/styles/` and `server/ui/components.tsx`.
 - Hosting and auth: `server/auth/` (OAuth 2.1 + WebAuthn), Mac mini ops via [docs/mac-mini-runbook.md](docs/mac-mini-runbook.md), release-triggered deploy in `.github/workflows/deploy.yml`, local auth dev via `npm run dev:auth` ([docs/local-auth.md](docs/local-auth.md)).
 - Dev utilities: `reset_schema`, `seed_data`, `npm run dev` (watch build + server).
 

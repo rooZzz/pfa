@@ -35,13 +35,13 @@ const APPLE_TOUCH_ICON = readFileSync(path.join(ASSETS_DIR, "apple-touch-icon.pn
 const ICON_CACHE_CONTROL = "public, max-age=86400";
 
 const TOKENS_CSS = readFileSync(
-  path.join(import.meta.dirname, "..", "src", "styles", "tokens.css"),
+  path.join(import.meta.dirname, "..", "ui", "styles", "tokens.css"),
   "utf8",
 );
 const AUTH_CSS = readFileSync(path.join(ASSETS_DIR, "auth.css"), "utf8");
 const AUTH_STYLESHEET = `${TOKENS_CSS}\n${AUTH_CSS}`;
 
-const FONTS_DIR = path.join(import.meta.dirname, "..", "src", "fonts");
+const FONTS_DIR = path.join(import.meta.dirname, "..", "ui", "fonts");
 const FONT_FILES = new Map(
   [
     "newsreader-latin-400-normal",

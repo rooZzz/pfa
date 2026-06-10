@@ -106,7 +106,7 @@ The fan-out (rather than a single dispatching tool) keeps each tool's argument s
 
 ## Flow 2 — Edit
 
-**Status: built (2026-06-01).** Deterministic primitive in `server/corrections.ts`; `correct_record` and `retract_record` tools. `superseded_by` marker (migration `0009`) excludes corrected/retracted rows from every read; removal is a logical tombstone. Connector-sourced rows are refused; equity grants are retract-and-recreate.
+**Status: built (2026-06-01).** Deterministic primitive in `server/core/corrections.ts`; `correct_record` and `retract_record` tools. `superseded_by` marker (migration `0009`) excludes corrected/retracted rows from every read; removal is a logical tombstone. Connector-sourced rows are refused; equity grants are retract-and-recreate.
 
 Edit is not a separate surface. It folds into the manual-entry path: a correction is a new manual observation that supersedes a prior one. There is no `ui://sources` browser. Editing must never destroy history — a correction is a new fact about an old fact.
 

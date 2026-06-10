@@ -33,7 +33,7 @@ Three modes:
 | `ui://pfa/net_worth.html` | Net worth dashboard — trended, point-in-time, goals briefing. |
 | `ui://pfa/cashflow.html` | Cashflow and budget dashboard with the gross-to-net waterfall. |
 
-Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/src/styles/` and `server/src/components.tsx`.
+Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/ui/styles/` and `server/ui/components.tsx`.
 
 **Connector sync** — Connectors (Monzo, Ethereum wallet) sync via manually-invoked tools (`sync_monzo`, `sync_ethereum`, `sync_prices`) inside the server process, preserving the single-writer invariant. Setup — credentials, asset selection — happens through `ui://pfa/connectors.html`. Scheduled background sync (launchd/cron) is deferred.
 
@@ -217,7 +217,7 @@ These are invariants. They hold across all tables, all ingestion types, all stag
 
 4. **Snapshot staleness is always surfaced.** Every query over snapshot data returns `recorded_at` alongside the value. The UI displays it. "Your pension is £42,000" without a date is a misleading statement.
 
-5. **As-of lookup is a single query contract.** The value for a snapshot at any query date is the most recent observation whose validity range covers it — `valid_from <= as_of AND (valid_to IS NULL OR valid_to > as_of)`, taking the latest `valid_from` per series (`DISTINCT ON (series) ... ORDER BY series, valid_from DESC`). This last-observation-carried-forward (LOCF) semantic lives in one centralised helper (`server/snapshots.ts`), composed by every line query and by the trend points. The application never interpolates or estimates. Unknown = last observed; null = never tracked, distinguished from zero.
+5. **As-of lookup is a single query contract.** The value for a snapshot at any query date is the most recent observation whose validity range covers it — `valid_from <= as_of AND (valid_to IS NULL OR valid_to > as_of)`, taking the latest `valid_from` per series (`DISTINCT ON (series) ... ORDER BY series, valid_from DESC`). This last-observation-carried-forward (LOCF) semantic lives in one centralised helper (`server/core/snapshots.ts`), composed by every line query and by the trend points. The application never interpolates or estimates. Unknown = last observed; null = never tracked, distinguished from zero.
 
 6. **`external_id` on event rows.** Required for connector-ingested events. Inserts from connectors use `INSERT OR IGNORE` — deduplication is guaranteed at the database level, not application logic.
 
@@ -442,7 +442,7 @@ a co-located Claude Desktop with no auth. The authenticated `127.0.0.1:4001` (Ex
 port ngrok forwards to; everything public goes through it. The same process is the MCP server, the
 OAuth 2.1 Authorization Server, and the Resource Server — it signs access tokens with an Ed25519
 key and verifies them in process. The per-request MCP handling is shared by both listeners
-(`server/mcp_request.ts`).
+(`server/mcp/mcp_request.ts`).
 
 ### Authentication
 
@@ -466,8 +466,8 @@ Sensitive tables — `connector_state` (Monzo/Ethereum tokens) and the OAuth/Web
 in a separate `secrets.sqlite` (`0600`), attached to the single better-sqlite3 writer as schema
 `secrets`; SQLite resolves the unqualified names there, so app code is unchanged. No DuckDB read
 engine attaches that file. The natural-language (text-to-SQL) path runs a dedicated DuckDB engine
-that materialises only an allow-listed set of product tables (`server/nlq_allowlist.ts`,
-`server/nlq_query.ts`) and detaches the source, so secrets and `tax_constants` are physically
+that materialises only an allow-listed set of product tables (`server/query/nlq_allowlist.ts`,
+`server/query/nlq_query.ts`) and detaches the source, so secrets and `tax_constants` are physically
 absent — a model-generated query against them returns a DuckDB Catalog Error, not a policy miss.
 Internal/admin reads keep the full read path. This is the enforceable analog of "two SQL users"
 given SQLite and embedded DuckDB have no roles/`GRANT`s.
@@ -510,7 +510,7 @@ theme-aware SVG via `@media (prefers-color-scheme: dark)`, an ICO fallback, an a
 served at the origin root and linked from every auth page, including a minimal `200` landing page at
 `/` (the root previously 404'd). The connector chip icon in Claude is sourced from Google's S2
 favicon service (`google.com/s2/favicons?domain=…`), which crawls the public domain rather than
-reading the MCP `serverInfo.icons` field (already populated in `server/icons.ts`); the landing page
+reading the MCP `serverInfo.icons` field (already populated in `server/mcp/icons.ts`); the landing page
 exists so that crawl finds the favicon. Cache refresh there is on Google's own cadence (often a day
 or more) and cannot be forced.
 

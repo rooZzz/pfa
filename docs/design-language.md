@@ -2,8 +2,8 @@
 
 The presentation layer for PFA's interactive surfaces (`ui://pfa/*`). This document captures the
 chosen direction and the principles behind it so the intent survives implementation and future
-change. It is the why that sits behind the token and component system in `server/src/styles/` and
-`server/src/components.tsx`.
+change. It is the why that sits behind the token and component system in `server/ui/styles/` and
+`server/ui/components.tsx`.
 
 ## North star
 
@@ -176,32 +176,32 @@ The design language is realized as a token-backed CSS system plus typed React pr
 into each `ui://pfa/*` resource by Vite (`vite-plugin-singlefile`), so every screen ships as one
 self-contained HTML document.
 
-- Tokens and styles: `server/src/styles/` — `fonts.css` (self-hosted woff2 `@font-face`),
+- Tokens and styles: `server/ui/styles/` — `fonts.css` (self-hosted woff2 `@font-face`),
   `tokens.css` (oklch colors, type scale, spacing, radii, motion; light on `:root`/`[data-theme="light"]`,
   dark on `[data-theme="dark"]`), `base.css` (reset, typography, layout utilities, the `.rise`
   entrance), `components.css` (buttons, fields, cards, stat tiles, tables, badges, meters, dropzone,
   notes, spinners), `screens.css` (screen-specific classes). `index.css` imports them in order.
-- Fonts: woff2 files in `server/src/fonts/` (Newsreader 400/500, Hanken Grotesk 400/500,
+- Fonts: woff2 files in `server/ui/fonts/` (Newsreader 400/500, Hanken Grotesk 400/500,
   IBM Plex Mono 400/500), base64-inlined at build time. No CDN, no network at render.
-- Components: `server/src/components.tsx` — `Icon`, `Btn`, `Stat`, `Badge`, `Meter`, `Sparkline`
+- Components: `server/ui/components.tsx` — `Icon`, `Btn`, `Stat`, `Badge`, `Meter`, `Sparkline`
   (measures its container via `ResizeObserver` and draws at true pixel scale, never stretched),
   `MiniBars`, `CompositionBar`, `ActionBar` (the one bottom flow-chrome bar), `EmptyState` (the one
   empty pattern), `TickerChip` (clay-tinted inline glyph or monogram). The single labelled-amount
-  table is `server/src/data_table.tsx` (`DataTable`, rows or bars variant, one `DisclosureToggle`).
+  table is `server/ui/data_table.tsx` (`DataTable`, rows or bars variant, one `DisclosureToggle`).
   All class-driven; charts are inline SVG computed from data, with dimensions and opacities in chart
   tokens (`tokens.css`) and classes (`components.css`), not inline literals.
-- Marks: `server/src/logos.ts` resolves a single-fill inline SVG (`fill="currentColor"`, tinted clay
+- Marks: `server/ui/logos.ts` resolves a single-fill inline SVG (`fill="currentColor"`, tinted clay
   by the container) by ticker (`glyph/`, crypto), then institution (`brand/`, e.g. Monzo), then asset
   kind (`category/`: cash/investment/pension/property). Inlined, not CSS-masked — a data-URI mask
   rendered as a solid square in the host webview.
-- Goal cards (`server/src/goals_section.tsx`): a progress-to-target metric is a `Meter`; a value/total
+- Goal cards (`server/ui/goals_section.tsx`): a progress-to-target metric is a `Meter`; a value/total
   metric is folded into context (e.g. the yearly pension contribution is a meta item on the projection
   meter's sub-line), never its own block. An unresolved metric stays a data-gap directive.
-- Formatting: `server/src/format.ts` — `formatGbp` and `formatGbpk`, the single edge where integer
+- Formatting: `server/ui/format.ts` — `formatGbp` and `formatGbpk`, the single edge where integer
   pence become display strings (U+2212 minus, en-GB grouping).
-- Theme: `server/src/theme.ts` sets `data-theme` from the host `prefers-color-scheme`, defaulting to
+- Theme: `server/ui/theme.ts` sets `data-theme` from the host `prefers-color-scheme`, defaulting to
   dark, and follows live changes.
-- Screens: `server/src/{net_worth,cashflow,upload,connectors}.tsx` compose the above. Data wiring
+- Screens: `server/ui/{net_worth,cashflow,upload,connectors}.tsx` compose the above. Data wiring
   (`useApp`, `app.callServerTool`, result parsing, flow state) is independent of presentation.
 
 ## Authentication surfaces
