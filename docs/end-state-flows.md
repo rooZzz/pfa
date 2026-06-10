@@ -1,6 +1,6 @@
 # End-State Flow Map
 
-**Status:** Draft for refinement. Defines the finished-app target the staged plan derives from. Not a description of what exists today.
+**Status:** Canonical end-state target. Defines the finished-app destination that stages derive backward from. Not a description of what exists today — see [architecture.md](architecture.md) for that.
 
 **Purpose:** We have been planning stages forward from the current code, so every new concern reopens the stage definitions. This document fixes the destination. Stages are then derived backward from it. Capabilities are not invented per stage — they fall out of the flows below.
 
