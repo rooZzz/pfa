@@ -8,6 +8,7 @@ dist/
 *.sqlite-shm
 *.sqlite-wal
 .env
+.localdev/
 bun.lockb
 yarn.lock
 server/tests/live/fixtures/

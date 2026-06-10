@@ -73,11 +73,30 @@ describe("auth app surface", () => {
     expect(JSON.parse(res.body).keys).toHaveLength(1);
   });
 
-  it("serves a 200 landing page at the root that links the favicon", async () => {
+  it("serves a 200 landing page at the root that links the favicon and stylesheet", async () => {
     const res = await request("GET", "/");
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/html");
     expect(res.body).toContain('rel="icon"');
+    expect(res.body).toContain('href="/assets/auth.css"');
+    expect(res.body).toContain('class="auth-card"');
+  });
+
+  it("serves the auth stylesheet with the design tokens", async () => {
+    const res = await request("GET", "/assets/auth.css");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/css");
+    expect(res.body).toContain("--accent");
+    expect(res.body).toContain(".auth-card");
+    expect(res.body).toContain("@font-face");
+  });
+
+  it("serves a self-hosted font, and 404s an unknown one", async () => {
+    const ok = await request("GET", "/assets/fonts/ibm-plex-mono-latin-400-normal.woff2");
+    expect(ok.status).toBe(200);
+    expect(ok.headers["content-type"]).toContain("font/woff2");
+    const missing = await request("GET", "/assets/fonts/not-a-font.woff2");
+    expect(missing.status).toBe(404);
   });
 
   it("serves a theme-aware SVG favicon at the origin root", async () => {

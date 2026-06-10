@@ -500,8 +500,7 @@ the permanent fix that retired an earlier `--host-header` proof stopgap.
 
 ### Deferred
 
-Rate-limiting the auth endpoints; an auth audit log; Instrument styling of the login experience (the
-offline bootstrap page excepted — not worth the effort); making the `ui://pfa/*` surfaces
+Rate-limiting the auth endpoints; an auth audit log; making the `ui://pfa/*` surfaces
 mobile-friendly (they render legibly in the Claude mobile app but content is crushed and wrapped); a
 dedicated broad integration suite; CORS/security headers and HSTS; signing-key rotation via the JWKS
 `kid`; validating the claude.ai hosted web connector (the flow is validated via MCP Inspector, the
@@ -523,6 +522,7 @@ or more) and cannot be forced.
 
 | Date | Decision | Rationale |
 |---|---|---|
+| 2026-06-09 | Auth pages restyled onto the Instrument design language ("Instrument Card" passkey sign-in) | The public sign-in/enrol/error/landing pages were unstyled system-font HTML. Recreated on the shared Instrument system — one calm centered card, passkey-only, four states (idle/authenticating/success/error) behind the real WebAuthn ceremony, light/dark equal. Server-rendered HTML + vanilla JS (not React/Vite), so they reuse the canonical `tokens.css` + a focused `server/auth/assets/auth.css` served at `/assets/auth.css` with self-hosted fonts at `/assets/fonts/`. Cross-device sign-in stays the browser's native passkey UI (no bespoke QR); prototype placeholder data is omitted, not fabricated. See the Authentication surfaces section of `docs/design-language.md`. |
 | 2026-06-09 | Remote hosting + deploy: always-on Mac mini, ngrok ingress, self-hosted runner, release-triggered deploy with backup/rollback | Local-first but internet-reachable; LaunchDaemons under `_pfa` (FileVault forces the system domain). See "Remote hosting, authentication, and operations" + the runbook. |
 | 2026-06-09 | Passkey auth: OAuth 2.1 + WebAuthn on a second loopback listener (4001), single-user | Passwordless, request-bound, single `sub`; Ed25519 in a `0600` file; open 4000 unchanged. See the hosting/auth section. |
 | 2026-06-09 | Secrets split from the NLQ path: `secrets.sqlite` + a restricted allow-list DuckDB engine | Sensitive tables physically absent from the text-to-SQL engine (Catalog Error, not a policy miss); the enforceable analog of two SQL users. |

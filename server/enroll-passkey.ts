@@ -1,7 +1,6 @@
-import { config } from "dotenv";
-import path from "node:path";
+import { loadEnv } from "./env.js";
 
-config({ override: true, path: path.join(import.meta.dirname, ".env") });
+loadEnv();
 
 const { initDb } = await import("./db.js");
 const { mintEnrollmentToken } = await import("./auth/enrollment.js");

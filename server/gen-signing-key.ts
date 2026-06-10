@@ -1,9 +1,9 @@
-import { config } from "dotenv";
 import path from "node:path";
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { generateKeyPair, exportPKCS8 } from "jose";
+import { loadEnv } from "./env.js";
 
-config({ override: true, path: path.join(import.meta.dirname, ".env") });
+loadEnv();
 
 const { signingKeyPath } = await import("./auth/config.js");
 const keyPath = signingKeyPath();

@@ -203,3 +203,25 @@ self-contained HTML document.
   dark, and follows live changes.
 - Screens: `server/src/{net_worth,cashflow,upload,connectors}.tsx` compose the above. Data wiring
   (`useApp`, `app.callServerTool`, result parsing, flow state) is independent of presentation.
+
+## Authentication surfaces
+
+The passkey sign-in, enrolment, error, and landing pages served from the public auth origin
+(`server/auth/`) follow the same Instrument language. They are not `ui://pfa/*` iframes — they are
+server-rendered HTML with vanilla JS (no React, no Vite), so they reuse the system differently: the
+canonical `tokens.css` plus a focused `server/auth/assets/auth.css` (the auth component layer:
+stage, card, brand lockup, passkey button, state blocks, device chip) are concatenated and served at
+`/assets/auth.css`, with the same self-hosted woff2 served from `/assets/fonts/`. Same tokens, same
+fonts, same light/dark equality (default dark, flips on `prefers-color-scheme`); only the delivery
+differs from the bundled screens.
+
+The sign-in pattern is one calm centered card — "Instrument Card". Passkey only: no password, no
+email fallback. The card swaps its body across four states (idle, authenticating, success, error)
+behind the real WebAuthn ceremony; a transform-only fade-rise carries the transition and respects
+`prefers-reduced-motion`. Cross-device sign-in is left to the browser's native passkey UI, not a
+bespoke QR surface. The brand lockup is the clay Quadrant mark + Newsreader wordmark + mono
+descriptor; the destination of an OAuth authorization is shown verbatim in the card (a security cue,
+not decoration). Two alternate layouts explored in the handoff (a split "security ledger" and a mono
+"console readout") were set aside in favour of the card. Per the honesty rule, placeholder data from
+the prototype (a greeting name, a "last sign-in" age) is omitted rather than fabricated — the card
+shows only what the ceremony actually establishes.
