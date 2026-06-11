@@ -30,6 +30,20 @@ function TestPanel() {
     [app],
   );
 
+  const callReal = useCallback(
+    async (name: "get_net_worth" | "get_briefing"): Promise<string> => {
+      if (!app) throw new Error("Bridge not connected.");
+      const today = new Date().toISOString().split("T")[0]!;
+      const result = await app.callServerTool({
+        name,
+        arguments: { as_of: today, auto_refresh: false },
+      });
+      const text = toolText(result) ?? "";
+      return `${text.length} chars`;
+    },
+    [app],
+  );
+
   const run = useCallback(async (label: string, fn: () => Promise<string>) => {
     setBusy(true);
     append(`${label}: started`);
@@ -46,11 +60,14 @@ function TestPanel() {
   useEffect(() => {
     if (!app || hasAutoRun.current) return;
     hasAutoRun.current = true;
-    void run("auto pings at mount", async () => {
-      const [a, b] = await Promise.all([ping(0), ping(0)]);
-      return `${a} + ${b}`;
+    void run("auto dashboard pair at mount", async () => {
+      const [networth, briefing] = await Promise.all([
+        callReal("get_net_worth"),
+        callReal("get_briefing"),
+      ]);
+      return `${networth} + ${briefing}`;
     });
-  }, [app, ping, run]);
+  }, [app, callReal, run]);
 
   if (error) return <ConnectionError message={error.message} />;
   if (!app) return <LoadingScreen label="Connecting to host" />;
@@ -58,8 +75,8 @@ function TestPanel() {
   return (
     <div className="screen rise stack">
       <p className="note">
-        Test panel loaded. Two parallel pings fire automatically at mount, mirroring the
-        dashboards. Buttons fire on click.
+        Test panel loaded. The real dashboard pair (get_net_worth + get_briefing) fires
+        automatically at mount. Buttons fire on click.
       </p>
       <div className="stack">
         <Btn
@@ -87,6 +104,28 @@ function TestPanel() {
           }
         >
           Call ping_test twice in parallel
+        </Btn>
+        <Btn
+          size="sm"
+          disabled={busy}
+          onClick={() => void run("get_net_worth", () => callReal("get_net_worth"))}
+        >
+          Call get_net_worth
+        </Btn>
+        <Btn
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            void run("dashboard pair", async () => {
+              const [networth, briefing] = await Promise.all([
+                callReal("get_net_worth"),
+                callReal("get_briefing"),
+              ]);
+              return `${networth} + ${briefing}`;
+            })
+          }
+        >
+          Call dashboard pair in parallel
         </Btn>
       </div>
       <div>
