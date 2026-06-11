@@ -50,7 +50,6 @@ export const UPLOAD_URI = "ui://pfa/upload.html";
 export const NET_WORTH_URI = "ui://pfa/net_worth.html";
 export const CASHFLOW_URI = "ui://pfa/cashflow.html";
 export const CONNECTORS_URI = "ui://pfa/connectors.html";
-export const TEST_PANEL_URI = "ui://pfa/test_panel.html";
 
 export type ToolResult = { content: { type: "text"; text: string }[] };
 
@@ -383,35 +382,6 @@ export const tools: ToolDescriptor[] = [
     handler: async (input) => text(await getBriefingTool(input)),
   }),
   defineTool({
-    name: "ping_test",
-    description:
-      "Diagnostic echo tool for the test panel widget. Returns pong plus an optional filler payload of the requested size. No data access.",
-    inputSchema: {
-      payload_bytes: z
-        .number()
-        .int()
-        .min(0)
-        .max(1_000_000)
-        .optional()
-        .describe("Size of the filler payload to return, in bytes."),
-    },
-    annotations: { readOnlyHint: true },
-    widgetAccessible: true,
-    handler: async (input) => {
-      const payloadBytes = (input as { payload_bytes?: number }).payload_bytes ?? 0;
-      return text(`pong ${"x".repeat(payloadBytes)}`);
-    },
-  }),
-  defineTool({
-    name: "open_test_panel",
-    description:
-      "Open the diagnostic test panel widget. Confirms the UI loads, then invokes ping_test only when a button is clicked, isolating widget-initiated tool calls from widget rendering.",
-    inputSchema: {},
-    app: { title: "Test Panel", resourceUri: TEST_PANEL_URI },
-    annotations: { readOnlyHint: true },
-    handler: async () => text("Test panel opened."),
-  }),
-  defineTool({
     name: "refresh_stale_data",
     description:
       "Refresh connector data that has aged past its freshness window: Monzo bank feed and Ethereum holdings (daily), automated asset prices (hourly). Fail-soft — a connector being down returns a 'failed' outcome rather than throwing. Returns a structured per-class outcome. The dashboards call this on load; call it directly only to force a freshness check.",
@@ -453,11 +423,5 @@ export const resources: { uri: string; file: string; description: string }[] = [
     file: "connectors.html",
     description:
       "Connector setup widget for linking Monzo or an Ethereum wallet with credentials entered directly in the widget.",
-  },
-  {
-    uri: TEST_PANEL_URI,
-    file: "test_panel.html",
-    description:
-      "Diagnostic test panel that confirms widget rendering and exercises widget-initiated tool calls on demand.",
   },
 ];
