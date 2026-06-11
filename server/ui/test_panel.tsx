@@ -12,7 +12,13 @@ function TestPanel() {
   const { app, error } = usePfaApp();
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [isHoldingLoader, setIsHoldingLoader] = useState(true);
   const hasAutoRun = useRef(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsHoldingLoader(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const append = (line: string) =>
     setLog((prev) => [...prev, `${new Date().toISOString().slice(11, 23)} ${line}`]);
@@ -70,7 +76,8 @@ function TestPanel() {
   }, [app, callReal, run]);
 
   if (error) return <ConnectionError message={error.message} />;
-  if (!app) return <LoadingScreen label="Connecting to host" />;
+  if (!app || isHoldingLoader)
+    return <LoadingScreen label={app ? "Loading test panel" : "Connecting"} />;
 
   return (
     <div className="screen rise stack">

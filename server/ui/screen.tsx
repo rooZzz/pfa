@@ -83,6 +83,12 @@ export function mountScreen(node: ReactNode) {
   );
   mark("mount");
   requestAnimationFrame(() => mark("first-frame"));
+  for (const sampleAt of [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200]) {
+    setTimeout(() => {
+      const height = Math.round(document.documentElement.getBoundingClientRect().height);
+      mark(`height ${height}px`);
+    }, sampleAt);
+  }
   let beats = 0;
   const heartbeat = setInterval(() => {
     beats += 1;
