@@ -11,9 +11,10 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
           DEPLOY_REPO: ${{ secrets.DEPLOY_REPO }}
+          SOURCE_REF: ${{ github.event.release.tag_name }}
         run: |
           gh workflow run deploy.yml \
             --repo "$DEPLOY_REPO" \
             --ref main \
             -f project=pfa \
-            -f source_ref="${{ github.event.release.tag_name }}"
+            -f source_ref="$SOURCE_REF"
