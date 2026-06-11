@@ -23,7 +23,7 @@ type DiscoveredAsset = {
   display_balance: string;
 };
 
-type WalletDiscovery = {
+export type WalletDiscovery = {
   address: string;
   assets: DiscoveredAsset[];
   transfers_capped: boolean;

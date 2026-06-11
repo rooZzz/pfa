@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   ContingentLine,
@@ -183,7 +183,9 @@ function isSayeFloor(line: ContingentLine): boolean {
 function SavingsFloorBadge({ line }: { line: ContingentLine }) {
   const [open, setOpen] = useState(false);
   const [placeUp, setPlaceUp] = useState(false);
+  const [shiftX, setShiftX] = useState(0);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLSpanElement>(null);
   const toggle = () => {
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
@@ -191,6 +193,14 @@ function SavingsFloorBadge({ line }: { line: ContingentLine }) {
     }
     setOpen((o) => !o);
   };
+  useLayoutEffect(() => {
+    if (!open) {
+      setShiftX(0);
+      return;
+    }
+    const rect = popRef.current?.getBoundingClientRect();
+    if (rect && rect.left < 16) setShiftX(16 - rect.left);
+  }, [open]);
   const total = line.savings_floor_pence ?? 0;
   const monthly = line.monthly_contribution_pence;
   const months = monthly && monthly > 0 ? Math.round(total / monthly) : null;
@@ -214,7 +224,12 @@ function SavingsFloorBadge({ line }: { line: ContingentLine }) {
         <Icon name="info" size={11} />
       </button>
       {open && (
-        <span className={"floor-pop" + (placeUp ? " floor-pop--up" : "")} role="tooltip">
+        <span
+          ref={popRef}
+          className={"floor-pop" + (placeUp ? " floor-pop--up" : "")}
+          style={shiftX ? { transform: `translateX(${shiftX}px)` } : undefined}
+          role="tooltip"
+        >
           {priceLine}
           <br />
           {savingsLine}

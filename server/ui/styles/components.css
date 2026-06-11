@@ -169,6 +169,10 @@
   color: var(--accent-ink);
 }
 
+.t-wrap {
+  width: 100%;
+  min-width: 0;
+}
 .t {
   width: 100%;
   border-collapse: collapse;
@@ -274,6 +278,7 @@
 
 .lhead {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
@@ -334,6 +339,7 @@
 
 .screen-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
@@ -341,11 +347,13 @@
 }
 .screen-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
 }
 .action-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -355,6 +363,7 @@
 }
 .action-bar-side {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
 }
@@ -375,6 +384,7 @@
   color: var(--ink-faint);
   margin-top: 3px;
   letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
 }
 
 .badge {

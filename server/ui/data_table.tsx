@@ -300,35 +300,37 @@ export function DataTable({
   if (compact) cls.push("compact");
   if (inset) cls.push("t--inset");
   return (
-    <table className={cls.join(" ")}>
-      {(hasHeader || labelHeader != null) && (
-        <thead>
-          <tr>
-            <th>{labelHeader}</th>
-            {cols.map((c) => (
-              <th
-                key={c.key}
-                className={(c.align ?? "num") === "num" ? "col-num" : undefined}
-              >
-                {c.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-      )}
-      {groups.map((group) => (
-        <GroupBody key={group.key} group={group} columns={cols} />
-      ))}
-      {footer && (
-        <tfoot>
-          <tr>
-            <td>{footer.label}</td>
-            <td className="col-num" colSpan={cols.length}>
-              {formatGbp(footer.valuePence)}
-            </td>
-          </tr>
-        </tfoot>
-      )}
-    </table>
+    <div className={cols.length > 1 ? "t-wrap t-wrap--multi" : "t-wrap"}>
+      <table className={cls.join(" ")}>
+        {(hasHeader || labelHeader != null) && (
+          <thead>
+            <tr>
+              <th>{labelHeader}</th>
+              {cols.map((c) => (
+                <th
+                  key={c.key}
+                  className={(c.align ?? "num") === "num" ? "col-num" : undefined}
+                >
+                  {c.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
+        {groups.map((group) => (
+          <GroupBody key={group.key} group={group} columns={cols} />
+        ))}
+        {footer && (
+          <tfoot>
+            <tr>
+              <td>{footer.label}</td>
+              <td className="col-num" colSpan={cols.length}>
+                {formatGbp(footer.valuePence)}
+              </td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
   );
 }
