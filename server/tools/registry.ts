@@ -46,10 +46,10 @@ import { recordVestingEvent, recordVestingEventSchema } from "./record_vesting_e
 import { refreshAssetPrice, refreshAssetPriceSchema } from "./refresh_asset_price.js";
 import { seedData } from "./seed_data.js";
 
-export const UPLOAD_URI = "ui://pfa/upload-v2.html";
-export const NET_WORTH_URI = "ui://pfa/net-worth-v2.html";
-export const CASHFLOW_URI = "ui://pfa/cashflow-v2.html";
-export const CONNECTORS_URI = "ui://pfa/connectors-v2.html";
+export const UPLOAD_URI = "ui://pfa/upload.html";
+export const NET_WORTH_URI = "ui://pfa/net_worth.html";
+export const CASHFLOW_URI = "ui://pfa/cashflow.html";
+export const CONNECTORS_URI = "ui://pfa/connectors.html";
 export const TEST_PANEL_URI = "ui://pfa/test_panel.html";
 
 export type ToolResult = { content: { type: "text"; text: string }[] };
