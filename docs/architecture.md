@@ -33,7 +33,7 @@ Three modes:
 | `ui://pfa/net_worth.html` | Net worth dashboard — trended, point-in-time, goals briefing. |
 | `ui://pfa/cashflow.html` | Cashflow and budget dashboard with the gross-to-net waterfall. |
 
-Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/ui/styles/` and `server/ui/components.tsx`.
+Presentation across these surfaces follows a single design language — "Instrument": a warm, scientific readout in a token-backed CSS system with self-hosted fonts and shared React primitives, full light and dark. See [docs/design-language.md](design-language.md); the system lives in `server/ui/styles/` and `server/ui/components.tsx`. The screens are responsive down to ~320px iframes (Claude mobile app, narrow desktop side panels): grids collapse at 460px (`base.css`), and every narrow-frame rule lives in one `@media (max-width: 420px)` block plus one `(pointer: coarse)` block in `server/ui/styles/narrow.css`. `npm run preview:widgets` serves all four screens at six widths against typed fixtures (`server/preview/`) for visual checks without an MCP host.
 
 **Connector sync** — Connectors (Monzo, Ethereum wallet) sync via manually-invoked tools (`sync_monzo`, `sync_ethereum`, `sync_prices`) inside the server process, preserving the single-writer invariant. Setup — credentials, asset selection — happens through `ui://pfa/connectors.html`. Scheduled background sync (launchd/cron) is deferred.
 
@@ -498,8 +498,7 @@ the permanent fix that retired an earlier `--host-header` proof stopgap.
 
 ### Deferred
 
-Rate-limiting the auth endpoints; an auth audit log; making the `ui://pfa/*` surfaces
-mobile-friendly (they render legibly in the Claude mobile app but content is crushed and wrapped); a
+Rate-limiting the auth endpoints; an auth audit log; a
 dedicated broad integration suite; CORS/security headers and HSTS; signing-key rotation via the JWKS
 `kid`; validating the claude.ai hosted web connector (the flow is validated via MCP Inspector, the
 Claude Code CLI, and Claude Desktop over `mcp-remote`). Unattended cold-boot recovery is limited by
