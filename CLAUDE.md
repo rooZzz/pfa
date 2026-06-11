@@ -82,7 +82,7 @@ What exists today, grouped by domain. Detail lives in [docs/architecture.md](doc
 - Goals: `propose_goal` (Haiku classify), `confirm_goal`, `update_goal`, `archive_goal`, `get_briefing` (full directive set + `earnings`/`tax_position`/`retirement_projection` blocks), `evaluate_scenario` (overlay recompute, empty overlay equals live). Types implemented: `emergency_fund`, `isa_max`, `house_deposit`, `retirement`, `fire`; `debt_payoff` is catalogued but unbuilt. Engines: `server/tax/engine.ts`, projection in `server/metrics/`, catalog in `server/goals/`.
 - Tax reference: `tax_constants` table seeded from primary sources, injected via `server/tax/constants.ts`, excluded from text-to-SQL.
 - UI: the four `ui://pfa/*` screens on the Instrument system ([docs/design-language.md](docs/design-language.md)); presentation in `server/ui/styles/` and `server/ui/components.tsx`.
-- Hosting and auth: `server/auth/` (OAuth 2.1 + WebAuthn), Mac mini ops via [docs/mac-mini-runbook.md](docs/mac-mini-runbook.md), release-triggered deploy in `.github/workflows/deploy.yml`, local auth dev via `npm run dev:auth` ([docs/local-auth.md](docs/local-auth.md)).
+- Hosting and auth: `server/auth/` (OAuth 2.1 + WebAuthn); Mac mini host provisioning and the release-triggered deploy live in a separate private `deploy` repo, so the self-hosted runner is not attached to this repository; local auth dev via `npm run dev:auth` ([docs/local-auth.md](docs/local-auth.md)).
 - Dev utilities: `reset_schema`, `seed_data`, `npm run dev` (watch build + server), `npm run preview:widgets` (all four screens at six widths against typed fixtures in `server/preview/`, no MCP host needed).
 
 ## Deferred

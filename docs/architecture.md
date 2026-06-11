@@ -432,8 +432,8 @@ This table records **design fit** — whether the schema and architecture accomm
 
 The app runs as an always-on service on a Mac mini, reachable over the internet through ngrok and
 gated by passwordless passkey auth — while staying local-first (the SQLite stores and all secrets
-never leave the box). Provisioning is scripted in `ops/mac-mini/provision.sh`; the operational
-how-to is [mac-mini-runbook.md](mac-mini-runbook.md).
+never leave the box). Host provisioning and the release-triggered deploy live in a separate private
+`deploy` repo, so the self-hosted runner is not attached to this (soon-public) repository.
 
 ### Two listeners, one process
 
@@ -478,9 +478,10 @@ Services run as LaunchDaemons under a dedicated `_pfa` user in the system domain
 (encrypting data and secrets at rest), which disables auto-login, so per-user LaunchAgents aren't
 viable; daemons start at boot after the one disk unlock. The host disables sleep, restarts after
 power loss, keeps NTP on (token expiry needs a correct clock), rotates logs, and snapshots both
-SQLite files nightly. Deploys are release-triggered: publishing a GitHub release runs a self-hosted
-runner (as `_pfa`) that backs up the data store, syncs the tag, builds, restarts the server daemon
-through a narrow `sudoers` entry, health-checks, and rolls back on failure. ngrok provides a stable
+SQLite files nightly. Deploys are release-triggered: publishing a GitHub release dispatches to a
+private `deploy` repo whose self-hosted runner (as `_pfa`) backs up the data store, syncs the tag,
+builds, restarts the server daemon through a narrow `sudoers` entry, health-checks, and rolls back
+on failure. ngrok provides a stable
 reserved domain (also the WebAuthn RP ID) and TLS; auth is enforced in-band, so ngrok is ingress
 only. The DNS-rebinding guard in `http.ts` (a `Host` allowlist) accepts the public origin on 4001 —
 the permanent fix that retired an earlier `--host-header` proof stopgap.
