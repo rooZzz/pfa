@@ -71,7 +71,12 @@ quiet progress meter.
    pretend to be a full-page app. Fill the frame rather than assume a fixed width: the screen is fluid
    to a sane maximum and centered, so leftover space is balanced, never dumped as right-hand padding.
    Figures, tables, and tiles stretch to use the room; prose stays capped near a readable measure
-   (~66ch) so a wider panel never produces over-long lines.
+   (~66ch) so a wider panel never produces over-long lines. The frame also goes small: the same
+   screens hold down to ~320px on the Claude mobile app and narrow desktop panels. Grids collapse to
+   one column at 460px; below 420px a single narrow tier tightens padding and table density and steps
+   the hero figure down a size — a figure scales rather than wraps, never the reverse — and coarse
+   pointers get larger touch targets. The narrow rules are additive overrides, so a wide panel renders
+   exactly as it did before.
 
 10. Money is never a float. Values are integer pence end-to-end and formatted at the edge. The UI
     reflects the data model's precision; it never introduces rounding of its own.
@@ -180,7 +185,9 @@ self-contained HTML document.
   `tokens.css` (oklch colors, type scale, spacing, radii, motion; light on `:root`/`[data-theme="light"]`,
   dark on `[data-theme="dark"]`), `base.css` (reset, typography, layout utilities, the `.rise`
   entrance), `components.css` (buttons, fields, cards, stat tiles, tables, badges, meters, dropzone,
-  notes, spinners), `screens.css` (screen-specific classes). `index.css` imports them in order.
+  notes, spinners), `screens.css` (screen-specific classes), `narrow.css` (the single
+  `@media (max-width: 420px)` block for mobile-width frames plus a `(pointer: coarse)` touch-target
+  block). `index.css` imports them in order, `narrow.css` last so its overrides win.
 - Fonts: woff2 files in `server/ui/fonts/` (Newsreader 400/500, Hanken Grotesk 400/500,
   IBM Plex Mono 400/500), base64-inlined at build time. No CDN, no network at render.
 - Components: `server/ui/components.tsx` — `Icon`, `Btn`, `Stat`, `Badge`, `Meter`, `Sparkline`
