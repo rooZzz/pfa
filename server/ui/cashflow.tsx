@@ -229,7 +229,7 @@ function CashflowApp() {
       />
     );
   }
-  if (!data) return null;
+  if (!data) return <LoadingScreen label="Loading cashflow" />;
 
   const hasIncome = data.income.payslip_count > 0;
   const outflowCategories = data.transactions_by_category

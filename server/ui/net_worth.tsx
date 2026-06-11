@@ -509,7 +509,7 @@ function NetWorthApp() {
       />
     );
   }
-  if (!data) return null;
+  if (!data) return <LoadingScreen label="Loading net worth" />;
 
   const trendVals = data.trend.map((t) => t.realised_total_pence);
   const first = trendVals[0];
