@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Btn } from "./components.js";
 import {
   usePfaApp,
@@ -12,14 +12,25 @@ function TestPanel() {
   const { app, error } = usePfaApp();
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const hasAutoRun = useRef(false);
 
   const append = (line: string) =>
     setLog((prev) => [...prev, `${new Date().toISOString().slice(11, 23)} ${line}`]);
 
-  if (error) return <ConnectionError message={error.message} />;
-  if (!app) return <LoadingScreen label="Connecting to host" />;
+  const ping = useCallback(
+    async (payloadBytes: number): Promise<string> => {
+      if (!app) throw new Error("Bridge not connected.");
+      const result = await app.callServerTool({
+        name: "ping_test",
+        arguments: payloadBytes > 0 ? { payload_bytes: payloadBytes } : {},
+      });
+      const text = toolText(result) ?? "";
+      return `${text.length} chars`;
+    },
+    [app],
+  );
 
-  async function run(label: string, fn: () => Promise<string>) {
+  const run = useCallback(async (label: string, fn: () => Promise<string>) => {
     setBusy(true);
     append(`${label}: started`);
     try {
@@ -30,21 +41,25 @@ function TestPanel() {
     } finally {
       setBusy(false);
     }
-  }
+  }, []);
 
-  async function ping(payloadBytes: number): Promise<string> {
-    const result = await app!.callServerTool({
-      name: "ping_test",
-      arguments: payloadBytes > 0 ? { payload_bytes: payloadBytes } : {},
+  useEffect(() => {
+    if (!app || hasAutoRun.current) return;
+    hasAutoRun.current = true;
+    void run("auto pings at mount", async () => {
+      const [a, b] = await Promise.all([ping(0), ping(0)]);
+      return `${a} + ${b}`;
     });
-    const text = toolText(result) ?? "";
-    return `${text.length} chars`;
-  }
+  }, [app, ping, run]);
+
+  if (error) return <ConnectionError message={error.message} />;
+  if (!app) return <LoadingScreen label="Connecting to host" />;
 
   return (
     <div className="screen rise stack">
       <p className="note">
-        Test panel loaded. Bridge connected. Tool calls fire only on click.
+        Test panel loaded. Two parallel pings fire automatically at mount, mirroring the
+        dashboards. Buttons fire on click.
       </p>
       <div className="stack">
         <Btn
