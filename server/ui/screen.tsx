@@ -70,5 +70,25 @@ export function ErrorScreen({
 }
 
 export function mountScreen(node: ReactNode) {
+  const startedAt = performance.now();
+  const mark = (label: string) =>
+    console.log(`pfa-widget ${label} at ${Math.round(performance.now() - startedAt)}ms`);
+  window.addEventListener("error", (event) => mark(`window-error ${event.message}`));
+  window.addEventListener("unhandledrejection", (event) =>
+    mark(`unhandled-rejection ${String(event.reason)}`),
+  );
+  window.addEventListener("pagehide", () => mark("pagehide"));
+  document.addEventListener("visibilitychange", () =>
+    mark(`visibility ${document.visibilityState}`),
+  );
+  mark("mount");
+  requestAnimationFrame(() => mark("first-frame"));
+  let beats = 0;
+  const heartbeat = setInterval(() => {
+    beats += 1;
+    const height = Math.round(document.documentElement.getBoundingClientRect().height);
+    mark(`heartbeat ${beats} height ${height}`);
+    if (beats >= 40) clearInterval(heartbeat);
+  }, 250);
   createRoot(document.getElementById("root")!).render(node);
 }
