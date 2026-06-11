@@ -17,16 +17,6 @@ Prioritize correctness and clarity over cleverness. This handles real financial 
 - No comments anywhere — in code, config, or responses.
 - No emojis anywhere — in code, config, or responses.
 
-## Workflow
-This project uses four skills:
-
-| Skill | Purpose | Input | Output |
-|-------|---------|-------|--------|
-| `/refine` | Clean it up | Working code | Simpler code |
-| `/test` | Verify behavior | Feature | Passing tests |
-| `/research` | Verify assumptions | Claim or decision | Evidence-based verdict |
-| `/explore` | Survey a space | Unfamiliar territory | Landscape map + direction |
-
 ## Code standards
 
 ### General
