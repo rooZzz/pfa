@@ -75,8 +75,9 @@
 
 .kv {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   font-size: var(--text-sm);
 }
 .kv .k {

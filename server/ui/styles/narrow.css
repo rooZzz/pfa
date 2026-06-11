@@ -1,0 +1,75 @@
+@media (max-width: 420px) {
+  .screen {
+    padding: var(--space-4) var(--space-3);
+  }
+  .card {
+    padding: var(--space-3);
+  }
+  .card--flush {
+    padding: 0;
+  }
+  .figure-hero {
+    font-size: var(--text-2xl);
+  }
+  .t {
+    font-size: var(--text-xs);
+  }
+  .t th,
+  .t td,
+  .t.compact td {
+    padding-right: var(--space-2);
+  }
+  .t th.col-num,
+  .t td.col-num {
+    padding-right: 0;
+  }
+  .t--inset td:first-child {
+    padding-left: var(--space-3);
+  }
+  .t--inset td:last-child {
+    padding-right: var(--space-3);
+  }
+  .t .sub.sub-inline {
+    display: block;
+    margin-top: 2px;
+    margin-left: 0;
+  }
+  .t-wrap--multi {
+    overflow-x: auto;
+  }
+  .meter-name,
+  .meter-val {
+    font-size: var(--text-xs);
+  }
+  .lhead .hint {
+    flex-basis: 100%;
+  }
+  .minibars {
+    gap: var(--space-1);
+  }
+  .dropzone {
+    padding: var(--space-6) var(--space-3);
+  }
+  .asset-row {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (pointer: coarse) {
+  .btn {
+    position: relative;
+  }
+  .btn::after {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--space-1));
+  }
+  .floor-badge {
+    position: relative;
+  }
+  .floor-badge::after {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--space-2));
+  }
+}
