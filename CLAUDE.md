@@ -65,6 +65,12 @@ The `ui://pfa/*` surfaces follow one design language — "Instrument" — captur
 - Before reporting work complete or opening a PR, run `npm run verify` in `server/`. This is the single source of truth for the gate set — `typecheck`, `lint`, `format:check` (Prettier), `test` in order — and [.github/workflows/ci.yml](.github/workflows/ci.yml) runs the same `npm run verify`, so local and CI verdicts cannot diverge.
 - CI fails the PR if any gate fails — formatting included. Do not validate by running `tsc`/`eslint`/`vitest` individually; the Prettier `format:check` is the one easy to miss. Fix formatting with `npm run format`.
 
+## Deployment
+Deployed by the private `deploy` repo, which owns the self-hosted runner and the release pipeline. This repo carries only `.github/workflows/ci.yml` and `release-dispatch.yml` (fires the deploy on `release: published`).
+- The deploy contract for this project is `deploy/projects/pfa/config.env` (host paths, ports, service daemon) plus the `project` allow-list in `deploy/.github/workflows/deploy.yml`.
+- Any change to how the app builds or runs — a new env var, a port, a service daemon, a build step — updates `deploy/projects/pfa/` in the same change-set, so the deploy never falls out of step.
+- The `deploy` repo is expected as a sibling checkout (`../deploy`); `.claude/settings.json` adds it to every session here.
+
 ## What not to do
 - Don't add features mid-work. Finish what's in scope first.
 - Don't refactor while fixing a bug. Fix first, refine after.
