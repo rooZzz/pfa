@@ -48,6 +48,7 @@ export function buildAuthApp(): express.Express {
       baseUrl: new URL(publicOrigin()),
       resourceServerUrl: new URL(mcpResource()),
       resourceName: "pfa",
+      scopesSupported: ["pfa:read", "pfa:write", "offline_access"],
     }),
   );
 

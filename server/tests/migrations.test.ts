@@ -40,6 +40,7 @@ describe("migration runner", () => {
       "0012_oauth_and_webauthn",
       "0013_move_secrets",
       "0014_webauthn_challenge_req",
+      "0015_credential_scopes",
     ]);
   });
 
@@ -68,6 +69,7 @@ describe("migration runner", () => {
       "0012_oauth_and_webauthn",
       "0013_move_secrets",
       "0014_webauthn_challenge_req",
+      "0015_credential_scopes",
     ]);
   });
 
@@ -184,6 +186,7 @@ describe("migration runner", () => {
       "0012_oauth_and_webauthn",
       "0013_move_secrets",
       "0014_webauthn_challenge_req",
+      "0015_credential_scopes",
     ]);
     expect(
       (getDb().prepare("SELECT COUNT(*) AS n FROM documents").get() as { n: number }).n,

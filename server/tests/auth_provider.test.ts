@@ -27,15 +27,15 @@ async function registerClient(): Promise<OAuthClientInformationFull> {
   } as Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">);
 }
 
-function stagePending(clientId: string, challenge: string): string {
+function stagePending(clientId: string, challenge: string, scope = "mcp"): string {
   const id = randomId();
   getDb()
     .prepare(
       `INSERT INTO pending_authorization
        (id, client_id, redirect_uri, code_challenge, code_challenge_method, scope, resource, state, expires_at)
-       VALUES (?, ?, 'https://app.test/cb', ?, 'S256', 'mcp', NULL, 'xyz', ?)`,
+       VALUES (?, ?, 'https://app.test/cb', ?, 'S256', ?, NULL, 'xyz', ?)`,
     )
-    .run(id, clientId, challenge, nowSec() + 600);
+    .run(id, clientId, challenge, scope, nowSec() + 600);
   return id;
 }
 
@@ -52,7 +52,7 @@ describe("authorization code exchange", () => {
   it("issues a code, exposes its PKCE challenge, and exchanges once", async () => {
     const client = await registerClient();
     const pendingId = stagePending(client.client_id, "challenge-abc");
-    const { code, state } = finalizePendingAuthorization(pendingId);
+    const { code, state } = finalizePendingAuthorization(pendingId, "pfa:write");
     expect(state).toBe("xyz");
 
     expect(await provider.challengeForAuthorizationCode(client, code)).toBe(
@@ -75,7 +75,10 @@ describe("authorization code exchange", () => {
 
   it("rejects a redirect_uri mismatch", async () => {
     const client = await registerClient();
-    const { code } = finalizePendingAuthorization(stagePending(client.client_id, "c"));
+    const { code } = finalizePendingAuthorization(
+      stagePending(client.client_id, "c"),
+      "pfa:write",
+    );
     await expect(
       provider.exchangeAuthorizationCode(client, code, "v", "https://evil.test/cb"),
     ).rejects.toThrow();
@@ -96,10 +99,51 @@ describe("authorization code exchange", () => {
   });
 });
 
+describe("scope capping", () => {
+  it("caps a read-only credential to pfa:read even when the client requests write", async () => {
+    const client = await registerClient();
+    const pendingId = stagePending(
+      client.client_id,
+      "c",
+      "pfa:read pfa:write offline_access",
+    );
+    const { code } = finalizePendingAuthorization(pendingId, "pfa:read");
+    const tokens = await provider.exchangeAuthorizationCode(
+      client,
+      code,
+      "v",
+      "https://app.test/cb",
+    );
+    const scopes = (tokens.scope ?? "").split(" ");
+    expect(scopes).toContain("pfa:read");
+    expect(scopes).not.toContain("pfa:write");
+  });
+
+  it("grants write to a write credential when the client requests it", async () => {
+    const client = await registerClient();
+    const pendingId = stagePending(
+      client.client_id,
+      "c",
+      "pfa:read pfa:write offline_access",
+    );
+    const { code } = finalizePendingAuthorization(pendingId, "pfa:write");
+    const tokens = await provider.exchangeAuthorizationCode(
+      client,
+      code,
+      "v",
+      "https://app.test/cb",
+    );
+    expect((tokens.scope ?? "").split(" ")).toContain("pfa:write");
+  });
+});
+
 describe("refresh grant", () => {
   it("rotates the refresh token and refuses reuse", async () => {
     const client = await registerClient();
-    const { code } = finalizePendingAuthorization(stagePending(client.client_id, "c"));
+    const { code } = finalizePendingAuthorization(
+      stagePending(client.client_id, "c"),
+      "pfa:write",
+    );
     const first = await provider.exchangeAuthorizationCode(
       client,
       code,

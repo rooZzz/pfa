@@ -11,7 +11,11 @@ import {
   verifyAuthentication,
   hasCredential,
 } from "./webauthn.js";
-import { isEnrollmentTokenValid, consumeEnrollmentToken } from "./enrollment.js";
+import {
+  isEnrollmentTokenValid,
+  consumeEnrollmentToken,
+  getEnrollmentTokenScope,
+} from "./enrollment.js";
 import { clientsStore } from "./clients_store.js";
 
 const BROWSER_BUNDLE = readFileSync(
@@ -150,8 +154,12 @@ export function authRoutes(): express.Router {
     async (req: Request, res: Response) => {
       try {
         const { req: reqId, challengeId, response } = req.body;
-        await verifyAuthentication(challengeId, response, reqId);
-        const fin = finalizePendingAuthorization(reqId);
+        const { credentialScope } = await verifyAuthentication(
+          challengeId,
+          response,
+          reqId,
+        );
+        const fin = finalizePendingAuthorization(reqId, credentialScope);
         const url = new URL(fin.redirectUri);
         url.searchParams.set("code", fin.code);
         if (fin.state) {
@@ -185,7 +193,6 @@ export function authRoutes(): express.Router {
         res.status(400).json({ error: "invalid_token" });
         return;
       }
-      consumeEnrollmentToken(token);
       const { options, challengeId } = await registrationOptions();
       res.json({ options, challengeId });
     },
@@ -195,9 +202,16 @@ export function authRoutes(): express.Router {
     "/webauthn/register/verify",
     express.json(),
     async (req: Request, res: Response) => {
+      const token = req.body?.token;
+      if (!isEnrollmentTokenValid(token)) {
+        res.status(400).json({ error: "invalid_token" });
+        return;
+      }
       try {
         const { challengeId, response, label } = req.body;
-        await verifyRegistration(challengeId, response, label);
+        const scope = getEnrollmentTokenScope(token);
+        await verifyRegistration(challengeId, response, label, scope);
+        consumeEnrollmentToken(token);
         res.json({ ok: true });
       } catch {
         res.status(400).json({ error: "registration_failed" });
