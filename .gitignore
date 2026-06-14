@@ -12,3 +12,4 @@ dist/
 bun.lockb
 yarn.lock
 server/tests/live/fixtures/
+design_handoff_mortgage_affordability/

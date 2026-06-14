@@ -90,6 +90,7 @@ export async function verifyRegistration(
   challengeId: string,
   response: RegistrationResponseJSON,
   label: string | undefined,
+  scope: string,
 ): Promise<void> {
   const { challenge: expectedChallenge } = takeChallenge(challengeId, "register");
   const verification = await verifyRegistrationResponse({
@@ -105,8 +106,8 @@ export async function verifyRegistration(
   getDb()
     .prepare(
       `INSERT OR REPLACE INTO webauthn_credential
-       (credential_id, public_key, counter, transports, label, created_at, last_used_at)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+       (credential_id, public_key, counter, transports, label, scope, created_at, last_used_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
     )
     .run(
       cred.id,
@@ -114,6 +115,7 @@ export async function verifyRegistration(
       cred.counter,
       cred.transports ? JSON.stringify(cred.transports) : null,
       label ?? null,
+      scope,
       nowSec(),
     );
 }
@@ -136,7 +138,7 @@ export async function verifyAuthentication(
   challengeId: string,
   response: AuthenticationResponseJSON,
   expectedReq: string,
-): Promise<void> {
+): Promise<{ credentialScope: string }> {
   const { challenge: expectedChallenge, req } = takeChallenge(
     challengeId,
     "authenticate",
@@ -146,7 +148,7 @@ export async function verifyAuthentication(
   }
   const row = getDb()
     .prepare("SELECT * FROM webauthn_credential WHERE credential_id = ?")
-    .get(response.id) as CredentialRow | undefined;
+    .get(response.id) as (CredentialRow & { scope: string }) | undefined;
   if (!row) {
     throw new Error("unknown credential");
   }
@@ -170,4 +172,5 @@ export async function verifyAuthentication(
       "UPDATE webauthn_credential SET counter = ?, last_used_at = ? WHERE credential_id = ?",
     )
     .run(verification.authenticationInfo.newCounter, nowSec(), row.credential_id);
+  return { credentialScope: row.scope ?? "pfa:write" };
 }

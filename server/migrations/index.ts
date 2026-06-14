@@ -13,6 +13,7 @@ import * as m0011 from "./0011_asset_quantity_scale_contract.js";
 import * as m0012 from "./0012_oauth_and_webauthn.js";
 import * as m0013 from "./0013_move_secrets.js";
 import * as m0014 from "./0014_webauthn_challenge_req.js";
+import * as m0015 from "./0015_credential_scopes.js";
 
 type Migration = {
   name: string;
@@ -35,6 +36,7 @@ const MIGRATIONS: Migration[] = [
   { name: "0012_oauth_and_webauthn", ...m0012 },
   { name: "0013_move_secrets", ...m0013 },
   { name: "0014_webauthn_challenge_req", ...m0014 },
+  { name: "0015_credential_scopes", ...m0015 },
 ];
 
 function ensureMigrationTable(db: Database.Database): void {

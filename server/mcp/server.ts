@@ -4,13 +4,25 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { PFA_ICONS } from "./icons.js";
 import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { widgetAssetOrigin, widgetHtml } from "./widget_assets.js";
 import { resources, tools, type ToolDescriptor } from "../tools/registry.js";
 
-function loggedHandler(tool: ToolDescriptor): ToolDescriptor["handler"] {
-  return async (input) => {
+function guardedHandler(tool: ToolDescriptor) {
+  return async (input: Record<string, unknown>, extra: { authInfo?: AuthInfo }) => {
+    if (
+      tool.requiresWrite &&
+      extra.authInfo &&
+      !extra.authInfo.scopes.includes("pfa:write")
+    ) {
+      return {
+        content: [
+          { type: "text" as const, text: "This operation requires write access." },
+        ],
+      };
+    }
     process.stderr.write(`pfa tool ${tool.name}\n`);
     return tool.handler(input);
   };
@@ -55,7 +67,7 @@ export function buildServer(): McpServer {
             ...(tool.widgetAccessible ? { "openai/widgetAccessible": true } : {}),
           },
         },
-        loggedHandler(tool),
+        guardedHandler(tool),
       );
     } else {
       server.registerTool(
@@ -65,7 +77,7 @@ export function buildServer(): McpServer {
           inputSchema: tool.inputSchema,
           ...(tool.annotations ? { annotations: tool.annotations } : {}),
         },
-        loggedHandler(tool),
+        guardedHandler(tool),
       );
     }
   }

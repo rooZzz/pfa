@@ -54,7 +54,23 @@ export function getPendingAuthorization(id: string): PendingRow | undefined {
     | undefined;
 }
 
-export function finalizePendingAuthorization(id: string): {
+function effectiveScope(credentialScope: string, requestedScope: string | null): string {
+  const granted = new Set(["pfa:read", "offline_access"]);
+  if (credentialScope === "pfa:write") {
+    granted.add("pfa:write");
+  }
+  if (!requestedScope) {
+    return [...granted].join(" ");
+  }
+  const requested = new Set(requestedScope.split(" ").filter(Boolean));
+  const result = [...granted].filter((s) => requested.has(s));
+  return result.length > 0 ? result.join(" ") : "pfa:read";
+}
+
+export function finalizePendingAuthorization(
+  id: string,
+  credentialScope: string,
+): {
   redirectUri: string;
   code: string;
   state?: string;
@@ -65,6 +81,7 @@ export function finalizePendingAuthorization(id: string): {
     throw new Error("authorization request not found or expired");
   }
   const code = randomToken();
+  const scope = effectiveScope(credentialScope, pending.scope);
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO oauth_authorization_code
@@ -77,7 +94,7 @@ export function finalizePendingAuthorization(id: string): {
       pending.redirect_uri,
       pending.code_challenge,
       pending.code_challenge_method,
-      pending.scope,
+      scope,
       pending.resource,
       authorizedSubject(),
       nowSec() + CODE_TTL,

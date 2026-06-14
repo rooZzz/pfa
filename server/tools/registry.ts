@@ -67,6 +67,7 @@ export type ToolDescriptor = {
   app?: AppMeta;
   widgetAccessible?: boolean;
   annotations?: ToolAnnotations;
+  requiresWrite?: boolean;
 };
 
 function defineTool<S extends z.ZodRawShape>(descriptor: {
@@ -77,6 +78,7 @@ function defineTool<S extends z.ZodRawShape>(descriptor: {
   app?: AppMeta;
   widgetAccessible?: boolean;
   annotations?: ToolAnnotations;
+  requiresWrite?: boolean;
 }): ToolDescriptor {
   return descriptor as unknown as ToolDescriptor;
 }
@@ -91,6 +93,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a bank or ISA account balance from a manually entered value. Creates the account if it does not exist. Writes an audit JSON file and persists the balance to SQLite.",
     inputSchema: recordAccountBalanceSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordAccountBalance(input)),
   }),
   defineTool({
@@ -98,6 +101,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record the user's standing employment profile: employer, annual base salary, and PAYE tax code, effective from a date. A correctable snapshot series. Makes salary a first-class fact for the tax-position engine rather than inferring it from payslips.",
     inputSchema: recordPersonProfileSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordPersonProfile(input)),
   }),
   defineTool({
@@ -105,6 +109,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record the current value of a pension pot. Creates the pension account if it does not exist. Writes an audit JSON file and persists the snapshot to SQLite.",
     inputSchema: recordPensionValueSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordPensionValue(input)),
   }),
   defineTool({
@@ -112,6 +117,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a mortgage. Returns a mortgage ID that must be supplied when recording balance snapshots with record_mortgage_balance.",
     inputSchema: recordMortgageSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordMortgage(input)),
   }),
   defineTool({
@@ -119,6 +125,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a mortgage balance snapshot. Requires a mortgage ID from record_mortgage. Writes an audit JSON file and persists the snapshot to SQLite.",
     inputSchema: recordMortgageBalanceSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordMortgageBalance(input)),
   }),
   defineTool({
@@ -126,6 +133,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record the quantity held for an asset (crypto, ETF, stock, property, other). Creates the asset if it does not exist. Quantity is inventory — for stock/ETF/crypto a fresh price is pulled automatically on capture (Yahoo/CoinGecko, best-effort); for manual-priced types record a price with record_asset_price. For stock, ETF, and crypto a ticker is required and is the asset's identity: pass the canonical symbol you are confident maps to the holding, or ask the user before calling.",
     inputSchema: recordAssetHoldingSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordAssetHolding(input, fetch)),
   }),
   defineTool({
@@ -133,6 +141,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a per-unit price observation for an asset. Used for valuation of holdings and unvested equity. Creates the asset if it does not exist. Call this whenever the price changes — holdings stay unchanged. For stock, ETF, and crypto a ticker is required so the price lands on the same canonical asset as its holding and grants. For ticker assets with an automated price source, prefer sync_prices over hand-entering prices.",
     inputSchema: recordAssetPriceSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordAssetPrice(input)),
   }),
   defineTool({
@@ -140,6 +149,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Refresh the price for a single asset according to its price_source. For automated sources (yahoo for stocks/ETFs, coingecko for crypto) it fetches and stores a fresh price tick and reports the source instrument name to confirm against the held security. For manual assets, returns instructions to call record_asset_price. To refresh every automated asset at once, use sync_prices.",
     inputSchema: refreshAssetPriceSchema,
+    requiresWrite: true,
     handler: async (input) => text(await refreshAssetPrice(input)),
   }),
   defineTool({
@@ -147,6 +157,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record an equity grant (RSU, EMI, unapproved option, or SAYE). Records only what was granted — units, strike, grant date — not when it vests. Returns a grant ID; record each vest date (including future maturity dates) separately with record_vesting_event using that ID. Always link the underlying share with underlying_asset_name and its ticker (the asset identity, shared across every grant over the same share); a fresh price for the underlying is pulled automatically on capture (best-effort). SAYE grants also require monthly_contribution_pence — the savings floor that an underwater SAYE returns at maturity.",
     inputSchema: recordEquityGrantSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordEquityGrant(input, fetch)),
   }),
   defineTool({
@@ -154,6 +165,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a single cash transaction manually. Positive amount = money in (credit), negative = money out (debit). Use for non-salary inflows and all outflows. Do not use for payslip salary — that is recorded via payslip ingestion.",
     inputSchema: recordTransactionSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordTransaction(input)),
   }),
   defineTool({
@@ -161,6 +173,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a vesting tranche for an existing equity grant — either a future scheduled vest or a past realised one. Requires the grant ID returned by record_equity_grant. For a future vest (e.g. an option maturity date), supply vest_date and units_vested and omit market_price_pence; it then appears as an upcoming vest valued from the latest asset price. For a past vest, also supply market_price_pence (the price at vest). Schedule each known future vest date this way — grants do not store their own maturity dates.",
     inputSchema: recordVestingEventSchema,
+    requiresWrite: true,
     handler: async (input) => text(await recordVestingEvent(input)),
   }),
   defineTool({
@@ -169,6 +182,7 @@ export const tools: ToolDescriptor[] = [
       "Correct a committed financial fact that was recorded WRONG, preserving history. Use only when the original value was never true (a typo, a misparse, a wrong date or account) and you can supply the right value. Do NOT use when the value simply changed over time (a new balance, a new statement, a pay rise, a new price) — that is a fresh observation, recorded with the relevant record_* tool, not a correction. The original row is kept for audit; a superseding row at the original effective date becomes the truth. Locate the exact row with query_natural_language and confirm it with the user before calling. Connector-sourced rows cannot be corrected. To fix an equity grant's terms, retract it with retract_record and record it again.",
     inputSchema: correctRecordSchema,
     annotations: { destructiveHint: true },
+    requiresWrite: true,
     handler: async (input) => text(await correctRecordTool(input)),
   }),
   defineTool({
@@ -177,6 +191,7 @@ export const tools: ToolDescriptor[] = [
       "Remove a committed financial fact that should not exist at all — there is no correct version of it (a duplicate upload, a transaction that never happened, a bogus snapshot). The row is tombstoned: it disappears from every total, dashboard, and query, but is retained on disk for audit. This is a logical removal, never a hard delete. Retracting an equity_grant also retracts its dependent vesting events. Locate the exact row with query_natural_language and confirm it with the user before calling. Connector-sourced rows cannot be retracted.",
     inputSchema: retractRecordSchema,
     annotations: { destructiveHint: true },
+    requiresWrite: true,
     handler: async (input) => text(await retractRecordTool(input)),
   }),
   defineTool({
@@ -213,6 +228,7 @@ export const tools: ToolDescriptor[] = [
     inputSchema: {},
     app: { title: "Upload", resourceUri: UPLOAD_URI },
     annotations: { readOnlyHint: true },
+    requiresWrite: true,
     handler: async () => text("Upload widget opened."),
   }),
   defineTool({
@@ -231,6 +247,7 @@ export const tools: ToolDescriptor[] = [
     inputSchema: {},
     app: { title: "Connectors", resourceUri: CONNECTORS_URI },
     annotations: { readOnlyHint: true },
+    requiresWrite: true,
     handler: async () => text("Connector setup opened."),
   }),
   defineTool({
@@ -240,6 +257,7 @@ export const tools: ToolDescriptor[] = [
     inputSchema: connectMonzoSchema,
     app: { title: "Connect Monzo", resourceUri: CONNECTORS_URI, visibility: ["app"] },
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async (input) => text(await connectMonzo(input)),
   }),
   defineTool({
@@ -248,6 +266,7 @@ export const tools: ToolDescriptor[] = [
       "Sync the latest Monzo transactions, balances, and pots into the canonical store. Idempotent — re-running does not duplicate transactions. Requires Monzo to be connected first.",
     inputSchema: {},
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async () => text(await syncMonzo()),
   }),
   defineTool({
@@ -267,6 +286,7 @@ export const tools: ToolDescriptor[] = [
     inputSchema: connectEthereumSchema,
     app: { title: "Connect Ethereum", resourceUri: CONNECTORS_URI, visibility: ["app"] },
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async (input) => text(await connectEthereum(input)),
   }),
   defineTool({
@@ -275,6 +295,7 @@ export const tools: ToolDescriptor[] = [
       "Refresh the connected Ethereum wallet: re-read on-chain balances for the tracked assets and write fresh holding snapshots. Idempotent. Requires Ethereum to be connected first. Prices refresh separately via sync_prices.",
     inputSchema: {},
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async () => text(await syncEthereum()),
   }),
   defineTool({
@@ -282,6 +303,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Fetch fresh prices for every asset with an automated price source (yahoo for stocks/ETFs, coingecko for crypto) and store a price tick for each. Appends to the price time series — net worth and unvested valuations pick up the latest. Reports each source instrument name so a mis-mapped ticker (a different company's price) is visible. Cadence is hourly at most. Assets without a ticker or with price_source 'manual' are untouched.",
     inputSchema: {},
+    requiresWrite: true,
     handler: async () => text(await syncPrices()),
   }),
   defineTool({
@@ -297,6 +319,7 @@ export const tools: ToolDescriptor[] = [
     },
     app: { title: "Ingest Document", visibility: ["app"] },
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async (input) => text(await ingestDocument(input)),
   }),
   defineTool({
@@ -310,6 +333,7 @@ export const tools: ToolDescriptor[] = [
     },
     app: { title: "Confirm Staged Rows", resourceUri: UPLOAD_URI, visibility: ["app"] },
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async (input) => text(await confirmStagedRows(input)),
   }),
   defineTool({
@@ -318,6 +342,7 @@ export const tools: ToolDescriptor[] = [
       "Development utility. Drops all tables and recreates them with the current schema. All data is permanently deleted. Does not reseed — call seed_data afterwards if you want representative data.",
     inputSchema: {},
     annotations: { destructiveHint: true },
+    requiresWrite: true,
     handler: async () => {
       resetDb();
       return text("Schema reset. All tables dropped and recreated. Database is empty.");
@@ -329,6 +354,7 @@ export const tools: ToolDescriptor[] = [
       "Development utility. Wipes the database and reseeds it with realistic, representative data including edge cases (overdrafts, stale snapshots, foreign-currency assets, RSU/EMI/SAYE/unapproved grants with mixed vesting states). Destroys existing data.",
     inputSchema: {},
     annotations: { destructiveHint: true },
+    requiresWrite: true,
     handler: async () => text(await seedData()),
   }),
   defineTool({
@@ -354,6 +380,7 @@ export const tools: ToolDescriptor[] = [
     description:
       "Record a financial goal after its needs_spec slots are filled. Supported goal types: emergency_fund (target_months), isa_max (tax_year), house_deposit (target_amount_pence, target_date). Stores the goal with its verbatim utterance and an audit document. Deterministic — no advice.",
     inputSchema: confirmGoalSchema,
+    requiresWrite: true,
     handler: async (input) => text(await confirmGoal(input)),
   }),
   defineTool({
@@ -362,6 +389,7 @@ export const tools: ToolDescriptor[] = [
       "Change a goal's targets or parameters (a new retirement income, a later FIRE age, a different deposit amount or date). Archives the existing goal and records a new version in its place, preserving history; parameters you do not pass carry over from the old goal. Supply the goal_id (from get_briefing or query_natural_language) and only the fields that change; pass goal_type only to reclassify. The goal id changes. Locate the exact goal and confirm it with the user before calling.",
     inputSchema: updateGoalSchema,
     annotations: { destructiveHint: true },
+    requiresWrite: true,
     handler: async (input) => text(await updateGoal(input)),
   }),
   defineTool({
@@ -370,6 +398,7 @@ export const tools: ToolDescriptor[] = [
       "Remove a goal the user no longer wants to track. The goal is archived: it drops out of every briefing but is retained on disk for history, never hard-deleted. Supply the goal_id (from get_briefing or query_natural_language) and confirm the exact goal with the user before calling.",
     inputSchema: archiveGoalSchema,
     annotations: { destructiveHint: true },
+    requiresWrite: true,
     handler: async (input) => text(await archiveGoal(input)),
   }),
   defineTool({
@@ -387,6 +416,7 @@ export const tools: ToolDescriptor[] = [
       "Refresh connector data that has aged past its freshness window: Monzo bank feed and Ethereum holdings (daily), automated asset prices (hourly). Fail-soft — a connector being down returns a 'failed' outcome rather than throwing. Returns a structured per-class outcome. The dashboards call this on load; call it directly only to force a freshness check.",
     inputSchema: refreshStaleDataSchema,
     widgetAccessible: true,
+    requiresWrite: true,
     handler: async (input) => text(await refreshStaleData(input)),
   }),
   defineTool({
