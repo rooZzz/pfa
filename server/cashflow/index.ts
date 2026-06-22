@@ -12,6 +12,12 @@ import type { CashflowResult, TrendPoint } from "./types.js";
 
 export type { CashflowResult } from "./types.js";
 
+function endOfMonth(date: string): string {
+  const [year, month] = date.split("-").map((part) => parseInt(part, 10));
+  const lastDay = new Date(Date.UTC(year!, month!, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
 export async function resolvePeriod(
   taxYear?: string,
   asOf?: string,
@@ -94,14 +100,17 @@ export async function getCashflow(params: {
   const today = new Date().toISOString().split("T")[0]!;
   const as_of = params.as_of ?? (today < period_end ? today : period_end);
 
+  const month_end = endOfMonth(as_of);
+  const payslip_as_of = month_end < period_end ? month_end : period_end;
+
   const [income, byCategory, incomeBySource, trend, pot_savings_net_pence, coverage] =
     await Promise.all([
-      queryIncome(period_start, as_of),
+      queryIncome(period_start, payslip_as_of),
       queryTransactionsByCategory(period_start, as_of),
       queryIncomeBySource(period_start, as_of),
       queryMonthlyTrend(period_start, as_of),
       queryPotSavingNetPence(period_start, as_of),
-      queryPayslipCoverage(as_of, period_start),
+      queryPayslipCoverage(payslip_as_of, period_start),
     ]);
 
   const transaction_inflow_total_pence = byCategory.reduce(

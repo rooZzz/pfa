@@ -193,6 +193,31 @@ describe("getCashflow", () => {
     expect(result.income.net_pence).toBe(451000);
   });
 
+  it("counts a payslip dated later in the current month, ahead of payday", async () => {
+    await insertIncome("2026-05-22", 600000, 450000, 120000, 20000, 10000);
+    await insertIncome("2026-06-23", 700000, 460000, 130000, 21000, 11000);
+
+    const result = await getCashflow({ as_of: "2026-06-22" });
+    expect(result.tax_year).toBe("2026/27");
+    expect(result.income.payslip_count).toBe(2);
+    expect(result.income.gross_pence).toBe(1300000);
+
+    const june = result.coverage.find((m) => m.year === 2026 && m.month === 6);
+    expect(june?.state).toBe("current");
+    expect(june?.series.find((s) => s.label === "Payslip")?.state).toBe("fresh");
+  });
+
+  it("excludes a payslip dated in a later month", async () => {
+    await insertIncome("2026-06-23", 700000, 460000, 130000, 21000, 11000);
+    await insertIncome("2026-07-25", 700000, 460000, 130000, 21000, 11000);
+
+    const result = await getCashflow({ as_of: "2026-06-22" });
+    expect(result.income.payslip_count).toBe(1);
+
+    const july = result.coverage.find((m) => m.year === 2026 && m.month === 7);
+    expect(july?.state).toBe("future");
+  });
+
   it("aggregates transactions by category", async () => {
     await recordTransaction({
       account_name: "Barclays",
